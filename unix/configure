@@ -557,9 +557,9 @@ fi
 TK_VERSION=8.4
 TK_MAJOR_VERSION=8
 TK_MINOR_VERSION=4
-TK_PATCH_LEVEL=".10"
+TK_PATCH_LEVEL=".11"
 VERSION=${TK_VERSION}
-LOCALES="cs de el en en_gb es fr it nl ru"
+LOCALES="cs de el en en_gb eo es es_es fr it nl pl ru"
 
 #--------------------------------------------------------------------
 # Find and load the tclConfig.sh file
@@ -2766,7 +2766,7 @@ echo "$ac_t""$tcl_cv_ld_single_module" 1>&6
 	    SHLIB_SUFFIX=".dylib"
 	    DL_OBJS="tclLoadDyld.o"
 	    DL_LIBS=""
-	    LDFLAGS="$LDFLAGS -prebind"
+	    LDFLAGS="$LDFLAGS -prebind -headerpad_max_install_names"
 	    echo $ac_n "checking if ld accepts -search_paths_first flag""... $ac_c" 1>&6
 echo "configure:2772: checking if ld accepts -search_paths_first flag" >&5
 if eval "test \"`echo '$''{'tcl_cv_ld_search_paths_first'+set}'`\" = set"; then
