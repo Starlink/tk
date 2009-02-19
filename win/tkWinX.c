@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinX.c,v 1.25.2.6 2005/02/28 22:10:26 hobbs Exp $
+ * RCS: @(#) $Id: tkWinX.c,v 1.25.2.9 2007/12/05 19:18:09 hobbs Exp $
  */
 
 #include "tkWinInt.h"
@@ -38,6 +38,15 @@
  */
 
 #include <imm.h>
+
+/*
+ * WM_UNICHAR is a message for Unicode input on all windows systems.
+ * Perhaps this definition should be moved in another file.
+ */
+#ifndef WM_UNICHAR
+#define WM_UNICHAR     0x0109
+#define UNICODE_NOCHAR 0xFFFF
+#endif
 
 static TkWinProcs asciiProcs = {
     0,
@@ -226,6 +235,9 @@ void
 TkWinXInit(hInstance)
     HINSTANCE hInstance;
 {
+    CHARSETINFO lpCs;
+    DWORD lpCP;
+
     if (childClassInitialized != 0) {
 	return;
     }
@@ -246,21 +258,7 @@ TkWinXInit(hInstance)
 	tkWinProcs = &asciiProcs;
     }
 
-    /*
-     * When threads are enabled, we cannot use CLASSDC because
-     * threads will then write into the same device context.
-     * 
-     * This is a hack; we should add a subsystem that manages
-     * device context on a per-thread basis.  See also tkWinWm.c,
-     * which also initializes a WNDCLASS structure.
-     */
-
-#ifdef TCL_THREADS
     childClass.style = CS_HREDRAW | CS_VREDRAW;
-#else
-    childClass.style = CS_HREDRAW | CS_VREDRAW | CS_CLASSDC;
-#endif
-
     childClass.cbClsExtra = 0;
     childClass.cbWndExtra = 0;
     childClass.hInstance = hInstance;
@@ -278,6 +276,17 @@ TkWinXInit(hInstance)
 
     if (!RegisterClass(&childClass)) {
 	panic("Unable to register TkChild class");
+    }
+
+    /*
+     * Initialize input language info
+     */
+
+    if (GetLocaleInfo(LANGIDFROMLCID(GetKeyboardLayout(0)),
+	       LOCALE_IDEFAULTANSICODEPAGE | LOCALE_RETURN_NUMBER,
+	       (LPTSTR) &lpCP, sizeof(lpCP)/sizeof(TCHAR))
+	    && TranslateCharsetInfo((DWORD *)lpCP, &lpCs, TCI_SRCCODEPAGE)) {
+	UpdateInputLanguage(lpCs.ciCharset);
     }
 
     /*
@@ -825,6 +834,22 @@ TkWinChildProc(hwnd, message, wParam, lParam)
 	    result =  TkWinEmbeddedEventProc(hwnd, message, wParam, lParam);
 	    break;
 
+	case WM_UNICHAR: 
+	    if (wParam == UNICODE_NOCHAR) {
+		/* If wParam is UNICODE_NOCHAR and the application processes
+		 * this message, then return TRUE. */
+		result = 1;
+	    } else {
+		/* If the event was translated, we must return 0 */
+		if (Tk_TranslateWinEvent(hwnd, message, wParam, lParam,
+			    &result)) {
+		    result = 0;
+		} else {
+		    result = 1;
+		}
+	    }
+	    break;
+
 	default:
 	    if (!Tk_TranslateWinEvent(hwnd, message, wParam, lParam,
 		    &result)) {
@@ -914,6 +939,7 @@ Tk_TranslateWinEvent(hwnd, message, wParam, lParam, resultPtr)
 	case WM_SETFOCUS:
 	case WM_KILLFOCUS:
 	case WM_DESTROYCLIPBOARD:
+	case WM_UNICHAR:
 	case WM_CHAR:
 	case WM_SYSKEYDOWN:
 	case WM_SYSKEYUP:
@@ -1061,6 +1087,7 @@ GenerateXEvent(hwnd, message, wParam, lParam)
 	     */
 
 	case WM_CHAR:
+	case WM_UNICHAR:
 	case WM_SYSKEYDOWN:
 	case WM_SYSKEYUP:
 	case WM_KEYDOWN:
@@ -1201,6 +1228,21 @@ GenerateXEvent(hwnd, message, wParam, lParam)
 		    Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
 		    event.type = KeyRelease;
 		    break;
+
+		case WM_UNICHAR: {
+		    char buffer[TCL_UTF_MAX+1];
+		    int i;
+		    event.type = KeyPress;
+		    event.xany.send_event = -3;
+		    event.xkey.keycode = wParam;
+		    event.xkey.nbytes = Tcl_UniCharToUtf(wParam, buffer);
+		    for (i=0; i<event.xkey.nbytes && i<TCL_UTF_MAX; ++i) {
+			event.xkey.trans_chars[i] = buffer[i];
+		    }
+		    Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
+		    event.type = KeyRelease;
+		    break;
+		}
 	    }
 	    break;
 	}
@@ -1355,13 +1397,12 @@ GetTranslatedKey(xkey)
  *
  * UpdateInputLanguage --
  *
- *	Gets called when a WM_INPUTLANGCHANGE message is received
- *      by the TK child window procedure. This message is sent
- *      by the Input Method Editor system when the user chooses
- *      a different input method. All subsequent WM_CHAR
- *      messages will contain characters in the new encoding. We record
- *      the new encoding so that TkpGetString() knows how to
- *      correctly translate the WM_CHAR into unicode.
+ *	Gets called when a WM_INPUTLANGCHANGE message is received by the Tk
+ *	child window procedure. This message is sent by the Input Method
+ *	Editor system when the user chooses a different input method. All
+ *	subsequent WM_CHAR messages will contain characters in the new
+ *	encoding. We record the new encoding so that TkpGetString() knows how
+ *	to correctly translate the WM_CHAR into unicode.
  *
  * Results:
  *	Records the new encoding in keyInputEncoding.

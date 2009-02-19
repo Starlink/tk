@@ -8,7 +8,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkStubInit.c,v 1.41.2.2 2004/09/23 00:56:14 mdejong Exp $
+ * RCS: @(#) $Id: tkStubInit.c,v 1.41.2.4 2005/11/27 02:44:25 das Exp $
  */
 
 #include "tkInt.h"
@@ -330,6 +330,9 @@ TkIntStubs tkIntStubs = {
     TkStylePkgFree, /* 147 */
     TkToplevelWindowForCommand, /* 148 */
     TkGetOptionSpec, /* 149 */
+    NULL, /* 150 */
+    NULL, /* 151 */
+    TkpDrawFrame, /* 152 */
 };
 
 TkIntPlatStubs tkIntPlatStubs = {
@@ -812,6 +815,7 @@ TkIntXlibStubs tkIntXlibStubs = {
     XQueryColor, /* 88 */
     XQueryColors, /* 89 */
     XQueryTree, /* 90 */
+    XSync, /* 91 */
 #endif /* MAC_OSX_TK */
 };
 

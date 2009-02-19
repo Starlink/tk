@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkListbox.c,v 1.29.2.2 2004/06/08 20:11:18 dgp Exp $
+ * RCS: @(#) $Id: tkListbox.c,v 1.29.2.5 2007/04/29 02:24:02 das Exp $
  */
 
 #include "tkPort.h"
@@ -278,7 +278,7 @@ static Tk_OptionSpec optionSpecs[] = {
 	 Tk_Offset(Listbox, selBorderWidth), 0, 0, 0},
     {TK_OPTION_COLOR, "-selectforeground", "selectForeground", "Background",
 	 DEF_LISTBOX_SELECT_FG_COLOR, -1, Tk_Offset(Listbox, selFgColorPtr),
-	 0, (ClientData) DEF_LISTBOX_SELECT_FG_MONO, 0},
+	 TK_CONFIG_NULL_OK, (ClientData) DEF_LISTBOX_SELECT_FG_MONO, 0},
     {TK_OPTION_STRING, "-selectmode", "selectMode", "SelectMode",
 	 DEF_LISTBOX_SELECT_MODE, -1, Tk_Offset(Listbox, selectMode),
 	 TK_OPTION_NULL_OK, 0, 0},
@@ -388,7 +388,7 @@ static int		ConfigureListbox _ANSI_ARGS_((Tcl_Interp *interp,
 			    int flags));
 static int		ConfigureListboxItem _ANSI_ARGS_ ((Tcl_Interp *interp,
 			    Listbox *listPtr, ItemAttr *attrs, int objc,
-			    Tcl_Obj *CONST objv[]));
+			    Tcl_Obj *CONST objv[], int index));
 static int		ListboxDeleteSubCmd _ANSI_ARGS_((Listbox *listPtr,
 			    int first, int last));
 static void		DestroyListbox _ANSI_ARGS_((char *memPtr));
@@ -939,7 +939,7 @@ ListboxWidgetObjCmd(clientData, interp, objc, objv)
 		}
 	    } else {
 		result = ConfigureListboxItem(interp, listPtr, attrPtr,
-			objc-3, objv+3);
+			objc-3, objv+3, index);
 	    }
 	    break;
 	}
@@ -1694,13 +1694,14 @@ ConfigureListbox(interp, listPtr, objc, objv, flags)
  */
 
 static int
-ConfigureListboxItem(interp, listPtr, attrs, objc, objv)
+ConfigureListboxItem(interp, listPtr, attrs, objc, objv, index)
     Tcl_Interp *interp;		/* Used for error reporting. */
     register Listbox *listPtr;	/* Information about widget;  may or may
 				 * not already have values for some fields. */
     ItemAttr *attrs;		/* Information about the item to configure */
     int objc;			/* Number of valid entries in argv. */
     Tcl_Obj *CONST objv[];	/* Arguments. */
+    int index;			/* Index of the listbox item being configure */
 {
     Tk_SavedOptions savedOptions;
 
@@ -1711,7 +1712,11 @@ ConfigureListboxItem(interp, listPtr, attrs, objc, objv)
 	return TCL_ERROR;
     }
     Tk_FreeSavedOptions(&savedOptions);
-    ListboxWorldChanged((ClientData) listPtr);
+    /*
+     * Redraw this index - ListboxWorldChanged would need to be called
+     * if item attributes were checked in the "world".
+     */
+    EventuallyRedrawRange(listPtr, index, index);
     return TCL_OK;
 }
 
@@ -1774,7 +1779,9 @@ ListboxWorldChanged(instanceData)
     }
     listPtr->textGC = gc;
 
-    gcValues.foreground = listPtr->selFgColorPtr->pixel;
+    if (listPtr->selFgColorPtr != NULL) {
+	gcValues.foreground = listPtr->selFgColorPtr->pixel;
+    }
     gcValues.font = Tk_FontId(listPtr->tkfont);
     mask = GCForeground | GCFont;
     gc = Tk_GetGC(listPtr->tkwin, mask, &gcValues);
@@ -1860,6 +1867,7 @@ DisplayListbox(clientData)
     listPtr->flags &= ~(REDRAW_PENDING|UPDATE_V_SCROLLBAR|UPDATE_H_SCROLLBAR);
     Tcl_Release((ClientData) listPtr);
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Redrawing is done in a temporary pixmap that is allocated
      * here and freed at the end of the procedure.  All drawing is
@@ -1870,6 +1878,9 @@ DisplayListbox(clientData)
 
     pixmap = Tk_GetPixmap(listPtr->display, Tk_WindowId(tkwin),
 	    Tk_Width(tkwin), Tk_Height(tkwin), Tk_Depth(tkwin));
+#else
+    pixmap = Tk_WindowId(tkwin);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     Tk_Fill3DRectangle(tkwin, pixmap, listPtr->normalBorder, 0, 0,
 	    Tk_Width(tkwin), Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
 
@@ -1917,7 +1928,11 @@ DisplayListbox(clientData)
 		if (entry != NULL) {
 		    attrs = (ItemAttr *)Tcl_GetHashValue(entry);
 		    /* Default GC has the values from the widget at large */
-		    gcValues.foreground = listPtr->selFgColorPtr->pixel;
+		    if (listPtr->selFgColorPtr) {
+			gcValues.foreground = listPtr->selFgColorPtr->pixel;
+		    } else {
+			gcValues.foreground = listPtr->fgColorPtr->pixel;
+		    }
 		    gcValues.font = Tk_FontId(listPtr->tkfont);
 		    gcValues.graphics_exposures = False;
 		    mask = GCForeground | GCFont | GCGraphicsExposures;
@@ -2117,10 +2132,12 @@ DisplayListbox(clientData)
 	            listPtr->highlightWidth, pixmap);
 	}
     }
+#ifndef TK_NO_DOUBLE_BUFFERING
     XCopyArea(listPtr->display, pixmap, Tk_WindowId(tkwin),
 	    listPtr->textGC, 0, 0, (unsigned) Tk_Width(tkwin),
 	    (unsigned) Tk_Height(tkwin), 0, 0);
     Tk_FreePixmap(listPtr->display, pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 }
 
 /*
@@ -2284,25 +2301,24 @@ ListboxInsertSubCmd(listPtr, index, objc, objv)
 	return result;
     }
 
+    /*
+     * Replace the current object and set attached listvar, if any.
+     * This may error if listvar points to a var in a deleted namespace, but
+     * we ignore those errors.  If the namespace is recreated, it will
+     * auto-sync with the current value. [Bug 1424513]
+     */
+
     Tcl_IncrRefCount(newListObj);
-    /* Clean up the old reference */
     Tcl_DecrRefCount(listPtr->listObj);
-
-    /* Set the internal pointer to the new obj */
     listPtr->listObj = newListObj;
-
-    /* If there is a listvar, make sure it points at the new object */
     if (listPtr->listVarName != NULL) {
-	if (Tcl_SetVar2Ex(listPtr->interp, listPtr->listVarName,
-		(char *)NULL, newListObj, TCL_GLOBAL_ONLY) == NULL) {
-	    Tcl_DecrRefCount(newListObj);
-	    return TCL_ERROR;
-	}
+	Tcl_SetVar2Ex(listPtr->interp, listPtr->listVarName,
+		(char *) NULL, listPtr->listObj, TCL_GLOBAL_ONLY);
     }
 
     /* Get the new list length */
     Tcl_ListObjLength(listPtr->interp, listPtr->listObj, &listPtr->nElements);
-    
+
     /*
      * Update the "special" indices (anchor, topIndex, active) to account
      * for the renumbering that just occurred.  Then arrange for the new
@@ -2433,24 +2449,23 @@ ListboxDeleteSubCmd(listPtr, first, last)
 	return result;
     }
 
-    Tcl_IncrRefCount(newListObj);
-    /* Clean up the old reference */
-    Tcl_DecrRefCount(listPtr->listObj);
+    /*
+     * Replace the current object and set attached listvar, if any.
+     * This may error if listvar points to a var in a deleted namespace, but
+     * we ignore those errors.  If the namespace is recreated, it will
+     * auto-sync with the current value. [Bug 1424513]
+     */
 
-    /* Set the internal pointer to the new obj */
+    Tcl_IncrRefCount(newListObj);
+    Tcl_DecrRefCount(listPtr->listObj);
     listPtr->listObj = newListObj;
+    if (listPtr->listVarName != NULL) {
+	Tcl_SetVar2Ex(listPtr->interp, listPtr->listVarName,
+		(char *) NULL, listPtr->listObj, TCL_GLOBAL_ONLY);
+    }
 
     /* Get the new list length */
     Tcl_ListObjLength(listPtr->interp, listPtr->listObj, &listPtr->nElements);
-    
-    /* If there is a listvar, make sure it points at the new object */
-    if (listPtr->listVarName != NULL) {
-	if (Tcl_SetVar2Ex(listPtr->interp, listPtr->listVarName,
-		(char *)NULL, newListObj, TCL_GLOBAL_ONLY) == NULL) {
-	    Tcl_DecrRefCount(newListObj);
-	    return TCL_ERROR;
-	}
-    }
 
     /*
      * Update the selection and viewing information to reflect the change

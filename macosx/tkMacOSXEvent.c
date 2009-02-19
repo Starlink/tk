@@ -1,284 +1,272 @@
-/* 
+/*
  * tkMacOSXEvent.c --
  *
- * This file contains the basic Mac OS X Event handling routines.
+ *	This file contains the basic Mac OS X Event handling routines.
  *
  * Copyright (c) 1995-1997 Sun Microsystems, Inc.
  * Copyright 2001, Apple Computer, Inc.
+ * Copyright (c) 2005-2007 Daniel A. Steffen <das@users.sourceforge.net>
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXEvent.c,v 1.3.2.1 2004/02/16 00:42:34 wolfsuit Exp $
+ * RCS: @(#) $Id: tkMacOSXEvent.c,v 1.3.2.16 2007/11/09 06:26:55 das Exp $
  */
 
-#include <stdio.h>
-
-#include "tkMacOSXInt.h"
+#include "tkMacOSXPrivate.h"
 #include "tkMacOSXEvent.h"
 #include "tkMacOSXDebug.h"
 
-/*
- * Enable this define to get debug printing for events not handled.
- */
-
- /*#define TK_MAC_DEBUG 1 */
-
-/*   
- * Forward declarations of procedures used in this file.
- */ 
-
-static int TkMacOSXProcessAppleEvent(
-        TkMacOSXEvent * eventPtr, MacEventStatus * statusPtr);
-static int TkMacOSXProcessEvent(
-        TkMacOSXEvent * eventPtr, MacEventStatus * statusPtr);
-
-static int ReceiveAndProcessEvent (void);
-
-/*   
- * Global data used in this file.
- */ 
-
-static EventTargetRef targetRef;
-
 
 /*
  *----------------------------------------------------------------------
  *
- * tkMacOSXFlushWindows --
+ * TkMacOSXFlushWindows --
  *
- *      This routine flushes all the Carbon windows of the application.  It
- *      is called by the setup procedure for the Tcl/Carbon event source.
+ *	This routine flushes all the Carbon windows of the application. It
+ *	is called by XSync().
  *
  * Results:
- *      None.
+ *	None.
  *
  * Side effects:
- *      Flushes all Carbon windows
+ *	Flushes all Carbon windows
  *
  *----------------------------------------------------------------------
  */
 
-void
-tkMacOSXFlushWindows ()
+MODULE_SCOPE void
+TkMacOSXFlushWindows(void)
 {
     WindowRef wRef = GetWindowList();
-    
+
     while (wRef) {
-        CGrafPtr portPtr = GetWindowPort(wRef);
-        if (QDIsPortBuffered(portPtr)) {
-            QDFlushPortBuffer(portPtr, NULL);
-        }
-        wRef = GetNextWindow(wRef);
+	TK_IF_MAC_OS_X_API (3, HIWindowFlush,
+	    ChkErr(HIWindowFlush, wRef);
+	) TK_ELSE_MAC_OS_X (3,
+	    CGrafPtr portPtr = GetWindowPort(wRef);
+
+	    if (QDIsPortBuffered(portPtr)) {
+		QDFlushPortBuffer(portPtr, NULL);
+	    }
+	) TK_ENDIF
+	wRef = GetNextWindow(wRef);
     }
 }
-
-
-
-int
-XSync (Display *display, Bool flag)
-{
-    tkMacOSXFlushWindows();
-    display->request++;
-    return 0;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkMacOSXCountAndProcessMacEvents --
- *
- *      This routine receives any Carbon events that are in the queue and
- *      converts them to Tk events.  It is called by the event set-up and
- *      check routines
- *
- * Results:
- *      The number of events in the queue.
- *
- * Side effects:
- *      Tells the Window Manager to deliver events to the event queue of the
- *      current thread.  Receives any Carbon events on the queue and converts
- *      them to Tk events.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TkMacOSXCountAndProcessMacEvents()
-{
-    EventQueueRef qPtr;
-    int           eventCount;
-    qPtr = GetMainEventQueue();
-    eventCount = GetNumEventsInQueue(qPtr);
-    if (eventCount) {
-        int n, err;
-        for (n = 0, err = 0;n<eventCount && !err;n++) {
-            err = ReceiveAndProcessEvent();
-        }
-    }
-    return eventCount;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkMacOSXProcessAppleEvent --
- *
- *      This processes Apple events
- *
- * Results:
- *      0 on success
- *      -1 on failure
- *
- * Side effects:
- *      Calls the Tk high-level event handler
- *
- *----------------------------------------------------------------------
- */
-
-static int
-TkMacOSXProcessAppleEvent(TkMacOSXEvent * eventPtr, MacEventStatus * statusPtr)
-{
-    int  err;
-    EventRecord eventRecord;
-    if (ConvertEventRefToEventRecord(eventPtr->eventRef,
-        &eventRecord )) {
-        err = TkMacOSXDoHLEvent(&eventRecord);
-        if (err != noErr) {
-            char buf1 [ 256 ];
-            char buf2 [ 256 ];
-            fprintf(stderr,
-                "TkMacOSXDoHLEvent failed : %s,%s,%d\n",
-                CarbonEventToAscii(eventPtr->eventRef, buf1),
-                ClassicEventToAscii(&eventRecord,buf2), err);
-            statusPtr->err = 1;
-        }
-    } else {
-        statusPtr->err = 1;
-        fprintf(stderr,"ConvertEventRefToEventRecord failed\n");
-    }
-    return 0;
-}
-
 
-/*      
+/*
  *----------------------------------------------------------------------
- *   
+ *
  * TkMacOSXProcessEvent --
- *   
- *      This dispatches a filtered Carbon event to the appropriate handler
  *
- *      Note on MacEventStatus.stopProcessing: Please be conservative in the
- *      individual handlers and don't assume the event is fully handled
- *      unless you *really* need to ensure that other handlers don't see the
- *      event anymore.  Some OS manager or library might be interested in
- *      events even after they are already handled on the Tk level.
+ *	This dispatches a filtered Carbon event to the appropriate handler
  *
- * Results: 
- *      0 on success
- *      -1 on failure
+ *	Note on MacEventStatus.stopProcessing: Please be conservative in the
+ *	individual handlers and don't assume the event is fully handled
+ *	unless you *really* need to ensure that other handlers don't see the
+ *	event anymore. Some OS manager or library might be interested in
+ *	events even after they are already handled on the Tk level.
+ *
+ * Results:
+ *	0 on success
+ *	-1 on failure
  *
  * Side effects:
- *      Converts a Carbon event to a Tk event
- *   
+ *	Converts a Carbon event to a Tk event
+ *
  *----------------------------------------------------------------------
  */
 
-static int  
-TkMacOSXProcessEvent(TkMacOSXEvent * eventPtr, MacEventStatus * statusPtr)
+MODULE_SCOPE int
+TkMacOSXProcessEvent(
+    TkMacOSXEvent *eventPtr,
+    MacEventStatus *statusPtr)
 {
     switch (eventPtr->eClass) {
-        case kEventClassMouse:
-            TkMacOSXProcessMouseEvent(eventPtr, statusPtr);
-            break;
-        case kEventClassWindow:
-            TkMacOSXProcessWindowEvent(eventPtr, statusPtr);
-            break;  
-        case kEventClassKeyboard:
-            TkMacOSXProcessKeyboardEvent(eventPtr, statusPtr);
-            break;
-        case kEventClassApplication:
-            TkMacOSXProcessApplicationEvent(eventPtr, statusPtr);
-            break;
-        case kEventClassAppleEvent:
-            TkMacOSXProcessAppleEvent(eventPtr, statusPtr);
-            break;  
-        case kEventClassWish: 
-            statusPtr->stopProcessing = 1;
-            break;  
-        default:
-#ifdef TK_MAC_DEBUG
-            if (0)
-            {
-                char buf [ 256 ];
-                fprintf(stderr,
-                    "Unrecognised event : %s\n",
-                    CarbonEventToAscii(eventPtr->eventRef, buf));
-            }
-#endif
-            break;
-    }   
+	case kEventClassMouse:
+	    TkMacOSXProcessMouseEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassWindow:
+	    TkMacOSXProcessWindowEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassKeyboard:
+	    TkMacOSXProcessKeyboardEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassApplication:
+	    TkMacOSXProcessApplicationEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassAppearance:
+	    TkMacOSXProcessAppearanceEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassMenu:
+	    TkMacOSXProcessMenuEvent(eventPtr, statusPtr);
+	    break;
+	case kEventClassCommand:
+	    TkMacOSXProcessCommandEvent(eventPtr, statusPtr);
+	    break;
+	default: {
+	    TkMacOSXDbgMsg("Unrecognised event: %s",
+		    TkMacOSXCarbonEventToAscii(eventPtr->eventRef));
+	    break;
+	}
+    }
     return 0;
-}   
-
+}
 
 /*
  *----------------------------------------------------------------------
  *
- * ReceiveAndProcessEvent --
+ * TkMacOSXProcessMenuEvent --
  *
- *      This receives a carbon event and converts it to a Tk event
+ *	This routine processes the event in eventPtr, and
+ *	generates the appropriate Tk events from it.
  *
  * Results:
- *      0 on success
- *      Mac OS error number on failure
+ *	True if event(s) are generated - false otherwise.
  *
  * Side effects:
- *      This receives the next Carbon event and converts it to the
- *      appropriate Tk event
+ *	Additional events may be place on the Tk event queue.
  *
  *----------------------------------------------------------------------
  */
 
-static int
-ReceiveAndProcessEvent()
+MODULE_SCOPE int
+TkMacOSXProcessMenuEvent(
+    TkMacOSXEvent *eventPtr,
+    MacEventStatus *statusPtr)
 {
-    TkMacOSXEvent       macEvent;
-    MacEventStatus   eventStatus;
-    int              err;
-    char             buf [ 256 ];
+    int menuContext;
+    OSStatus err;
 
-    /*
-     * This is a poll, since we have already counted the events coming
-     * into this routine, and are guaranteed to have one waiting.
-     */
-     
-    err = ReceiveNextEvent(0, NULL, kEventDurationNoWait, 
-            true, &macEvent.eventRef);
-    if (err != noErr) {
-        return err;
-    } else {
-        macEvent.eClass = GetEventClass(macEvent.eventRef);
-        macEvent.eKind = GetEventKind(macEvent.eventRef);
-        bzero(&eventStatus, sizeof(eventStatus));
-        TkMacOSXProcessEvent(&macEvent,&eventStatus);
-        if (!eventStatus.stopProcessing) {
-            if (!targetRef) {
-                targetRef = GetEventDispatcherTarget();
-            }
-            
-            err = SendEventToEventTarget(macEvent.eventRef,targetRef);
-            if (err != noErr
-#if !TK_MAC_DEBUG
-                    && err != eventNotHandledErr
-#endif
-                ) {
-                fprintf(stderr,
-                        "RCNE SendEventToEventTarget (%s) failed, %d\n",
-                        CarbonEventToAscii(macEvent.eventRef, buf),err);
-            }
-         }
-         ReleaseEvent(macEvent.eventRef);
-         return 0;
-     }
+    switch (eventPtr->eKind) {
+	case kEventMenuBeginTracking:
+	case kEventMenuEndTracking:
+	case kEventMenuOpening:
+	case kEventMenuTargetItem:
+	    break;
+	default:
+	    return 0;
+	    break;
+    }
+    err = ChkErr(GetEventParameter, eventPtr->eventRef, kEventParamMenuContext,
+	    typeUInt32, NULL, sizeof(menuContext), NULL, &menuContext);
+    if (err == noErr && ((menuContext & kMenuContextMenuBarTracking) ||
+	    (menuContext & kMenuContextPopUpTracking))) {
+	switch (eventPtr->eKind) {
+	    MenuRef menu;
+
+	    case kEventMenuBeginTracking:
+		TkMacOSXClearMenubarActive();
+
+		/*
+		 * Handle -postcommand
+		 */
+
+		TkMacOSXPreprocessMenu();
+		TkMacOSXTrackingLoop(1);
+		break;
+	    case kEventMenuEndTracking:
+		TkMacOSXTrackingLoop(0);
+		break;
+	    case kEventMenuOpening:
+		err = ChkErr(GetEventParameter, eventPtr->eventRef,
+			kEventParamDirectObject, typeMenuRef, NULL,
+			sizeof(menu), NULL, &menu);
+		if (err == noErr) {
+		    TkMacOSXClearActiveMenu(menu);
+		    return TkMacOSXGenerateParentMenuSelectEvent(menu);
+		}
+		break;
+	    case kEventMenuTargetItem:
+		err = ChkErr(GetEventParameter, eventPtr->eventRef,
+			kEventParamDirectObject, typeMenuRef, NULL,
+			sizeof(menu), NULL, &menu);
+		if (err == noErr) {
+		    MenuItemIndex index;
+
+		    err = ChkErr(GetEventParameter, eventPtr->eventRef,
+			    kEventParamMenuItemIndex, typeMenuItemIndex, NULL,
+			    sizeof(index), NULL, &index);
+		    if (err == noErr) {
+			return TkMacOSXGenerateMenuSelectEvent(menu, index);
+		    }
+		}
+		break;
+	}
+    }
+    return 0;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXProcessCommandEvent --
+ *
+ *	This routine processes the event in eventPtr, and
+ *	generates the appropriate Tk events from it.
+ *
+ * Results:
+ *	True if event(s) are generated - false otherwise.
+ *
+ * Side effects:
+ *	Additional events may be place on the Tk event queue.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE int
+TkMacOSXProcessCommandEvent(
+    TkMacOSXEvent *eventPtr,
+    MacEventStatus * statusPtr)
+{
+    HICommand command;
+    int menuContext;
+    OSStatus err;
+
+    switch (eventPtr->eKind) {
+	case kEventCommandProcess:
+	case kEventCommandUpdateStatus:
+	    break;
+	default:
+	    return 0;
+	    break;
+    }
+    err = ChkErr(GetEventParameter, eventPtr->eventRef,
+	    kEventParamDirectObject, typeHICommand, NULL, sizeof(command),
+	    NULL, &command);
+    if (err == noErr && (command.attributes & kHICommandFromMenu)) {
+	if (eventPtr->eKind == kEventCommandProcess) {
+	    err = ChkErr(GetEventParameter, eventPtr->eventRef,
+		    kEventParamMenuContext, typeUInt32, NULL,
+		    sizeof(menuContext), NULL, &menuContext);
+	    if (err == noErr && (menuContext & kMenuContextMenuBar) &&
+		    (menuContext & kMenuContextMenuBarTracking)) {
+		TkMacOSXHandleMenuSelect(GetMenuID(command.menu.menuRef),
+			command.menu.menuItemIndex,
+			(GetCurrentEventKeyModifiers() & optionKey) != 0);
+		return 1;
+	    }
+	} else {
+	    Tcl_CmdInfo dummy;
+	    if (command.commandID == kHICommandPreferences && eventPtr->interp) {
+		if (Tcl_GetCommandInfo(eventPtr->interp,
+			"::tk::mac::ShowPreferences", &dummy)) {
+		    if (!IsMenuItemEnabled(command.menu.menuRef,
+			    command.menu.menuItemIndex)) {
+			EnableMenuItem(command.menu.menuRef,
+				command.menu.menuItemIndex);
+		    }
+		} else {
+		    if (IsMenuItemEnabled(command.menu.menuRef,
+			    command.menu.menuItemIndex)) {
+			DisableMenuItem(command.menu.menuRef,
+				command.menu.menuItemIndex);
+		    }
+		}
+		statusPtr->stopProcessing = 1;
+		return 1;
+	    }
+	}
+    }
+    return 0;
 }

@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkTextDisp.c,v 1.14 2002/11/22 23:25:19 hobbs Exp $
+ * RCS: @(#) $Id: tkTextDisp.c,v 1.14.2.5 2007/04/29 02:24:02 das Exp $
  */
 
 #include "tkPort.h"
@@ -21,6 +21,12 @@
 #ifdef __WIN32__
 #include "tkWinInt.h"
 #endif
+
+#ifdef TK_NO_DOUBLE_BUFFERING
+#ifdef MAC_OSX_TK
+#include "tkMacOSXInt.h"
+#endif
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
 /*
  * The following structure describes how to display a range of characters.
@@ -546,15 +552,21 @@ GetStyle(textPtr, indexPtr)
 	tagPtr = tagPtrs[i];
 
 	/*
-	 * On Windows and Mac, we need to skip the selection tag if
-	 * we don't have focus.
+	 * Skip the selection tag if we don't have focus,
+	 * unless we always want to show the selection.
 	 */
 
-#ifndef ALWAYS_SHOW_SELECTION
-	if ((tagPtr == textPtr->selTagPtr) && !(textPtr->flags & GOT_FOCUS)) {
+	if (
+#ifndef MAC_OSX_TK
+		!TkpAlwaysShowSelection(textPtr->tkwin)
+#else
+		/* Don't show inactive selection in disabled widgets. */
+		textPtr->state == TK_STATE_DISABLED
+#endif
+		&& (tagPtr == textPtr->selTagPtr)
+		&& !(textPtr->flags & GOT_FOCUS)) {
 	    continue;
 	}
-#endif
 
 	if ((tagPtr->border != NULL) && (tagPtr->priority > borderPrio)) {
 	    styleValues.border = tagPtr->border;
@@ -1680,16 +1692,32 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
     TextDInfo *dInfoPtr = textPtr->dInfoPtr;
     Display *display;
     int height, x;
+#ifndef TK_NO_DOUBLE_BUFFERING
+    const int y = 0;
+#else
+    const int y = dlPtr->y;
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     if (dlPtr->chunkPtr == NULL) return;
+
+    display = Tk_Display(textPtr->tkwin);
+
+    height = dlPtr->height;
+    if ((height + dlPtr->y) > dInfoPtr->maxY) {
+	height = dInfoPtr->maxY - dlPtr->y;
+    }
+
+#ifdef TK_NO_DOUBLE_BUFFERING
+    TkpClipDrawableToRect(display, pixmap, dInfoPtr->x, y,
+	    dInfoPtr->maxX - dInfoPtr->x, height);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     /*
      * First, clear the area of the line to the background color for the
      * text widget.
      */
 
-    display = Tk_Display(textPtr->tkwin);
-    Tk_Fill3DRectangle(textPtr->tkwin, pixmap, textPtr->border, 0, 0,
+    Tk_Fill3DRectangle(textPtr->tkwin, pixmap, textPtr->border, 0, y,
 	    Tk_Width(textPtr->tkwin), dlPtr->height, 0, TK_RELIEF_FLAT);
 
     /*
@@ -1711,7 +1739,7 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
 		chunkPtr = chunkPtr->nextPtr) {
 	    x = chunkPtr->x + dInfoPtr->x - dInfoPtr->curPixelOffset;
 	    if (chunkPtr->displayProc == TkTextInsertDisplayProc) {
-		(*chunkPtr->displayProc)(chunkPtr, x, dlPtr->spaceAbove,
+		(*chunkPtr->displayProc)(chunkPtr, x, y + dlPtr->spaceAbove,
 			dlPtr->height - dlPtr->spaceAbove - dlPtr->spaceBelow,
 			dlPtr->baseline - dlPtr->spaceAbove, display, pixmap,
 			dlPtr->y + dlPtr->spaceAbove);
@@ -1751,7 +1779,7 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
 
 	    if (chunkPtr->displayProc != NULL)
 	    (*chunkPtr->displayProc)(chunkPtr, -chunkPtr->width,
-		    dlPtr->spaceAbove,
+		    y + dlPtr->spaceAbove,
 		    dlPtr->height - dlPtr->spaceAbove - dlPtr->spaceBelow,
 		    dlPtr->baseline - dlPtr->spaceAbove, display, pixmap,
 		    dlPtr->y + dlPtr->spaceAbove);
@@ -1759,7 +1787,7 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
 	    /* don't call if elide.  This tax ok since not very many visible DLine's in
 		  an area, but potentially many elide ones */
 	    if (chunkPtr->displayProc != NULL)
-	    (*chunkPtr->displayProc)(chunkPtr, x, dlPtr->spaceAbove,
+	    (*chunkPtr->displayProc)(chunkPtr, x, y + dlPtr->spaceAbove,
 		    dlPtr->height - dlPtr->spaceAbove - dlPtr->spaceBelow,
 		    dlPtr->baseline - dlPtr->spaceAbove, display, pixmap,
 		    dlPtr->y + dlPtr->spaceAbove);
@@ -1769,6 +1797,7 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
 	}
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Copy the pixmap onto the screen.  If this is the last line on
      * the screen then copy a piece of the line, so that it doesn't
@@ -1778,13 +1807,12 @@ DisplayDLine(textPtr, dlPtr, prevPtr, pixmap)
      * to get as much of the cursor as possible.
      */
 
-    height = dlPtr->height;
-    if ((height + dlPtr->y) > dInfoPtr->maxY) {
-	height = dInfoPtr->maxY - dlPtr->y;
-    }
     XCopyArea(display, pixmap, Tk_WindowId(textPtr->tkwin), dInfoPtr->copyGC,
-	    dInfoPtr->x, 0, (unsigned) (dInfoPtr->maxX - dInfoPtr->x),
+	    dInfoPtr->x, y, (unsigned) (dInfoPtr->maxX - dInfoPtr->x),
 	    (unsigned) height, dInfoPtr->x, dlPtr->y);
+#else
+    TkpClipDrawableToRect(display, pixmap, 0, 0, -1, -1);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     linesRedrawn++;
 }
 
@@ -1846,7 +1874,11 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
     int minX, maxX, xOffset;
     StyleValues *sValuePtr;
     Display *display;
-
+#ifndef TK_NO_DOUBLE_BUFFERING
+    const int y = 0;
+#else
+    const int y = dlPtr->y;
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     /*
      * Pass 1: scan through dlPtr from left to right.  For each range of
@@ -1910,15 +1942,15 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 	    }
 
 	    XFillRectangle(display, pixmap, chunkPtr->stylePtr->bgGC,
-		    leftX + xOffset, 0, (unsigned int) (rightX - leftX),
+		    leftX + xOffset, y, (unsigned int) (rightX - leftX),
 		    (unsigned int) dlPtr->height);
 	    if (sValuePtr->relief != TK_RELIEF_FLAT) {
 		Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-			leftX + xOffset, 0, sValuePtr->borderWidth,
+			leftX + xOffset, y, sValuePtr->borderWidth,
 			dlPtr->height, 1, sValuePtr->relief);
 		Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
 			rightX - sValuePtr->borderWidth + xOffset,
-			0, sValuePtr->borderWidth, dlPtr->height, 0,
+			y, sValuePtr->borderWidth, dlPtr->height, 0,
 			sValuePtr->relief);
 	    }
 	}
@@ -1978,7 +2010,7 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 		    chunkPtr->nextPtr->stylePtr)) {
 		if (!matchLeft && (sValuePtr->relief != TK_RELIEF_FLAT)) {
 		    Tk_3DHorizontalBevel(textPtr->tkwin, pixmap,
-			    sValuePtr->border, leftX + xOffset, 0,
+			    sValuePtr->border, leftX + xOffset, y,
 			    rightX - leftX, sValuePtr->borderWidth, leftXIn,
 			    1, 1, sValuePtr->relief);
 		}
@@ -2019,7 +2051,7 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 	if (matchLeft && !matchRight) {
 	    if (sValuePtr->relief != TK_RELIEF_FLAT) {
 		Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-			rightX2 - sValuePtr->borderWidth + xOffset, 0,
+			rightX2 - sValuePtr->borderWidth + xOffset, y,
 			sValuePtr->borderWidth, sValuePtr->borderWidth, 0,
 			sValuePtr->relief);
 	    }
@@ -2028,11 +2060,11 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 	} else if (!matchLeft && matchRight
 		&& (sValuePtr->relief != TK_RELIEF_FLAT)) {
 	    Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-		    rightX2 + xOffset, 0, sValuePtr->borderWidth,
+		    rightX2 + xOffset, y, sValuePtr->borderWidth,
 		    sValuePtr->borderWidth, 1, sValuePtr->relief);
 	    Tk_3DHorizontalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-		    leftX + xOffset, 0, rightX2 + sValuePtr->borderWidth -leftX,
-		    sValuePtr->borderWidth, leftXIn, 0, 1,
+		    leftX + xOffset, y, rightX2 + sValuePtr->borderWidth -
+		    leftX, sValuePtr->borderWidth, leftXIn, 0, 1,
 		    sValuePtr->relief);
 	}
 
@@ -2095,7 +2127,7 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 		if (!matchLeft && (sValuePtr->relief != TK_RELIEF_FLAT)) {
 		    Tk_3DHorizontalBevel(textPtr->tkwin, pixmap,
 			    sValuePtr->border, leftX + xOffset,
-			    dlPtr->height - sValuePtr->borderWidth,
+			    y + dlPtr->height - sValuePtr->borderWidth,
 			    rightX - leftX, sValuePtr->borderWidth, leftXIn,
 			    0, 0, sValuePtr->relief);
 		}
@@ -2122,7 +2154,7 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 	    if (sValuePtr->relief != TK_RELIEF_FLAT) {
 		Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
 			rightX2 - sValuePtr->borderWidth + xOffset,
-			dlPtr->height - sValuePtr->borderWidth,
+			y + dlPtr->height - sValuePtr->borderWidth,
 			sValuePtr->borderWidth, sValuePtr->borderWidth, 0,
 			sValuePtr->relief);
 	    }
@@ -2131,13 +2163,14 @@ DisplayLineBackground(textPtr, dlPtr, prevPtr, pixmap)
 	} else if (!matchLeft && matchRight
 		&& (sValuePtr->relief != TK_RELIEF_FLAT)) {
 	    Tk_3DVerticalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-		    rightX2 + xOffset, dlPtr->height - sValuePtr->borderWidth,
+		    rightX2 + xOffset, y + dlPtr->height -
 		    sValuePtr->borderWidth, sValuePtr->borderWidth,
-		    1, sValuePtr->relief);
+		    sValuePtr->borderWidth, 1, sValuePtr->relief);
 	    Tk_3DHorizontalBevel(textPtr->tkwin, pixmap, sValuePtr->border,
-		    leftX + xOffset, dlPtr->height - sValuePtr->borderWidth,
-		    rightX2 + sValuePtr->borderWidth - leftX,
-		    sValuePtr->borderWidth, leftXIn, 1, 0, sValuePtr->relief);
+		    leftX + xOffset, y + dlPtr->height -
+		    sValuePtr->borderWidth, rightX2 + sValuePtr->borderWidth -
+		    leftX, sValuePtr->borderWidth, leftXIn, 1, 0,
+		    sValuePtr->relief);
 	}
 
 	nextChunk2b:
@@ -2448,9 +2481,13 @@ DisplayText(clientData)
 	maxHeight = dInfoPtr->maxY;
     }
     if (maxHeight > 0) {
+#ifndef TK_NO_DOUBLE_BUFFERING
 	pixmap = Tk_GetPixmap(Tk_Display(textPtr->tkwin),
 		Tk_WindowId(textPtr->tkwin), Tk_Width(textPtr->tkwin),
 		maxHeight, Tk_Depth(textPtr->tkwin));
+#else
+	pixmap = Tk_WindowId(textPtr->tkwin);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 	for (prevPtr = NULL, dlPtr = textPtr->dInfoPtr->dLinePtr;
 		(dlPtr != NULL) && (dlPtr->y < dInfoPtr->maxY);
 		prevPtr = dlPtr, dlPtr = dlPtr->nextPtr) {
@@ -2465,7 +2502,9 @@ DisplayText(clientData)
 		}
 		DisplayDLine(textPtr, dlPtr, prevPtr, pixmap);
 		if (dInfoPtr->dLinesInvalidated) {
+#ifndef TK_NO_DOUBLE_BUFFERING
 		    Tk_FreePixmap(Tk_Display(textPtr->tkwin), pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 		    return;
 		}
 		dlPtr->oldY = dlPtr->y;
@@ -2473,7 +2512,9 @@ DisplayText(clientData)
 	    }
 	    /*prevPtr = dlPtr;*/
 	}
+#ifndef TK_NO_DOUBLE_BUFFERING
 	Tk_FreePixmap(Tk_Display(textPtr->tkwin), pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     }
 
     /*
@@ -3210,7 +3251,8 @@ MeasureUp(textPtr, srcPtr, distance, dstPtr)
     int lineNum;		/* Number of current line. */
     int bytesToCount;		/* Maximum number of bytes to measure in
 				 * current line. */
-    TkTextIndex bestIndex;	/* Best candidate seen so far for result. */
+    TkTextIndex bestIndex = {NULL, NULL, 0}; /* Best candidate seen so far for
+					      * result. Silence gcc 4 warning */
     TkTextIndex index;
     DLine *dlPtr, *lowestPtr;
     int noBestYet;		/* 1 means bestIndex hasn't been set. */
@@ -4175,6 +4217,15 @@ TkTextPixelIndex(textPtr, x, y, indexPtr)
     }
     if (dlPtr->chunkPtr == NULL) dlPtr = validdlPtr;
 
+    *indexPtr = dlPtr->index;
+
+    /*
+     * If it is still empty, we have nothing to access. [Bug 1442102]
+     */
+
+    if (dlPtr->chunkPtr == NULL) {
+	return;
+    }
 
     /*
      * Scan through the line's chunks to find the one that contains
@@ -4183,7 +4234,6 @@ TkTextPixelIndex(textPtr, x, y, indexPtr)
      * coordinate system of the line (to take account of x-scrolling).
      */
 
-    *indexPtr = dlPtr->index;
     x = x - dInfoPtr->x + dInfoPtr->curPixelOffset;
     for (chunkPtr = dlPtr->chunkPtr; x >= (chunkPtr->x + chunkPtr->width);
 	    indexPtr->byteIndex += chunkPtr->numBytes,

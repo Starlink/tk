@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: $Id: tkInt.h,v 1.56.2.4 2005/01/11 10:46:39 dkf Exp $ 
+ * RCS: $Id: tkInt.h,v 1.56.2.9 2006/09/06 22:01:25 hobbs Exp $ 
  */
 
 #ifndef _TKINT
@@ -24,7 +24,46 @@
 #include "tcl.h"
 #endif
 #ifndef _TKPORT
-#include <tkPort.h>
+#include "tkPort.h"
+#endif
+
+/*
+ * Ensure WORDS_BIGENDIAN is defined correcly:
+ * Needs to happen here in addition to configure to work with fat compiles on
+ * Darwin (where configure runs only once for multiple architectures).
+ */
+
+#ifdef HAVE_SYS_TYPES_H
+#    include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
+#    include <sys/param.h>
+#endif
+#ifdef BYTE_ORDER
+#    ifdef BIG_ENDIAN
+#	 if BYTE_ORDER == BIG_ENDIAN
+#	     undef WORDS_BIGENDIAN
+#	     define WORDS_BIGENDIAN
+#	 endif
+#    endif
+#    ifdef LITTLE_ENDIAN
+#	 if BYTE_ORDER == LITTLE_ENDIAN
+#	     undef WORDS_BIGENDIAN
+#	 endif
+#    endif
+#endif
+
+/*
+ * Used to tag functions that are only to be visible within the module being
+ * built and not outside it (where this is supported by the linker).
+ */
+
+#ifndef MODULE_SCOPE
+#   ifdef __cplusplus
+#	define MODULE_SCOPE extern "C"
+#   else
+#	define MODULE_SCOPE extern
+#   endif
 #endif
 
 /*
@@ -637,6 +676,8 @@ typedef struct TkMainInfo {
 				 * structures.  Managed by tkImage.c. */
     int strictMotif;		/* This is linked to the tk_strictMotif
 				 * global variable. */
+    int alwaysShowSelection;	/* This is linked to the
+				 * ::tk::AlwaysShowSelection variable. */
     struct TkMainInfo *nextPtr;	/* Next in list of all main windows managed by
 				 * this process. */
 } TkMainInfo;
@@ -1089,9 +1130,6 @@ EXTERN int		Tk_WmObjCmd _ANSI_ARGS_((ClientData clientData,
 			    Tcl_Interp *interp, int objc,
 			    Tcl_Obj *CONST objv[]));
 
-EXTERN void		TkConsolePrint _ANSI_ARGS_((Tcl_Interp *interp,
-			    int devId, CONST char *buffer, long size));
-
 EXTERN void		TkEventInit _ANSI_ARGS_((void));
 
 EXTERN void		TkRegisterObjTypes _ANSI_ARGS_((void));
@@ -1176,12 +1214,14 @@ EXTERN void		TkPrintPadAmount _ANSI_ARGS_((Tcl_Interp *interp,
 EXTERN int		TkParsePadAmount _ANSI_ARGS_((Tcl_Interp *interp,
 			    Tk_Window tkwin, Tcl_Obj *objPtr,
 			    int *pad1Ptr, int *pad2Ptr));
+EXTERN int		TkpAlwaysShowSelection _ANSI_ARGS_((Tk_Window tkwin));
 
-/* 
+/*
  * Unsupported commands.
  */
-EXTERN int		TkUnsupported1Cmd _ANSI_ARGS_((ClientData clientData,
-			    Tcl_Interp *interp, int argc, CONST char **argv));
+EXTERN int		TkUnsupported1ObjCmd _ANSI_ARGS_((
+			    ClientData clientData, Tcl_Interp *interp,
+			    int objc, Tcl_Obj *CONST objv[]));
 
 # undef TCL_STORAGE_CLASS
 # define TCL_STORAGE_CLASS DLLIMPORT

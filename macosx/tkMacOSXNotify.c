@@ -1,21 +1,20 @@
 /*
  * tkMacOSXNotify.c --
  *
- *	This file contains the implementation of a tcl event source 
+ *	This file contains the implementation of a tcl event source
  *	for the Carbon event loop.
  *
  * Copyright (c) 1995-1997 Sun Microsystems, Inc.
  * Copyright 2001, Apple Computer, Inc.
- * Copyright 2005, Tcl Core Team.
+ * Copyright (c) 2005-2007 Daniel A. Steffen <das@users.sourceforge.net>
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXNotify.c,v 1.5.2.5 2005/05/29 07:00:47 das Exp $
+ * RCS: @(#) $Id: tkMacOSXNotify.c,v 1.5.2.12 2007/06/29 03:22:02 das Exp $
  */
 
-#include "tclInt.h"
-#include "tkInt.h"
+#include "tkMacOSXPrivate.h"
 #include "tkMacOSXEvent.h"
 #include <pthread.h>
 
@@ -51,40 +50,41 @@ static void CarbonEventsCheckProc(ClientData clientData, int flags);
  */
 
 void
-Tk_MacOSXSetupTkNotifier()
+Tk_MacOSXSetupTkNotifier(void)
 {
-    ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
-    
-    if (!tsdPtr->initialized) {
-        /* HACK ALERT: There is a bug in Jaguar where when it goes to make
-         * the event queue for the Main Event Loop, it stores the Current
-         * event loop rather than the Main Event Loop in the Queue structure.
-         * So we have to make sure that the Main Event Queue gets set up on
-         * the main thread.  Calling GetMainEventQueue will force this to
-         * happen.
-         */
-        GetMainEventQueue();
+    ThreadSpecificData *tsdPtr = Tcl_GetThreadData(&dataKey,
+	    sizeof(ThreadSpecificData));
 
-        tsdPtr->initialized = 1;
-        /* Install Carbon events event source in main event loop thread. */
-        if (GetCurrentEventLoop() == GetMainEventLoop()) {
-            if (!pthread_main_np()) {
-                /* 
-                 * Panic if the Carbon main event loop thread (i.e. the 
-                 * thread  where HIToolbox was first loaded) is not the
-                 * main application thread, as Carbon does not support
-                 * this properly.
-                 */
-                Tcl_Panic("Tk_MacOSXSetupTkNotifier: %s",
-                    "first [load] of TkAqua has to occur in the main thread!");
-            }
-            Tcl_CreateEventSource(CarbonEventsSetupProc, 
-                    CarbonEventsCheckProc, GetMainEventQueue());
-            TkCreateExitHandler(TkMacOSXNotifyExitHandler, NULL);
+    if (!tsdPtr->initialized) {
+	/* HACK ALERT: There is a bug in Jaguar where when it goes to make
+	 * the event queue for the Main Event Loop, it stores the Current
+	 * event loop rather than the Main Event Loop in the Queue structure.
+	 * So we have to make sure that the Main Event Queue gets set up on
+	 * the main thread. Calling GetMainEventQueue will force this to
+	 * happen.
+	 */
+	GetMainEventQueue();
+
+	tsdPtr->initialized = 1;
+	/* Install Carbon events event source in main event loop thread. */
+	if (GetCurrentEventLoop() == GetMainEventLoop()) {
+	    if (!pthread_main_np()) {
+		/*
+		 * Panic if the Carbon main event loop thread (i.e. the
+		 * thread  where HIToolbox was first loaded) is not the
+		 * main application thread, as Carbon does not support
+		 * this properly.
+		 */
+		Tcl_Panic("Tk_MacOSXSetupTkNotifier: %s",
+		    "first [load] of TkAqua has to occur in the main thread!");
+	    }
+	    Tcl_CreateEventSource(CarbonEventsSetupProc,
+		    CarbonEventsCheckProc, GetMainEventQueue());
+	    TkCreateExitHandler(TkMacOSXNotifyExitHandler, NULL);
 	}
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -106,10 +106,11 @@ static void
 TkMacOSXNotifyExitHandler(clientData)
     ClientData clientData;	/* Not used. */
 {
-    ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+    ThreadSpecificData *tsdPtr = Tcl_GetThreadData(&dataKey,
+	    sizeof(ThreadSpecificData));
 
-    Tcl_DeleteEventSource(CarbonEventsSetupProc, 
-            CarbonEventsCheckProc, GetMainEventQueue());
+    Tcl_DeleteEventSource(CarbonEventsSetupProc,
+	    CarbonEventsCheckProc, GetMainEventQueue());
     tsdPtr->initialized = 0;
 }
 
@@ -119,7 +120,7 @@ TkMacOSXNotifyExitHandler(clientData)
  * CarbonEventsSetupProc --
  *
  *	This procedure implements the setup part of the Carbon Events
- *	event source.  It is invoked by Tcl_DoOneEvent before entering
+ *	event source. It is invoked by Tcl_DoOneEvent before entering
  *	the notifier to check for events.
  *
  * Results:
@@ -144,10 +145,10 @@ CarbonEventsSetupProc(clientData, flags)
     }
 
     if (GetNumEventsInQueue((EventQueueRef)clientData)) {
-        Tcl_SetMaxBlockTime(&blockTime);
+	Tcl_SetMaxBlockTime(&blockTime);
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -170,11 +171,21 @@ CarbonEventsCheckProc(clientData, flags)
     ClientData clientData;
     int flags;
 {
+    int numFound;
+    OSStatus err = noErr;
+
     if (!(flags & TCL_WINDOW_EVENTS)) {
 	return;
     }
 
-    if (GetNumEventsInQueue((EventQueueRef)clientData)) {
-        TkMacOSXCountAndProcessMacEvents();
+    numFound = GetNumEventsInQueue((EventQueueRef)clientData);
+
+    /* Avoid starving other event sources: */
+    if (numFound > 4) {
+	numFound = 4;
+    }
+    while (numFound > 0 && err == noErr) {
+	err = TkMacOSXReceiveAndDispatchEvent();
+	numFound--;
     }
 }

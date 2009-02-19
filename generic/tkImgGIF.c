@@ -29,7 +29,7 @@
  * |   provided "as is" without express or implied warranty.		|
  * +-------------------------------------------------------------------+
  *
- * RCS: @(#) $Id: tkImgGIF.c,v 1.24.2.2 2005/06/20 10:28:00 dkf Exp $
+ * RCS: @(#) $Id: tkImgGIF.c,v 1.24.2.6 2008/02/01 16:59:58 rmax Exp $
  */
 
 /*
@@ -243,7 +243,7 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
     int srcX, srcY;		/* Coordinates of top-left pixel to be used
 				 * in image being read. */
 {
-    int fileWidth, fileHeight;
+    int fileWidth, fileHeight, imageWidth, imageHeight;
     int nBytes, index = 0, argc = 0, i;
     Tcl_Obj **objv;
     Tk_PhotoImageBlock block;
@@ -376,8 +376,8 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
 	    goto error;
 	}
 
-	fileWidth = LM_to_uint(buf[4],buf[5]);
-	fileHeight = LM_to_uint(buf[6],buf[7]);
+	imageWidth = LM_to_uint(buf[4],buf[5]);
+	imageHeight = LM_to_uint(buf[6],buf[7]);
 
 	bitPixel = 1<<((buf[8]&0x07)+1);
 
@@ -419,8 +419,8 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
 	     * of the less frequent case, I chose to maintain high
 	     * performance for the common case.
 	     */
-	    if (ReadImage(interp, (char *) trashBuffer, chan, fileWidth,
-		    fileHeight, colorMap, 0, 0, 0, 0, 0, -1) != TCL_OK) {
+	    if (ReadImage(interp, (char *) trashBuffer, chan, imageWidth,
+		    imageHeight, colorMap, 0, 0, 0, 0, 0, -1) != TCL_OK) {
 		goto error;
 	    }
 	    continue;
@@ -441,8 +441,8 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
 	    srcX = 0;
 	}
 
-	if (width > fileWidth) {
-	    width = fileWidth;
+	if (width > imageWidth) {
+	    width = imageWidth;
 	}
 
 	index = LM_to_uint(buf[2],buf[3]);
@@ -451,8 +451,8 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
 	    destY -= srcY; height += srcY;
 	    srcY = 0;
 	}
-	if (height > fileHeight) {
-	    height = fileHeight;
+	if (height > imageHeight) {
+	    height = imageHeight;
 	}
 
 	if ((width <= 0) || (height <= 0)) {
@@ -464,12 +464,12 @@ FileReadGIF(interp, chan, fileName, format, imageHandle, destX, destY,
 	block.height = height;
 	block.pixelSize = (transparent>=0) ? 4 : 3;
 	block.offset[3] = (transparent>=0) ? 3 : 0;
-	block.pitch = block.pixelSize * fileWidth;
-	nBytes = block.pitch * fileHeight;
+	block.pitch = block.pixelSize * imageWidth;
+	nBytes = block.pitch * imageHeight;
 	block.pixelPtr = (unsigned char *) ckalloc((unsigned) nBytes);
 
-	if (ReadImage(interp, (char *) block.pixelPtr, chan, fileWidth,
-		fileHeight, colorMap, fileWidth, fileHeight, srcX, srcY,
+	if (ReadImage(interp, (char *) block.pixelPtr, chan, imageWidth,
+		imageHeight, colorMap, fileWidth, fileHeight, srcX, srcY,
 		BitSet(buf[8], INTERLACE), transparent) != TCL_OK) {
 	    goto error;
 	}
@@ -826,6 +826,12 @@ ReadImage(interp, imagePtr, chan, len, rows, cmap,
 		Tcl_PosixError(interp), (char *) NULL);
 	return TCL_ERROR;
     }
+
+    if (initialCodeSize > MAX_LWZ_BITS) {
+	Tcl_SetResult(interp, "malformed image", TCL_STATIC);
+	return TCL_ERROR;
+    }
+
     if (transparent != -1) {
 	cmap[transparent][CM_RED] = 0;
 	cmap[transparent][CM_GREEN] = 0;
@@ -995,7 +1001,7 @@ ReadImage(interp, imagePtr, chan, len, rows, cmap,
 	 */
 	if (interlace) {
 	    ypos += interlaceStep[pass];
-	    while (ypos >= height) {
+	    while (ypos >= rows) {
 		pass++;
 		if (pass > 3) {
 		    return TCL_OK;
@@ -1838,7 +1844,7 @@ output(val)
     obuf |= val << obits;
     obits += out_bits;
     while (obits >= 8) {
-	block_out(obuf&0xff);
+	block_out(UCHAR(obuf&0xff));
 	obuf >>= 8;
 	obits -= 8;
     }
@@ -1850,7 +1856,7 @@ output_flush()
 {
     DEBUGMSG(("output_flush\n"));
     if (obits > 0) {
-	block_out(obuf);
+	block_out(UCHAR(obuf));
     }
     block_flush();
 }

@@ -4,7 +4,12 @@
 #	uses the standard unix build system in tk/unix (which can be used directly instead of this
 #	if you are not using the tk/macosx projects).
 #
-# RCS: @(#) $Id: Makefile,v 1.7.2.11 2005/06/18 21:47:47 das Exp $
+# Copyright (c) 2002-2007 Daniel A. Steffen <das@users.sourceforge.net>
+#
+# See the file "license.terms" for information on usage and redistribution of
+# this file, and for a DISCLAIMER OF ALL WARRANTIES.
+#
+# RCS: @(#) $Id: Makefile,v 1.7.2.17 2007/04/29 02:26:47 das Exp $
 #
 ########################################################################################################
 
@@ -18,8 +23,8 @@ BUILD_DIR		?= ${CURDIR}/../../build
 SYMROOT			?= ${BUILD_DIR}/${PROJECT}
 OBJROOT			?= ${SYMROOT}
 
-EXTRA_CONFIGURE_ARGS 	?= 
-EXTRA_MAKE_ARGS		?= 
+EXTRA_CONFIGURE_ARGS	?=
+EXTRA_MAKE_ARGS		?=
 
 INSTALL_PATH		?= /Library/Frameworks
 APPLICATION_INSTALL_PATH ?= /Applications/Utilities
@@ -35,7 +40,7 @@ TCL_FRAMEWORK_DIR	?= /Library/Frameworks
 TCLSH_DIR		?= ${PREFIX}
 
 # set to non-empty value to install manpages in addition to html help:
-INSTALL_MANPAGES 	?= 
+INSTALL_MANPAGES	?=
 
 # set to non-empty value to build TkX11 instead of TkAqua:
 TK_X11			?=
@@ -43,7 +48,7 @@ TK_X11			?=
 #-------------------------------------------------------------------------------------------------------
 # meta targets
 
-meta 			:= all install embedded install-embedded clean distclean test
+meta			:= all install embedded install-embedded clean distclean test
 
 styles			:= develop deploy
 
@@ -84,7 +89,7 @@ deploy_make_args	:= BUILD_STYLE=Deployment INSTALL_TARGET=install-strip
 embedded_make_args	:= EMBEDDED_BUILD=1
 install_make_args	:= INSTALL_BUILD=1
 
-${targets}: 
+${targets}:
 	${MAKE} ${action}${PROJECT} \
 	$(foreach s,${styles} embedded install,$(if $(findstring $s,$@),${${s}_make_args}))
 
@@ -100,7 +105,7 @@ TCL_VERSION		:= ${VERSION}
 wish			:= wish
 WISH			= wish${VERSION}
 
-BUILD_TARGET		:= wish
+BUILD_TARGET		:= all tktest
 INSTALL_TARGET		:= install
 
 ifneq ($(wildcard ${TCL_BUILD_DIR}/tclConfig.sh),)
@@ -108,7 +113,7 @@ TCL_DIR			:= ${TCL_BUILD_DIR}
 TCL_FRAMEWORK_DIR	:= ${TCL_BUILD_DIR}/..
 else
 TCL_DIR			:= ${TCL_FRAMEWORK_DIR}/Tcl.framework
-TCL_EXE                 := ${TCLSH_DIR}/tclsh${TCL_VERSION}
+TCL_EXE			:= ${TCLSH_DIR}/tclsh${TCL_VERSION}
 MAKE_VARS		= TCL_EXE
 export DYLD_FRAMEWORK_PATH := ${TCL_FRAMEWORK_DIR}
 endif
@@ -135,7 +140,7 @@ endif
 MAKE_VARS		+= INSTALL_ROOT INSTALL_TARGETS VERSION
 MAKE_ARGS_V		= $(foreach v,${MAKE_VARS},$v='${$v}')
 
-build-${PROJECT}:	target = ${TARGET}
+build-${PROJECT}:	target = ${BUILD_TARGET}
 install-${PROJECT}:	target = ${INSTALL_TARGET}
 clean-${PROJECT} distclean-${PROJECT} test-${PROJECT}: \
 			target = $*
@@ -164,12 +169,14 @@ TK_FMWK_DIR		:= ${FMWK_DIR}/${PRODUCT_NAME}.framework/Versions/${VERSION}
 ${PROJECT}:
 	${MAKE} install-${PROJECT} INSTALL_ROOT=${OBJ_DIR}/
 
-${OBJ_DIR}/Makefile: ${UNIX_DIR}/Makefile.in ${UNIX_DIR}/configure
-	mkdir -p ${OBJ_DIR} && cd ${OBJ_DIR} && ${UNIX_DIR}/configure \
+${OBJ_DIR}/Makefile: ${UNIX_DIR}/Makefile.in ${UNIX_DIR}/configure \
+		     ${UNIX_DIR}/tkConfig.sh.in Tk-Info.plist.in Wish-Info.plist.in
+	mkdir -p ${OBJ_DIR} && cd ${OBJ_DIR} && \
+	if [ ${UNIX_DIR}/configure -nt config.status ]; then ${UNIX_DIR}/configure \
 	--prefix=${PREFIX} --bindir=${BINDIR} --libdir=${LIBDIR} \
 	--mandir=${MANDIR} --enable-threads --enable-framework \
 	--with-tcl=${TCL_DIR} \
-	${CONFIGURE_ARGS} ${EXTRA_CONFIGURE_ARGS}
+	${CONFIGURE_ARGS} ${EXTRA_CONFIGURE_ARGS}; else ./config.status; fi
 ifneq (${TK_X11},)
 	@cd ${OBJ_DIR} && sed -e 's#/Versions/${TCL_VERSION}#/Versions/${VERSION}#' \
 	tkConfig.sh > tkConfig.sh.1 && mv -f tkConfig.sh.1 tkConfig.sh
@@ -177,6 +184,7 @@ endif
 
 build-${PROJECT}: ${OBJ_DIR}/Makefile
 	${DO_MAKE}
+ifeq (${INSTALL_BUILD},)
 # symolic link hackery to trick
 # 'make install INSTALL_ROOT=${OBJ_DIR}'
 # into building Tk.framework and wish in ${SYMROOT}
@@ -184,11 +192,13 @@ build-${PROJECT}: ${OBJ_DIR}/Makefile
 	rm -rf ./${LIBDIR} ./${BINDIR} && ln -fs ${SYMROOT} ./${LIBDIR} && \
 	ln -fs ${SYMROOT} ./${BINDIR} && ln -fs ${OBJ_DIR}/tktest ${SYMROOT}
 ifeq (${TK_X11},)
-	@rm -f ${OBJ_DIR}/${BINDIR}
+	@rm -f ${OBJ_DIR}/${BINDIR} && \
+	ln -fs Wish.app/Contents/MacOS/Wish ${SYMROOT}/${WISH}
 endif
 # Create symbolic link to Tcl.framework in ${SYMROOT}if necessary
 	@cd ${SYMROOT} && if [ ! -e Tcl.framework -o -L Tcl.framework ]; then \
 	rm -f Tcl.framework && ln -s ${TCL_FRAMEWORK_DIR}/Tcl.framework . ; fi
+endif
 
 install-${PROJECT}: build-${PROJECT}
 ifeq (${EMBEDDED_BUILD}_${INSTALL_ROOT},1_)
@@ -198,14 +208,22 @@ ifeq (${EMBEDDED_BUILD},1)
 	@rm -rf "${INSTALL_ROOT}/${LIBDIR}/Tk.framework"
 endif
 	${DO_MAKE}
+ifeq (${EMBEDDED_BUILD}_${TK_X11},1_)
+# workaround bug with 'cp -pRH' on Darwin 6 and earlier
+	@if [ "`uname -r | awk -F. '{print $$1}'`" -lt 7 ]; then \
+	mkdir -p ${TOP_DIR}/{"${TCL_FMWK_DIR}","${TK_FMWK_DIR}"}/PrivateHeaders; fi
+endif
 ifeq (${INSTALL_BUILD},1)
 ifeq (${EMBEDDED_BUILD},1)
 # if we are embedding frameworks, don't install wish
 	@rm -f "${INSTALL_ROOT}${BINDIR}/${WISH}" && \
 	rmdir -p "${INSTALL_ROOT}${BINDIR}" 2>&- || true
 else
-# redo prebinding
-	@cd ${INSTALL_ROOT}/ && \
+# redo prebinding (when not building for Mac OS X 10.4 or later only)
+	@if [ "`echo "$${MACOSX_DEPLOYMENT_TARGET}" | \
+	awk -F '10\\.' '{print int($$2)}'`" -lt 4 -a "`echo "$${CFLAGS}" | \
+	awk -F '-mmacosx-version-min=10\\.' '{print int($$2)}'`" -lt 4 ]; \
+	then cd ${INSTALL_ROOT}/; \
 	if [ ! -d usr/lib ]; then mkdir -p usr && ln -fs /usr/lib usr/ && RM_USRLIB=1; fi; \
 	if [ -n "${TK_X11}" -a ! -d usr/X11R6 ]; then mkdir -p usr && ln -fs /usr/X11R6 usr/ && RM_USRX11=1; fi; \
 	if [ ! -d System ]; then ln -fs /System . && RM_SYSTEM=1; fi; \
@@ -216,7 +234,7 @@ else
 	if [ -n "$${RM_USRLIB:-}" ]; then rm -f usr/lib; rmdir -p usr 2>&-; fi; \
 	if [ -n "$${RM_USRX11:-}" ]; then rm -f usr/X11R6; rmdir -p usr 2>&-; fi; \
 	if [ -n "$${RM_SYSTEM:-}" ]; then rm -f System; fi; \
-	if [ -n "$${RM_TCL:-}" ]; then rm -f ./${LIBDIR}/Tcl.framework; fi
+	if [ -n "$${RM_TCL:-}" ]; then rm -f ./${LIBDIR}/Tcl.framework; fi; fi
 # install wish symbolic link
 	@ln -fs ${WISH} ${INSTALL_ROOT}${BINDIR}/${wish}
 endif
@@ -232,7 +250,7 @@ endif
 ifeq (${TK_X11},)
 ifeq (${EMBEDDED_BUILD},)
 # install Wish.app link in APPLICATION_INSTALL_PATH and setup 'Wish Shell' compatibility links
-	@cd ${TOP_DIR} && if [ -n "${APP_DIR}" ]; then mkdir -p "./${APP_DIR}" && \
+	@cd ${TOP_DIR} && if [ -n "${APP_DIR}" ]; then mkdir -p "./${APP_DIR}" && rm -rf "./${APP_DIR}/Wish.app" && \
 	ln -fsh "./$$(echo ${APP_DIR} | sed -e 's#/[^/][^/]*#/..#g')/${FMWK_DIR}/${PRODUCT_NAME}.framework/Resources/Wish.app" "./${APP_DIR}" && \
 	ln -fsh Wish.app "./${APP_DIR}/Wish Shell.app"; fi && \
 	ln -fsh Wish.app "./${TK_FMWK_DIR}/Resources/Wish Shell.app" && \
@@ -245,8 +263,8 @@ else
 	ln -fsh Wish.app "./${APP_DIR}/Wish Shell.app" && \
 	rm -rf "./${APP_DIR}/Wish.app/Contents/Frameworks" && \
 	mkdir -p "./${APP_DIR}/Wish.app/Contents/Frameworks" && \
-	mv -f "./${FMWK_DIR}"/T{cl,k}.framework "./${APP_DIR}/Wish.app/Contents/Frameworks" && \
-	rmdir -p "./${FMWK_DIR}" 2>&- || true && cd "./${APP_DIR}/Wish.app/Contents" && \
+	${CPPROG} -RH "./${FMWK_DIR}"/T{cl,k}.framework "./${APP_DIR}/Wish.app/Contents/Frameworks" && \
+	cd "./${APP_DIR}/Wish.app/Contents" && \
 	rm -rf Frameworks/Tcl.framework/{,/Versions/$(TCL_VERSION)}/{Headers,PrivateHeaders,*_debug,lib*.a,*Config.sh} && \
 	rm -rf Frameworks/Tk.framework/{,/Versions/$(VERSION)}/{Headers,PrivateHeaders,*_debug,lib*.a,*Config.sh} && \
 	fix_install_id ( ) { \
@@ -261,6 +279,9 @@ else
 	} && \
 	fix_install_id Frameworks/Tcl.framework/Tcl Tcl && fix_install_id Frameworks/Tk.framework/Tk Tk && \
 	fix_install_name MacOS/Wish Tcl && fix_install_name MacOS/Wish Tk
+ifeq (${INSTALL_BUILD},1)
+	@cd ${TOP_DIR} && rm -rf "./${FMWK_DIR}"/T{cl,k}.framework && rmdir -p "./${FMWK_DIR}" 2>&- || true
+endif
 endif
 endif
 
@@ -274,7 +295,7 @@ clean-${PROJECT}: %-${PROJECT}:
 distclean-${PROJECT}: %-${PROJECT}: clean-${PROJECT}
 	${DO_MAKE}
 	rm -rf ${OBJ_DIR}
-	
+
 test-${PROJECT}: %-${PROJECT}: build-${PROJECT}
 	${DO_MAKE}
 

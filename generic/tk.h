@@ -12,11 +12,16 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tk.h,v 1.74.2.11 2005/06/18 19:36:55 dgp Exp $
+ * RCS: @(#) $Id: tk.h,v 1.74.2.22 2008/04/07 19:17:54 dgp Exp $
  */
 
 #ifndef _TK
 #define _TK
+
+#include <tcl.h>
+#if (TCL_MAJOR_VERSION != 8) || (TCL_MINOR_VERSION != 4)
+#	error Tk 8.4 must be compiled with tcl.h from Tcl 8.4
+#endif
 
 /*
  * For C++ compilers, use extern "C"
@@ -36,8 +41,6 @@ extern "C" {
  * win/makefile.vc	(not patchlevel)
  * README		(sections 0 and 1)
  * mac/README		(not patchlevel)
- * macosx/Wish.pbproj/project.pbxproj
- * 			(14 LOC total, 4 LOC patch)
  * win/README		(not patchlevel)
  * unix/README		(not patchlevel)
  * unix/tk.spec		(3 LOC Major/Minor, 2 LOC patch)
@@ -50,28 +53,10 @@ extern "C" {
 #define TK_MAJOR_VERSION   8
 #define TK_MINOR_VERSION   4
 #define TK_RELEASE_LEVEL   TCL_FINAL_RELEASE
-#define TK_RELEASE_SERIAL  11
+#define TK_RELEASE_SERIAL  19
 
 #define TK_VERSION	"8.4"
-#define TK_PATCH_LEVEL	"8.4.11"
-
-/*
- * The following definitions set up the proper options for Macintosh
- * compilers.  We use this method because there is no autoconf equivalent.
- */
-
-#if defined(MAC_TCL) || defined(MAC_OSX_TK)
-#   ifndef REDO_KEYSYM_LOOKUP
-#	define REDO_KEYSYM_LOOKUP
-#   endif
-#endif
-
-#ifndef _TCL
-#   include <tcl.h>
-#   if (TCL_MAJOR_VERSION != 8) || (TCL_MINOR_VERSION != 4)
-#	error Tk 8.4 must be compiled with tcl.h from Tcl 8.4
-#   endif
-#endif
+#define TK_PATCH_LEVEL	"8.4.19"
 
 /* 
  * A special definition used to allow this header file to be included

@@ -3,7 +3,7 @@
 # This file defines the procedure tk_dialog, which creates a dialog
 # box containing a bitmap, a message, and one or more buttons.
 #
-# RCS: @(#) $Id: dialog.tcl,v 1.14.2.1 2003/10/22 15:22:07 dkf Exp $
+# RCS: @(#) $Id: dialog.tcl,v 1.14.2.5 2007/05/30 06:37:03 das Exp $
 #
 # Copyright (c) 1992-1993 The Regents of the University of California.
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -34,21 +34,29 @@ proc ::tk_dialog {w title text bitmap default args} {
     variable ::tk::Priv
 
     # Check that $default was properly given
-    if {[string is int $default]} {
+    if {[string is integer -strict $default]} {
 	if {$default >= [llength $args]} {
 	    return -code error "default button index greater than number of\
 		    buttons specified for tk_dialog"
 	}
-    } elseif {[string equal {} $default]} {
+      # Never call if -strict option is omitted in previous test !
+    } elseif {"" eq $default} {
 	set default -1
     } else {
 	set default [lsearch -exact $args $default]
     }
 
+    set windowingsystem [tk windowingsystem]
+    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
+	option add *Dialog*background systemDialogBackgroundActive widgetDefault
+	option add *Dialog*Button.highlightBackground \
+		systemDialogBackgroundActive widgetDefault
+    }
+
     # 1. Create the top-level window and divide it into top
     # and bottom parts.
 
-    catch {destroy $w}
+    destroy $w
     toplevel $w -class Dialog
     wm title $w $title
     wm iconname $w Dialog
@@ -63,16 +71,15 @@ proc ::tk_dialog {w title text bitmap default args} {
     #
     if {[winfo viewable [winfo toplevel [winfo parent $w]]] } {
 	wm transient $w [winfo toplevel [winfo parent $w]]
-    }    
+    }
 
-    if {[string equal $tcl_platform(platform) "macintosh"]
-	    || [string equal [tk windowingsystem] "aqua"]} {
-	::tk::unsupported::MacWindowStyle style $w dBoxProc
+    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
+	::tk::unsupported::MacWindowStyle style $w moveableModal {}
     }
 
     frame $w.bot
     frame $w.top
-    if {[string equal [tk windowingsystem] "x11"]} {
+    if {$windowingsystem eq "x11"} {
 	$w.bot configure -relief raised -bd 1
 	$w.top configure -relief raised -bd 1
     }
@@ -84,8 +91,7 @@ proc ::tk_dialog {w title text bitmap default args} {
     # overridden by the caller).
 
     option add *Dialog.msg.wrapLength 3i widgetDefault
-    if {[string equal $tcl_platform(platform) "macintosh"]
-	    || [string equal [tk windowingsystem] "aqua"]} {
+    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
 	option add *Dialog.msg.font system widgetDefault
     } else {
 	option add *Dialog.msg.font {Times 12} widgetDefault
@@ -93,10 +99,9 @@ proc ::tk_dialog {w title text bitmap default args} {
 
     label $w.msg -justify left -text $text
     pack $w.msg -in $w.top -side right -expand 1 -fill both -padx 3m -pady 3m
-    if {[string compare $bitmap ""]} {
-	if {([string equal $tcl_platform(platform) "macintosh"]
-	     || [string equal [tk windowingsystem] "aqua"]) &&\
-		[string equal $bitmap "error"]} {
+    if {$bitmap ne ""} {
+	if {($tcl_platform(platform) eq "macintosh"
+	     || $windowingsystem eq "aqua") && ($bitmap eq "error")} {
 	    set bitmap "stop"
 	}
 	label $w.bitmap -bitmap $bitmap
@@ -117,12 +122,12 @@ proc ::tk_dialog {w title text bitmap default args} {
 		-padx 10 -pady 4
 	grid columnconfigure $w.bot $i
 	# We boost the size of some Mac buttons for l&f
-	if {[string equal $tcl_platform(platform) "macintosh"]
-	    || [string equal [tk windowingsystem] "aqua"]} {
+	if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
 	    set tmp [string tolower $but]
-	    if {[string equal $tmp "ok"] || [string equal $tmp "cancel"]} {
-		grid columnconfigure $w.bot $i -minsize [expr {59 + 20}]
+	    if {$tmp eq "ok" || $tmp eq "cancel"} {
+		grid columnconfigure $w.bot $i -minsize 90
 	    }
+	    grid configure $w.button$i -pady 7
 	}
 	incr i
     }
@@ -165,14 +170,16 @@ proc ::tk_dialog {w title text bitmap default args} {
 	set y 0
     }
     wm maxsize $w [winfo screenwidth $w] [winfo screenheight $w]
-    wm geom $w +$x+$y
+    wm geometry $w +$x+$y
     wm deiconify $w
+
+    tkwait visibility $w
 
     # 7. Set a grab and claim the focus too.
 
     set oldFocus [focus]
     set oldGrab [grab current $w]
-    if {[string compare $oldGrab ""]} {
+    if {$oldGrab ne ""} {
 	set grabStatus [grab status $oldGrab]
     }
     grab $w
@@ -198,11 +205,11 @@ proc ::tk_dialog {w title text bitmap default args} {
 	bind $w <Destroy> {}
 	destroy $w
     }
-    if {[string compare $oldGrab ""]} {
-      if {[string compare $grabStatus "global"]} {
+    if {$oldGrab ne ""} {
+	if {$grabStatus ne "global"} {
 	    grab $oldGrab
-      } else {
-          grab -global $oldGrab
+	} else {
+	    grab -global $oldGrab
 	}
     }
     return $Priv(button)

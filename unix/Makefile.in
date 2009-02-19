@@ -5,11 +5,12 @@
 # "autoconf" program (constructs like "@foo@" will get replaced in the
 # actual Makefile.
 #
-# RCS: @(#) $Id: Makefile.in,v 1.87.2.11 2005/06/23 06:00:29 das Exp $
+# RCS: @(#) $Id: Makefile.in,v 1.87.2.21 2007/08/07 05:07:49 das Exp $
 
 # Current Tk version;  used in various names.
 
 TCLVERSION		= @TCL_VERSION@
+TCLPATCHL		= @TCL_PATCH_LEVEL@
 VERSION 		= @TK_VERSION@
 MAJOR_VERSION		= @TK_MAJOR_VERSION@
 MINOR_VERSION		= @TK_MINOR_VERSION@
@@ -186,6 +187,21 @@ NO_DEPRECATED_FLAGS	= -DTCL_NO_DEPRECATED
 # determine which shell to use for executing commands:
 SHELL			= /bin/sh
 
+# BUILD_TCLSH is the fully qualified path name of the tclsh shell
+# in the Tcl build directory. Test that need to be run in the
+# version of tclsh that we are building against should use this
+# path. Targets that need an installed tclsh should not depend
+# on this variable.
+
+BUILD_TCLSH		= @BUILD_TCLSH@
+
+# TCL_EXE is the name of a tclsh executable that is available *BEFORE*
+# running make for the first time. Certain build targets (make genstubs)
+# need it to be available on the PATH. This executable should *NOT* be
+# required just to do a normal build although it can be required to run
+# make dist. This variable is set to "" if no tclsh is available.
+TCL_EXE			= @TCLSH_PROG@
+
 # Tk used to let the configure script choose which program to use
 # for installing, but there are just too many different versions of
 # "install" around;  better to use the install-sh script that comes
@@ -198,13 +214,6 @@ INSTALL			= @srcdir@/install-sh -c
 INSTALL_PROGRAM		= ${INSTALL}
 INSTALL_LIBRARY		= ${INSTALL}
 INSTALL_DATA		= ${INSTALL} -m 644
-
-# TCL_EXE is the name of a tclsh executable that is available *BEFORE*
-# running make for the first time. Certain build targets (make genstubs)
-# need it to be available on the PATH. This executable should *NOT* be
-# required just to do a normal build although it can be required to run
-# make dist.
-TCL_EXE			= tclsh
 
 # The symbol below provides support for dynamic loading and shared
 # libraries.  See configure.in for a description of what it means.
@@ -304,12 +313,13 @@ MAN_FLAGS               = @MAN_FLAGS@
 CC			= @CC@
 
 CC_SWITCHES_NO_STUBS = ${CFLAGS} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} \
--I${UNIX_DIR} -I${GENERIC_DIR} \
--I${BMAP_DIR} -I${TCL_GENERIC_DIR} ${@TK_WINDOWINGSYSTEM@_INCLUDES} \
-${AC_FLAGS} ${PROTO_FLAGS} \
-${SECURITY_FLAGS} ${MEM_DEBUG_FLAGS} ${KEYSYM_FLAGS} ${NO_DEPRECATED_FLAGS} @EXTRA_CC_SWITCHES@
+-I${UNIX_DIR} -I${GENERIC_DIR} -I${BMAP_DIR} -I${TCL_GENERIC_DIR} \
+${@TK_WINDOWINGSYSTEM@_INCLUDES} ${AC_FLAGS} ${PROTO_FLAGS} ${SECURITY_FLAGS} \
+${MEM_DEBUG_FLAGS} ${KEYSYM_FLAGS} ${NO_DEPRECATED_FLAGS} @EXTRA_CC_SWITCHES@
 
-CC_SWITCHES = ${CC_SWITCHES_NO_STUBS} ${TCL_STUB_FLAGS} 
+CC_SWITCHES = $(CC_SWITCHES_NO_STUBS) ${TCL_STUB_FLAGS} 
+
+APP_CC_SWITCHES = $(CC_SWITCHES_NO_STUBS) @EXTRA_APP_CC_SWITCHES@
 
 DEPEND_SWITCHES = ${CFLAGS} -I${UNIX_DIR} -I${GENERIC_DIR} \
 -I${BMAP_DIR} \
@@ -358,7 +368,7 @@ AQUA_OBJS = tkMacOSXBitmap.o tkMacOSXButton.o tkMacOSXClipboard.o \
 	tkMacOSXMenubutton.o tkMacOSXMenus.o tkMacOSXMouseEvent.o \
 	tkMacOSXNotify.o tkMacOSXRegion.o tkMacOSXScrlbr.o tkMacOSXSend.o \
 	tkMacOSXSubwindows.o tkMacOSXTest.o tkMacOSXWindowEvent.o \
-	tkMacOSXWm.o tkMacOSXXStubs.o \
+	tkMacOSXWm.o tkMacOSXXStubs.o tkMacOSXCarbonEvents.o \
 	tkFileFilter.o tkMacWinMenu.o tkPointer.o tkUnix3d.o tkUnixScale.o \
 	xcolors.o xdraw.o xgc.o ximage.o xutil.o
 
@@ -442,6 +452,7 @@ AQUA_SRCS = \
 	$(MAC_OSX_DIR)/tkMacOSXSend.c $(MAC_OSX_DIR)/tkMacOSXSubwindows.c \
 	$(MAC_OSX_DIR)/tkMacOSXTest.c $(MAC_OSX_DIR)/tkMacOSXWindowEvent.c \
 	$(MAC_OSX_DIR)/tkMacOSXWm.c $(MAC_OSX_DIR)/tkMacOSXXStubs.c \
+	$(MAC_OSX_DIR)/tkMacOSXCarbonEvents.c \
 	$(GENERIC_DIR)/tkFileFilter.c $(GENERIC_DIR)/tkMacWinMenu.c \
 	$(GENERIC_DIR)/tkPointer.c $(UNIX_DIR)/tkUnix3d.c \
 	$(UNIX_DIR)/tkUnixScale.c $(XLIB_DIR)/xcolors.c $(XLIB_DIR)/xdraw.c \
@@ -451,7 +462,7 @@ SRCS = $(GENERIC_SRCS) $(@TK_WINDOWINGSYSTEM@_SRCS) @PLAT_SRCS@
 
 AQUA_RESOURCES = \
 	$(MAC_OSX_DIR)/tkAboutDlg.r $(MAC_OSX_DIR)/tkMacOSXCursors.r \
-	$(MAC_OSX_DIR)/tkMacOSXMenu.r $(MAC_OSX_DIR)/tkMacOSXXCursors.r
+	$(MAC_OSX_DIR)/tkMacOSXXCursors.r
 
 AQUA_WISH_RESOURCES = $(MAC_OSX_DIR)/tkMacOSXAETE.r
 
@@ -513,8 +524,7 @@ objs: ${OBJS}
 
 
 wish: $(WISH_OBJS) $(TK_LIB_FILE) $(TK_STUB_LIB_FILE) @APP_RSRC_FILE@
-	$(CC) $(LDFLAGS) $(WISH_OBJS) \
-		@TK_BUILD_LIB_SPEC@ \
+	${CC} ${CFLAGS} ${LDFLAGS} $(WISH_OBJS) @TK_BUILD_LIB_SPEC@ \
 		$(WISH_LIBS) $(CC_SEARCH_FLAGS) -o wish
 
 # Resetting the LIB_RUNTIME_DIR below is required so that
@@ -527,7 +537,7 @@ tktest: $(TKTEST_OBJS) $(TK_LIB_FILE)
 	$(MAKE) tktest-real LIB_RUNTIME_DIR=`pwd`:$(TCL_BIN_DIR)
 
 tktest-real:
-	${CC} $(LDFLAGS) $(TKTEST_OBJS) @TK_BUILD_LIB_SPEC@ \
+	${CC} ${CFLAGS} ${LDFLAGS} $(TKTEST_OBJS) @TK_BUILD_LIB_SPEC@ \
 		$(WISH_LIBS) $(CC_SEARCH_FLAGS) -o tktest
 
 # FIXME: This xttest rule seems to be broken in a number of ways.
@@ -535,7 +545,7 @@ tktest-real:
 # lib location logic from tktest, and it is not clear where this
 # test.o object file comes from.
 xttest: test.o tkTest.o tkSquare.o $(TK_LIB_FILE)
-	${CC} $(LDFLAGS) test.o tkTest.o tkSquare.o \
+	${CC} ${CFLAGS} ${LDFLAGS} test.o tkTest.o tkSquare.o \
 		@TK_BUILD_LIB_SPEC@ \
 		$(WISH_LIBS) $(LD_SEARCH_FLAGS) -lXt -o xttest
 
@@ -622,9 +632,8 @@ install-binaries: $(TK_LIB_FILE) $(TK_STUB_LIB_FILE) $(TK_BUILD_EXP_FILE) wish
 	    echo "Creating package index $(PKG_INDEX)"; \
 	    rm -f $(PKG_INDEX); \
 	    (\
-	    echo "if {[package vcompare [package provide Tcl]\
-		$(TCLVERSION)] != 0} { return }";\
 	    relative=`echo | awk '{ORS=" "; split("$(TK_PKG_DIR)",a,"/"); for (f in a) {print ".."}}'`;\
+	    echo "if {[package vcompare [package provide Tcl] $(TCLVERSION)] != 0} { return }";\
 	    echo "package ifneeded Tk $(MAJOR_VERSION).$(MINOR_VERSION)\
 		[list load [file join \$$dir $${relative}$(TK_LIB_FILE)] Tk]";\
 	    ) > $(PKG_INDEX); \
@@ -797,13 +806,17 @@ depend:
 # Test binaries.  The rule for tkTestInit.o is complicated because
 # it is is compiled from tkAppInit.c.  Can't use the "-o" option
 # because this doesn't work on some strange compilers (e.g. UnixWare).
+# To enable concurrent parallel make of wish and tktest, this target has to
+# depend on wish, this ensures that linking of wish with tkTestInit.o does not
+# execute concurrently with the renaming and recompiling of that same object
+# file in the target below.
 
-tkTestInit.o: $(UNIX_DIR)/tkAppInit.c
+tkTestInit.o: $(UNIX_DIR)/tkAppInit.c wish
 	@if test -f tkAppInit.o ; then \
 	    rm -f tkAppInit.sav; \
 	    mv tkAppInit.o tkAppInit.sav; \
 	fi;
-	$(CC) -c $(CC_SWITCHES_NO_STUBS) -DTK_TEST $(UNIX_DIR)/tkAppInit.c
+	$(CC) -c $(APP_CC_SWITCHES) -DTK_TEST $(UNIX_DIR)/tkAppInit.c
 	rm -f tkTestInit.o
 	mv tkAppInit.o tkTestInit.o
 	@if test -f tkAppInit.sav ; then \
@@ -811,7 +824,7 @@ tkTestInit.o: $(UNIX_DIR)/tkAppInit.c
 	fi;
 
 tkAppInit.o: $(UNIX_DIR)/tkAppInit.c
-	$(CC) -c $(CC_SWITCHES_NO_STUBS) $(UNIX_DIR)/tkAppInit.c
+	$(CC) -c $(APP_CC_SWITCHES) $(UNIX_DIR)/tkAppInit.c
 
 tk3d.o: $(GENERIC_DIR)/tk3d.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tk3d.c
@@ -940,7 +953,7 @@ tkScrollbar.o: $(GENERIC_DIR)/tkScrollbar.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkScrollbar.c
 
 tkSquare.o: $(GENERIC_DIR)/tkSquare.c
-	$(CC) -c $(CC_SWITCHES_NO_STUBS) $(GENERIC_DIR)/tkSquare.c
+	$(CC) -c $(APP_CC_SWITCHES) $(GENERIC_DIR)/tkSquare.c
 
 tkCanvas.o: $(GENERIC_DIR)/tkCanvas.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkCanvas.c
@@ -994,7 +1007,7 @@ tkImgPhoto.o: $(GENERIC_DIR)/tkImgPhoto.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkImgPhoto.c
 
 tkTest.o: $(GENERIC_DIR)/tkTest.c
-	$(CC) -c $(CC_SWITCHES_NO_STUBS) $(GENERIC_DIR)/tkTest.c
+	$(CC) -c $(APP_CC_SWITCHES) $(GENERIC_DIR)/tkTest.c
 
 tkText.o: $(GENERIC_DIR)/tkText.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkText.c
@@ -1105,6 +1118,9 @@ tkMacOSXBitmap.o: $(MAC_OSX_DIR)/tkMacOSXBitmap.c
 tkMacOSXButton.o: $(MAC_OSX_DIR)/tkMacOSXButton.c
 	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXButton.c
 
+tkMacOSXCarbonEvents.o: $(MAC_OSX_DIR)/tkMacOSXCarbonEvents.c
+	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXCarbonEvents.c
+
 tkMacOSXClipboard.o: $(MAC_OSX_DIR)/tkMacOSXClipboard.c
 	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXClipboard.c
 
@@ -1141,8 +1157,9 @@ tkMacOSXFont.o: $(MAC_OSX_DIR)/tkMacOSXFont.c
 tkMacOSXHLEvents.o: $(MAC_OSX_DIR)/tkMacOSXHLEvents.c
 	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXHLEvents.c
 
-tkMacOSXInit.o: $(MAC_OSX_DIR)/tkMacOSXInit.c
-	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXInit.c
+tkMacOSXInit.o: $(MAC_OSX_DIR)/tkMacOSXInit.c $(GENERIC_DIR)/tkInitScript.h tkConfig.sh
+	$(CC) -c $(CC_SWITCHES)  -DTK_LIBRARY=\"${TK_LIBRARY}\" \
+	    $(MAC_OSX_DIR)/tkMacOSXInit.c
 
 tkMacOSXKeyboard.o: $(MAC_OSX_DIR)/tkMacOSXKeyboard.c
 	$(CC) -c $(CC_SWITCHES) $(MAC_OSX_DIR)/tkMacOSXKeyboard.c
@@ -1235,12 +1252,13 @@ genstubs:
 # tables.
 #
 
-checkstubs:
-	-@for i in `nm -p $(TK_LIB_FILE) | awk '$$2 ~ /T/ { print $$3 }' \
+checkstubs: $(TK_LIB_FILE)
+	-@for i in `nm -p $(TK_LIB_FILE) \
+		| awk '$$2 ~ /^[TDBCS]$$/ { sub("^_", "", $$3); print $$3 }' \
 		| sort -n`; do \
 		match=0; \
 		for j in $(TK_DECLS); do \
-		    if [ `grep -c $$i $$j` -gt 0 ]; then \
+		    if [ `grep -c "$$i *(" $$j` -gt 0 ]; then \
 			match=1; \
 		    fi; \
 		done; \
@@ -1260,7 +1278,9 @@ checkuchar:
 #
 
 checkexports: $(TK_LIB_FILE)
-	-nm -p $(TK_LIB_FILE) | awk '$$2 ~ /[TDB]/ { print $$3 }' | sort -n | grep -v '^[Tt]k'
+	-@nm -p $(TK_LIB_FILE) \
+	| awk '$$2 ~ /^[TDBCS]$$/ { sub("^_", "", $$3); print $$3 }' \
+	| sort -n | grep -E -v '^([Tt]k|_?X)' || true
 
 #
 # Target to create a Tk RPM for Linux.  Requires that you be on a Linux
@@ -1334,12 +1354,12 @@ dist:
 	cp -p $(TOP_DIR)/win/lamp.bmp $(DISTDIR)/win
 	cp -p $(TOP_DIR)/license.terms $(DISTDIR)/win
 	mkdir $(DISTDIR)/win/rc
-	cp -p $(TOP_DIR)/win/rc/wish.exe.manifest $(DISTDIR)/win/rc/
+	cp -p $(TOP_DIR)/win/wish.exe.manifest.in $(DISTDIR)/win/
 	cp -p $(TOP_DIR)/win/rc/*.rc $(TOP_DIR)/win/rc/*.cur \
 		$(TOP_DIR)/win/rc/*.ico $(TOP_DIR)/win/rc/*.bmp \
 		$(DISTDIR)/win/rc
 	$(TCL_EXE) $(TOOL_DIR)/eolFix.tcl -crlf $(DISTDIR)/win/rc/*.rc
-	$(TCL_EXE) $(TOOL_DIR)/eolFix.tcl -crlf $(DISTDIR)/win/rc/wish.exe.manifest
+	$(TCL_EXE) $(TOOL_DIR)/eolFix.tcl -crlf $(DISTDIR)/win/wish.exe.manifest.in
 	mkdir $(DISTDIR)/mac
 	cp -p $(TOP_DIR)/mac/tkMacProjects.sea.hqx $(DISTDIR)/mac
 	cp -p $(TOP_DIR)/mac/*.c $(TOP_DIR)/mac/*.h $(TOP_DIR)/mac/*.r \
@@ -1350,22 +1370,22 @@ dist:
 	cp -p $(TOP_DIR)/mac/*.doc $(DISTDIR)/mac
 	cp -p $(TOP_DIR)/mac/*.tcl $(DISTDIR)/mac
 	mkdir $(DISTDIR)/macosx
-	cp -p $(TOP_DIR)/macosx/Makefile $(TOP_DIR)/macosx/Wish.icns \
-		$(TOP_DIR)/macosx/*.c $(TOP_DIR)/macosx/*.h $(TOP_DIR)/macosx/*.in \
-		$(TOP_DIR)/macosx/*.r $(TOP_DIR)/macosx/*.tcl $(DISTDIR)/macosx
+	cp -p $(MAC_OSX_DIR)/Makefile $(MAC_OSX_DIR)/README \
+		$(MAC_OSX_DIR)/Wish.icns $(MAC_OSX_DIR)/*.c \
+		$(MAC_OSX_DIR)/*.h $(MAC_OSX_DIR)/*.in \
+		$(MAC_OSX_DIR)/*.r $(DISTDIR)/macosx
+	cp -p $(TOP_DIR)/license.terms $(DISTDIR)/macosx
 	mkdir $(DISTDIR)/macosx/Wish.pbproj
-	cp -p $(TOP_DIR)/macosx/Wish.pbproj/*.pbx* \
-		$(DISTDIR)/macosx/Wish.pbproj
-	cp -p $(TOP_DIR)/macosx/README $(DISTDIR)/macosx
+	cp -p $(MAC_OSX_DIR)/Wish.pbproj/*.pbx* $(DISTDIR)/macosx/Wish.pbproj
 	mkdir $(DISTDIR)/compat
 	cp -p $(TOP_DIR)/license.terms $(TCLDIR)/compat/unistd.h \
 		$(TCLDIR)/compat/stdlib.h $(TCLDIR)/compat/limits.h \
 		$(DISTDIR)/compat
 	mkdir $(DISTDIR)/xlib
-	cp -p $(TOP_DIR)/xlib/*.h $(TOP_DIR)/xlib/*.c $(DISTDIR)/xlib
+	cp -p $(XLIB_DIR)/*.h $(XLIB_DIR)/*.c $(DISTDIR)/xlib
 	cp -p $(TOP_DIR)/license.terms $(DISTDIR)/xlib
 	mkdir $(DISTDIR)/xlib/X11
-	cp -p $(TOP_DIR)/xlib/X11/*.h $(DISTDIR)/xlib/X11
+	cp -p $(XLIB_DIR)/X11/*.h $(DISTDIR)/xlib/X11
 	cp -p $(TOP_DIR)/license.terms $(DISTDIR)/xlib/X11
 	mkdir $(DISTDIR)/library
 	cp -p $(TOP_DIR)/license.terms $(TOP_DIR)/library/*.tcl \
@@ -1455,13 +1475,13 @@ html-tk:
 	@EXTRA_BUILD_HTML@
 
 BUILD_HTML = \
-	@if test -f $(TCL_BIN_DIR)/tclsh; then \
+	@if test -f "$(BUILD_TCLSH)"; then \
 	@LD_LIBRARY_PATH_VAR@=$(TCL_BIN_DIR):$${@LD_LIBRARY_PATH_VAR@}; export @LD_LIBRARY_PATH_VAR@; \
 	TCL_LIBRARY=@TCL_SRC_DIR@/library; export TCL_LIBRARY; \
-	TCLSH="$(TCL_BIN_DIR)/tclsh"; else \
+	TCLSH="$(BUILD_TCLSH)"; else \
 	TCLSH="$(TCL_EXE)"; fi ;\
 	$${TCLSH} $(TOOL_DIR)/tcltk-man2html.tcl --htmldir=$(HTML_INSTALL_DIR) \
-		--srcdir=$(TOP_DIR)/..
+		--srcdir=$(TOP_DIR)/.. $(BUILD_HTML_FLAGS)
 
 #
 # Target to create a Macintosh version of the distribution.  This will
