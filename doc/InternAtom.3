@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: InternAtom.3,v 1.3 2002/08/05 04:30:38 dgp Exp $
+'\" RCS: @(#) $Id: InternAtom.3,v 1.9 2007/12/13 15:23:43 dgp Exp $
 '\" 
 .so man.macros
 .TH Tk_InternAtom 3 "" Tk "Tk Library Procedures"
@@ -19,13 +19,13 @@ Tk_InternAtom, Tk_GetAtomName \- manage cache of X atoms
 Atom
 \fBTk_InternAtom(\fItkwin, name\fR)
 .sp
-CONST char *
+const char *
 \fBTk_GetAtomName(\fItkwin, atom\fR)
 .SH ARGUMENTS
 .AS Tk_Window parent
 .AP Tk_Window tkwin in
 Token for window.  Used to map atom or name relative to a particular display.
-.AP "CONST char" *name in
+.AP "const char" *name in
 String name for which atom is desired.
 .AP Atom atom in
 Atom for which corresponding string name is desired.
@@ -44,7 +44,8 @@ by \fBTk_GetAtomName\fR is in Tk's storage:  the caller need
 not free this space when finished with the string, and the caller
 should not modify the contents of the returned string.
 If there is no atom \fIatom\fR on \fItkwin\fR's display,
-then \fBTk_GetAtomName\fR returns the string ``?bad atom?''.
+then \fBTk_GetAtomName\fR returns the string
+.QW "?bad atom?" .
 .PP
 Tk caches
 the information returned by \fBTk_InternAtom\fR and \fBTk_GetAtomName\fR

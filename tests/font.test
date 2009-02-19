@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: font.test,v 1.8 2002/07/14 05:48:46 dgp Exp $
+# RCS: @(#) $Id: font.test,v 1.17 2007/12/13 15:27:54 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 catch {destroy .b}
@@ -51,11 +48,14 @@ proc csetup {{str ""}} {
 
 setup
 
-case $tcl_platform(platform) {
-    unix	{set fixed "fixed"}
-    windows	{set fixed "courier 12"}
-    macintosh	{set fixed "monaco 9"}
+case [tk windowingsystem] {
+    x11	 	{set fixed "fixed"}
+    win32	{set fixed "courier 12"}
+    classic -
+    aqua	{set fixed "monaco 9"}
 }
+
+
 set times [font actual {times 0} -family]
 
 test font-1.1 {TkFontPkgInit} {
@@ -115,11 +115,11 @@ test font-4.1 {font command: actual: arguments} {
 test font-4.2 {font command: actual: arguments} {
     # (objc < 3) 
     list [catch {font actual} msg] $msg
-} {1 {wrong # args: should be "font actual font ?-displayof window? ?option?"}}
+} {1 {wrong # args: should be "font actual font ?-displayof window? ?option? ?--? ?char?"}}
 test font-4.3 {font command: actual: arguments} {
     # (objc - skip > 4) when skip == 0
     list [catch {font actual xyz abc def} msg] $msg
-} {1 {wrong # args: should be "font actual font ?-displayof window? ?option?"}}
+} {1 {wrong # args: should be "font actual font ?-displayof window? ?option? ?--? ?char?"}}
 test font-4.4 {font command: actual: displayof specified, so skip to next} {
     catch {font actual xyz -displayof . -size}
 } {0}
@@ -129,7 +129,7 @@ test font-4.5 {font command: actual: displayof specified, so skip to next} {
 test font-4.6 {font command: actual: arguments} {
     # (objc - skip > 4) when skip == 2
     list [catch {font actual xyz -displayof . abc def} msg] $msg
-} {1 {wrong # args: should be "font actual font ?-displayof window? ?option?"}}
+} {1 {wrong # args: should be "font actual font ?-displayof window? ?option? ?--? ?char?"}}
 test font-4.7 {font command: actual: arguments} {noExceed} {
     # (tkfont == NULL)
     list [catch {font actual "\{xyz"} msg] $msg
@@ -138,11 +138,11 @@ test font-4.8 {font command: actual: all attributes} {
     # not (objc > 3) so objPtr = NULL
     lindex [font actual {-family times}] 0
 } {-family}
-test font-4.9 {font command: actual} {macOrUnix noExceed} {
+test font-4.9 {font command: actual} {unix noExceed} {
     # (objc > 3) so objPtr = objv[3 + skip]
     string tolower [font actual {-family times} -family]
 } {times}
-test font-4.10 {font command: actual} {pcOnly} {
+test font-4.10 {font command: actual} win {
     # (objc > 3) so objPtr = objv[3 + skip]
     font actual {-family times} -family
 } {Times New Roman}
@@ -309,8 +309,8 @@ test font-8.4 {font command: families} {
 
 test font-9.1 {font command: measure: arguments} {
     # (skip < 0)
-    list [catch {font measure xyz -displayof} msg] $msg
-} {1 {value for "-displayof" missing}}
+    list [catch {expr {[font measure xyz -displayof]>0}} msg] $msg
+} {0 1}
 test font-9.2 {font command: measure: arguments} {
     # (objc - skip != 4) 
     list [catch {font measure} msg] $msg
@@ -327,6 +327,15 @@ test font-9.5 {font command: measure} {
     # Tk_TextWidth()
     expr [font measure $fixed "abcdefg"]==[font measure $fixed "a"]*7
 } {1}
+test font-9.6 {font command: measure -d} {
+     list [catch {expr {[font measure $fixed -d] > 0}} msg] $msg
+} {0 1}
+test font-9.7 {font command: measure -d with -displayof} {
+     list [catch {expr {[font measure $fixed -displayof . -d] > 0}} msg] $msg
+} {0 1}
+test font-9.8 {font command: measure: arguments} {
+    list [catch {font measure $fixed -displayof .} msg] $msg
+} {1 {wrong # args: should be "font measure font ?-displayof window? text"}}
 
 test font-10.1 {font command: metrics: arguments} {
     list [catch {font metrics xyz -displayof} msg] $msg
@@ -500,20 +509,15 @@ test font-15.6 {Tk_AllocFontFromObj procedure: not a named font} {
     setup
     .b.f config -font {times 20}
 } {}
-test font-15.7 {Tk_AllocFontFromObj procedure: get native font} {unixOnly} {
+test font-15.7 {Tk_AllocFontFromObj procedure: get native font} unix {
     # not (fontPtr == NULL) 
     setup
     .b.f config -font fixed
 } {}
-test font-15.8 {Tk_AllocFontFromObj procedure: get native font} {pcOnly} {
+test font-15.8 {Tk_AllocFontFromObj procedure: get native font} win {
     # not (fontPtr == NULL) 
     setup
     .b.f config -font oemfixed
-} {}
-test font-15.9 {Tk_AllocFontFromObj procedure: get native font} {macOnly} {
-    # not (fontPtr == NULL) 
-    setup
-    .b.f config -font application
 } {}
 test font-15.10 {Tk_AllocFontFromObj procedure: get attribute font} {
     # (fontPtr == NULL) 
@@ -651,7 +655,7 @@ proc psfontname {name} {
     set start [string first "gsave" $post]
     return [string range $post [expr $start+7] end]
 }
-test font-21.1 {Tk_PostscriptFontName procedure: native} {unixOnly} {
+test font-21.1 {Tk_PostscriptFontName procedure: native} unix {
     set x [font actual {{itc avant garde} 10} -family]
     if {[string match *avant*garde $x]} {
 	psfontname "{itc avant garde} 10"
@@ -659,25 +663,16 @@ test font-21.1 {Tk_PostscriptFontName procedure: native} {unixOnly} {
 	set x {AvantGarde-Book}
     }
 } {AvantGarde-Book}
-test font-21.2 {Tk_PostscriptFontName procedure: native} {pcOnly} {
+test font-21.2 {Tk_PostscriptFontName procedure: native} win {
     psfontname "arial 10"
 } {Helvetica}
-test font-21.3 {Tk_PostscriptFontName procedure: native} {pcOnly} {
+test font-21.3 {Tk_PostscriptFontName procedure: native} win {
     psfontname "{times new roman} 10"
 } {Times-Roman}
-test font-21.4 {Tk_PostscriptFontName procedure: native} {pcOnly} {
+test font-21.4 {Tk_PostscriptFontName procedure: native} win {
     psfontname "{courier new} 10"
 } {Courier}
-test font-21.5 {Tk_PostscriptFontName procedure: native} {macOnly} {
-    psfontname "geneva 10"
-} {Helvetica}
-test font-21.6 {Tk_PostscriptFontName procedure: native} {macOnly} {
-    psfontname "{new york} 10"
-} {Times-Roman}
-test font-21.7 {Tk_PostscriptFontName procedure: native} {macOnly} {
-    psfontname "monaco 10"
-} {Courier}
-test font-21.8 {Tk_PostscriptFontName procedure: spaces} {unixOnly} {
+test font-21.8 {Tk_PostscriptFontName procedure: spaces} unix {
     set x [font actual {{lucida bright} 10} -family]
     if {[string match lucida*bright $x]} {
 	psfontname "{lucida bright} 10"
@@ -685,80 +680,75 @@ test font-21.8 {Tk_PostscriptFontName procedure: spaces} {unixOnly} {
 	set x {LucidaBright}
     }
 } {LucidaBright}
-test font-21.9 {Tk_PostscriptFontName procedure: spaces} {unixOnly} {
+test font-21.9 {Tk_PostscriptFontName procedure: spaces} unix {
     psfontname "{new century schoolbook} 10"
 } {NewCenturySchlbk-Roman}
 set i 10
 foreach p {
-    {"avantgarde" AvantGarde-Book AvantGarde-Demi AvantGarde-BookOblique AvantGarde-DemiOblique}
-    {"bookman" Bookman-Light Bookman-Demi Bookman-LightItalic Bookman-DemiItalic}
-    {"courier" Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
-    {"helvetica" Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
-    {"new century schoolbook" NewCenturySchlbk-Roman NewCenturySchlbk-Bold NewCenturySchlbk-Italic NewCenturySchlbk-BoldItalic}
-    {"palatino" Palatino-Roman Palatino-Bold Palatino-Italic Palatino-BoldItalic}
-    {"symbol" Symbol Symbol Symbol Symbol}
-    {"times" Times-Roman Times-Bold Times-Italic Times-BoldItalic}
-    {"zapfchancery" ZapfChancery-MediumItalic ZapfChancery-MediumItalic ZapfChancery-MediumItalic ZapfChancery-MediumItalic}
-    {"zapfdingbats" ZapfDingbats ZapfDingbats ZapfDingbats ZapfDingbats}
+    {font-21.10 "avantgarde"
+	    AvantGarde-Book AvantGarde-Demi
+	    AvantGarde-BookOblique AvantGarde-DemiOblique}
+    {font-21.11 "bookman"
+	    Bookman-Light Bookman-Demi Bookman-LightItalic Bookman-DemiItalic}
+    {font-21.12 "courier"
+	    Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
+    {font-21.13 "helvetica"
+	    Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
+    {font-21.14 "new century schoolbook"
+	    NewCenturySchlbk-Roman NewCenturySchlbk-Bold
+	    NewCenturySchlbk-Italic NewCenturySchlbk-BoldItalic}
+    {font-21.15 "palatino"
+	    Palatino-Roman Palatino-Bold Palatino-Italic Palatino-BoldItalic}
+    {font-21.16 "symbol"
+	    Symbol Symbol Symbol Symbol}
+    {font-21.17 "times"
+	    Times-Roman Times-Bold Times-Italic Times-BoldItalic}
+    {font-21.18 "zapfchancery"
+	    ZapfChancery-MediumItalic ZapfChancery-MediumItalic
+	    ZapfChancery-MediumItalic ZapfChancery-MediumItalic}
+    {font-21.19 "zapfdingbats"
+	    ZapfDingbats ZapfDingbats ZapfDingbats ZapfDingbats}
 } {
-    test font-21.$i {Tk_PostscriptFontName procedure: exhaustive} {unixOnly} {
-	set family [lindex $p 0]
+    set values [lassign $p testName family]
+    test $testName {Tk_PostscriptFontName procedure: exhaustive} unix {
 	set x {}
-	set i 1
+	set j 0
 	foreach slant {roman italic} {
 	    foreach weight {normal bold} {
 		set name [list $family 12 $slant $weight]
 		if {[font actual $name -family] == $family} {
 		    lappend x [psfontname $name]
 		} else {
-		    lappend x [lindex $p $i]
+		    lappend x [lindex $values $j]
 		}
-		incr i
+		incr j
 	    }
 	}
-        incr i
 	set x
-    } [lrange $p 1 end]
+    } $values
 }
 foreach p {
-    {"arial" Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
-    {"courier new" Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
-    {"helvetica" Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
-    {"symbol" Symbol Symbol-Bold Symbol-Italic Symbol-BoldItalic}
-    {"times new roman" Times-Roman Times-Bold Times-Italic Times-BoldItalic}
+    {font-21.20 "arial"
+	    Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
+    {font-21.21 "courier new"
+	    Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
+    {font-21.22 "helvetica"
+	    Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
+    {font-21.23 "symbol"
+	    Symbol Symbol-Bold Symbol-Italic Symbol-BoldItalic}
+    {font-21.24 "times new roman"
+	    Times-Roman Times-Bold Times-Italic Times-BoldItalic}
 } {
-    test font-21.$i {Tk_PostscriptFontName procedure: exhaustive} {pcOnly} {
-	set family [lindex $p 0]
+    set values [lassign $p testName family]
+    test $testName {Tk_PostscriptFontName procedure: exhaustive} win {
 	set x {}
 	foreach slant {roman italic} {
 	    foreach weight {normal bold} {
 		lappend x [psfontname [list $family 12 "$slant $weight"]]
 	    }
 	}
-        incr i
 	set x
-    } [lrange $p 1 end]
-}
-foreach p {
-    {"courier" Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
-    {"geneva" Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
-    {"helvetica" Helvetica Helvetica-Bold Helvetica-Oblique Helvetica-BoldOblique}
-    {"monaco" Courier Courier-Bold Courier-Oblique Courier-BoldOblique}
-    {"new york" Times-Roman Times-Bold Times-Italic Times-BoldItalic}
-    {"symbol" Symbol Symbol-Bold Symbol-Italic Symbol-BoldItalic}
-    {"times" Times-Roman Times-Bold Times-Italic Times-BoldItalic}
-} {
-    test font-21.$i {Tk_PostscriptFontName procedure: exhaustive} {macOnly} {
-	set family [lindex $p 0]
-	set x {}
-	foreach slant {roman italic} {
-	    foreach weight {normal bold} {
-		lappend x [psfontname [list $family 12 $slant $weight]]
-	    }
-	}
-	incr i
-	set x
-    } [lrange $p 1 end]
+    } $values
 }
 
 test font-22.1 {Tk_TextWidth procedure} {
@@ -1154,48 +1144,47 @@ test font-32.1 {Tk_TextLayoutToPostscript: ensure buffer doesn't overflow} {
 test font-33.1 {Tk_TextWidth procedure} {
 } {}
 
-test font-33.2 {ConfigAttributesObj procedure: arguments} {
+test font-34.1 {ConfigAttributesObj procedure: arguments} {
     # (Tcl_GetIndexFromObj() != TCL_OK)
     setup
     list [catch {font create xyz -xyz} msg] $msg
 } {1 {bad option "-xyz": must be -family, -size, -weight, -slant, -underline, or -overstrike}}
-test font-34.1 {ConfigAttributesObj procedure: arguments} {
+test font-34.2 {ConfigAttributesObj procedure: arguments} {
     # (objc & 1)
     setup
     list [catch {font create xyz -family} msg] $msg
 } {1 {value for "-family" option missing}}
-set i 3
 foreach p {
-    {family xyz times}
-    {size 20 40}
-    {weight normal bold}
-    {slant roman italic}
-    {underline 0 1}
-    {overstrike 0 1}
+    {font-34.3 family xyz times}
+    {font-34.4 size 20 40}
+    {font-34.5 weight normal bold}
+    {font-34.6 slant roman italic}
+    {font-34.7 underline 0 1}
+    {font-34.8 overstrike 0 1}
 } {
-    set opt [lindex $p 0]
-    test font-34.$i "ConfigAttributesObj procedure: $opt" {
+    lassign $p testName opt val1 val2
+    test $testName "ConfigAttributesObj procedure: $opt" {
 	setup
 	set x {}
-	font create xyz -$opt [lindex $p 1]
+	font create xyz -$opt $val1
 	lappend x [font config xyz -$opt]
-	font config xyz -$opt [lindex $p 2]
+	font config xyz -$opt $val2
 	lappend x [font config xyz -$opt]
-    } [lrange $p 1 2]
-    incr i
+    } [list $val1 $val2]
 }
 foreach p {
-    {size	xyz {1 {expected integer but got "xyz"}}}
-    {weight	xyz {1 {bad -weight value "xyz": must be normal, or bold}}}
-    {slant	xyz {1 {bad -slant value "xyz": must be roman, or italic}}}
-    {underline	xyz {1 {expected boolean value but got "xyz"}}}
-    {overstrike	xyz {1 {expected boolean value but got "xyz"}}}
+    {font-34.9  size   xyz {expected integer but got "xyz"}}
+    {font-34.10 weight xyz {bad -weight value "xyz": must be normal, or bold}}
+    {font-34.11 slant  xyz {bad -slant value "xyz": must be roman, or italic}}
+    {font-34.12 underline  xyz {expected boolean value but got "xyz"}}
+    {font-34.13 overstrike xyz {expected boolean value but got "xyz"}}
 } {
-    test font-34.$i "ConfigAttributesObj procedure: [lindex $p 0]" {
+    lassign $p testName opt val result
+    test $testName "ConfigAttributesObj procedure: $opt" -setup {
 	setup
-	list [catch {font create xyz -[lindex $p 0] [lindex $p 1]} msg] $msg
-    } [lindex $p 2]
-    incr i
+    } -body {
+	font create xyz -$opt $val
+    } -returnCodes error -result $result
 }
 
 test font-35.1 {GetAttributeInfoObj procedure: one attribute} {
@@ -1204,12 +1193,14 @@ test font-35.1 {GetAttributeInfoObj procedure: one attribute} {
     font create xyz -family xyz
     font config xyz -family
 } {xyz}
+
 test font-36.1 {GetAttributeInfoObj procedure: unknown attribute} {
     # (Tcl_GetIndexFromObj() != TCL_OK)
     setup
     font create xyz
     list [catch {font config xyz -xyz} msg] $msg
 } {1 {bad option "-xyz": must be -family, -size, -weight, -slant, -underline, or -overstrike}}
+
 test font-37.1 {GetAttributeInfoObj procedure: all attributes} {
     # not (objPtr != NULL) 
     setup
@@ -1218,19 +1209,20 @@ test font-37.1 {GetAttributeInfoObj procedure: all attributes} {
 } {-family xyz -size 0 -weight normal -slant roman -underline 0 -overstrike 0}
 set i 4
 foreach p {
-    {family	xyz	xyz}
-    {size	20	20}
-    {weight	normal	normal}
-    {slant	italic	italic}
-    {underline	yes	1}
-    {overstrike	false	0}
+    {font-37.2 family     xyz    xyz}
+    {font-37.3 size       20     20}
+    {font-37.4 weight     normal normal}
+    {font-37.5 slant      italic italic}
+    {font-37.6 underline  yes    1}
+    {font-37.7 overstrike false  0}
 } {
-    test font-31.$i "GetAttributeInfo procedure: [lindex $p 0]" {
+    lassign $p testName opt val expected
+    test $testName "GetAttributeInfo procedure: $opt" -setup {
 	setup
-	font create xyz -[lindex $p 0] [lindex $p 1]
-	font config xyz -[lindex $p 0]
-    } [lindex $p 2]
-    incr i
+    } -body {
+	font create xyz -$opt $val
+	font config xyz -$opt
+    } -result $expected
 }
 
 # In tests below, one field is set to "xyz" so that font name doesn't
@@ -1269,9 +1261,6 @@ test font-38.9 {ParseFontNameObj procedure: arguments} {
 test font-38.10 {ParseFontNameObj procedure: arguments} {
     list [catch {font actual {times xyz xyz}} msg] $msg
 } {1 {expected integer but got "xyz"}}
-test font-38.11 {ParseFontNameObj procedure: stylelist loop} {macOnly} {
-    lrange [font actual {times 12 bold italic overstrike underline}] 4 end
-} {-weight bold -slant italic -underline 1 -overstrike 0}
 test font-38.12 {ParseFontNameObj procedure: stylelist loop} {unixOrPc} {
     lrange [font actual {times 12 bold italic overstrike underline}] 4 end
 } {-weight bold -slant italic -underline 1 -overstrike 1}
@@ -1346,35 +1335,48 @@ tk scaling $oldscale
 test font-45.1 {TkFontGetAliasList: no match} {
     font actual {snarky 10} -family
 } [font actual {-size 10} -family]
-test font-45.2 {TkFontGetAliasList: match} {macOnly} {
-    # Result could be either "Times" or "New York"
-    font actual {{times new roman} 10} -family
-} [font actual {times 10} -family]
-test font-45.3 {TkFontGetAliasList: match} {pcOnly} {
+test font-45.3 {TkFontGetAliasList: match} win {
     font actual {times 10} -family
 } {Times New Roman}
-test font-45.4 {TkFontGetAliasList: match} {unixOnly noExceed} {
+test font-45.4 {TkFontGetAliasList: match} {unix noExceed} {
     # can fail on Unix systems that have a real "times new roman" font
     font actual {{times new roman} 10} -family
 } [font actual {times 10} -family]
+
+test font-46.1 {font actual, with character, no option, no --} \
+    -body {
+	font actual {times 10} a
+    } \
+    -match glob \
+    -result [list -family [font actual {times 10} -family] -size *\
+		 -slant roman -underline 0 -overstrike 0]
+
+test font-46.2 {font actual, with character introduced by --} \
+    -body {
+	font actual {times 10} -- -
+    } \
+    -match glob \
+    -result [list -family [font actual {times 10} -family] -size *\
+		 -slant roman -underline 0 -overstrike 0]
+
+test font-46.3 {font actual, with character and option} {
+    font actual {times 10} -family a
+} [font actual {times 10} -family]
+
+test font-46.4 {font actual, with character, option and --} {
+    font actual {times 10} -family -- -
+} [font actual {times 10} -family]
+
+test font-46.5 {font actual, too many chars} {
+    list [catch {
+	font actual {times 10} 123456789012345678901234567890123456789012345678901
+    } result] $result
+} {1 {expected a single character but got "1234567890123456789012345678901234567..."}}
 
 setup
 
 destroy .b
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: winfo.test,v 1.9.2.1 2005/10/10 15:19:41 patthoyts Exp $
+# RCS: @(#) $Id: winfo.test,v 1.15 2007/12/13 15:27:55 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 # eatColors --
@@ -84,20 +81,16 @@ test winfo-2.7 {"winfo atom" command} {
     winfo atomname -displayof . 2
 } SECONDARY
 
-# Some tests require the "pseudocolor" visual class.
-testConstraint pseudocolor [expr { ([winfo depth .] == 8) 
-				&& ([winfo visual .] == "pseudocolor")}]
-
-test winfo-3.1 {"winfo colormapfull" command} {pseudocolor} {
+test winfo-3.1 {"winfo colormapfull" command} defaultPseudocolor8 {
     list [catch {winfo colormapfull} msg] $msg
 } {1 {wrong # args: should be "winfo colormapfull window"}}
-test winfo-3.2 {"winfo colormapfull" command} {pseudocolor} {
+test winfo-3.2 {"winfo colormapfull" command} defaultPseudocolor8 {
     list [catch {winfo colormapfull a b} msg] $msg
 } {1 {wrong # args: should be "winfo colormapfull window"}}
-test winfo-3.3 {"winfo colormapfull" command} {pseudocolor} {
+test winfo-3.3 {"winfo colormapfull" command} defaultPseudocolor8 {
     list [catch {winfo colormapfull foo} msg] $msg
 } {1 {bad window path name "foo"}}
-test winfo-3.4 {"winfo colormapfull" command} {macOrUnix pseudocolor} {
+test winfo-3.4 {"winfo colormapfull" command} {unix defaultPseudocolor8} {
     eatColors .t {-colormap new}
     set result [list [winfo colormapfull .] [winfo colormapfull .t]]
     .t.c delete 34
@@ -115,8 +108,7 @@ toplevel .t -width 550 -height 400
 frame .t.f -width 80 -height 60 -bd 2 -relief raised
 place .t.f -x 50 -y 50
 wm geom .t +0+0
-tkwait visibility .t.f
-
+update
 test winfo-4.1 {"winfo containing" command} {
     list [catch {winfo containing 22} msg] $msg
 } {1 {wrong # args: should be "winfo containing ?-displayof window? rootX rootY"}}
@@ -130,6 +122,7 @@ test winfo-4.4 {"winfo containing" command} {
     list [catch {winfo containing -displayof geek 25 30} msg] $msg
 } {1 {bad window path name "geek"}}
 test winfo-4.5 {"winfo containing" command} {
+    raise .t
     winfo containing [winfo rootx .t.f] [winfo rooty .t.f]
 } .t.f
 test winfo-4.6 {"winfo containing" command} {nonPortable} {
@@ -151,10 +144,10 @@ test winfo-5.2 {"winfo interps" command} {
 test winfo-5.3 {"winfo interps" command} {
     list [catch {winfo interps -displayof geek} msg] $msg
 } {1 {bad window path name "geek"}}
-test winfo-5.4 {"winfo interps" command} {unixOnly} {
+test winfo-5.4 {"winfo interps" command} unix {
     expr [lsearch -exact [winfo interps] [tk appname]] >= 0
 } {1}
-test winfo-5.5 {"winfo interps" command} {unixOnly} {
+test winfo-5.5 {"winfo interps" command} unix {
     expr [lsearch -exact [winfo interps -displayof .] [tk appname]] >= 0
 } {1}
 
@@ -204,7 +197,7 @@ test winfo-7.6 {"winfo pathname" command} {
 test winfo-7.7 {"winfo pathname" command} {
     winfo pathname -displayof .b [winfo id .]
 } {.}
-test winfo-7.8 {"winfo pathname" command} {unixOnly testwrapper} {
+test winfo-7.8 {"winfo pathname" command} {unix testwrapper} {
     winfo pathname [testwrapper .]
 } {}
 
@@ -373,5 +366,5 @@ test winfo-14.4 {mapped at idle time} {
 
 deleteWindows
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

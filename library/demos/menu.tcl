@@ -3,11 +3,13 @@
 # This demonstration script creates a window with a bunch of menus
 # and cascaded menus using menubars.
 #
-# RCS: @(#) $Id: menu.tcl,v 1.4.2.3 2007/04/29 02:24:24 das Exp $
+# RCS: @(#) $Id: menu.tcl,v 1.11 2007/04/23 21:16:00 das Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 set w .menu
 catch {destroy $w}
@@ -17,8 +19,7 @@ wm iconname $w "menu"
 positionWindow $w
 
 label $w.msg -font $font -wraplength 4i -justify left 
-if {[string equal [tk windowingsystem] "classic"]
-	|| [string equal [tk windowingsystem] "aqua"]} {
+if {[tk windowingsystem] eq "aqua"} {
     catch {set origUseCustomMDEF $::tk::mac::useCustomMDEF; set ::tk::mac::useCustomMDEF 1}
     $w.msg configure -text "This window has a menubar with cascaded menus.  You can invoke entries with an accelerator by typing Command+x, where \"x\" is the character next to the command key symbol. The rightmost menu can be torn off into a palette by selecting the first item in the menu."
 } else {
@@ -32,11 +33,9 @@ label $w.statusBar.label -textvariable menustatus -relief sunken -bd 1 -font "He
 pack $w.statusBar.label -side left -padx 2 -expand yes -fill both
 pack $w.statusBar -side bottom -fill x -pady 2
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 menu $w.menu -tearoff 0
 
@@ -57,8 +56,7 @@ set m $w.menu.basic
 $w.menu add cascade -label "Basic" -menu $m -underline 0
 menu $m -tearoff 0
 $m add command -label "Long entry that does nothing"
-if {[string equal [tk windowingsystem] "classic"] 
-	|| [string equal [tk windowingsystem] "aqua"]} {
+if {[tk windowingsystem] eq "aqua"} {
     set modifier Command
 } elseif {$tcl_platform(platform) == "windows"} {
     set modifier Control
@@ -117,8 +115,9 @@ $m invoke 7
 set m $w.menu.icon
 $w.menu add cascade -label "Icons" -menu $m -underline 0
 menu $m -tearoff 0
-$m add command -bitmap @[file join $tk_library demos images pattern.bmp] \
-	-hidemargin 1 -command [list \
+# Main widget program sets variable tk_demoDirectory
+$m add command -bitmap @[file join $tk_demoDirectory images pattern.xbm] \
+    -hidemargin 1 -command [list \
 	tk_dialog $w.pattern {Bitmap Menu Entry} \
 		"The menu entry you invoked displays a bitmap rather than\
 		a text string.  Other than this, it is just like any other\
@@ -161,6 +160,4 @@ bind Menu <<MenuSelect>> {
     update idletasks
 }
 
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
-    catch {set ::tk::mac::useCustomMDEF $origUseCustomMDEF}
-}
+if {[tk windowingsystem] eq "aqua"} {catch {set ::tk::mac::useCustomMDEF $origUseCustomMDEF}}

@@ -3,11 +3,13 @@
 # This demonstration script creates a text widget with bindings set
 # up for hypertext-like effects.
 #
-# RCS: @(#) $Id: bind.tcl,v 1.2 1998/09/14 18:23:26 stanton Exp $
+# RCS: @(#) $Id: bind.tcl,v 1.5 2004/12/21 11:56:35 dkf Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 set w .bind
 catch {destroy $w}
@@ -16,11 +18,9 @@ wm title $w "Text Demonstration - Tag Bindings"
 wm iconname $w "bind"
 positionWindow $w
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 text $w.text -yscrollcommand "$w.scroll set" -setgrid true \
 	-width 60 -height 24 -font $font -wrap word
@@ -68,12 +68,13 @@ foreach tag {d1 d2 d3 d4 d5 d6} {
     $w.text tag bind $tag <Any-Enter> "$w.text tag configure $tag $bold"
     $w.text tag bind $tag <Any-Leave> "$w.text tag configure $tag $normal"
 }
-$w.text tag bind d1 <1> {source [file join $tk_library demos items.tcl]}
-$w.text tag bind d2 <1> {source [file join $tk_library demos plot.tcl]}
-$w.text tag bind d3 <1> {source [file join $tk_library demos ctext.tcl]}
-$w.text tag bind d4 <1> {source [file join $tk_library demos arrow.tcl]}
-$w.text tag bind d5 <1> {source [file join $tk_library demos ruler.tcl]}
-$w.text tag bind d6 <1> {source [file join $tk_library demos cscroll.tcl]}
+# Main widget program sets variable tk_demoDirectory
+$w.text tag bind d1 <1> {source [file join $tk_demoDirectory items.tcl]}
+$w.text tag bind d2 <1> {source [file join $tk_demoDirectory plot.tcl]}
+$w.text tag bind d3 <1> {source [file join $tk_demoDirectory ctext.tcl]}
+$w.text tag bind d4 <1> {source [file join $tk_demoDirectory arrow.tcl]}
+$w.text tag bind d5 <1> {source [file join $tk_demoDirectory ruler.tcl]}
+$w.text tag bind d6 <1> {source [file join $tk_demoDirectory cscroll.tcl]}
 
 $w.text mark set insert 0.0
 $w.text configure -state disabled

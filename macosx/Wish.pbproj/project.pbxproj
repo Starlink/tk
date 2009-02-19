@@ -1794,80 +1794,80 @@
 		F5375689016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = error.bmp;
-			path = ../bitmaps/error.bmp;
+			name = error.xbm;
+			path = ../bitmaps/error.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568A016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = gray12.bmp;
-			path = ../bitmaps/gray12.bmp;
+			name = gray12.xbm;
+			path = ../bitmaps/gray12.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568B016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = gray25.bmp;
-			path = ../bitmaps/gray25.bmp;
+			name = gray25.xbm;
+			path = ../bitmaps/gray25.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568C016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = gray50.bmp;
-			path = ../bitmaps/gray50.bmp;
+			name = gray50.xbm;
+			path = ../bitmaps/gray50.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568D016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = gray75.bmp;
-			path = ../bitmaps/gray75.bmp;
+			name = gray75.xbm;
+			path = ../bitmaps/gray75.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568E016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = hourglass.bmp;
-			path = ../bitmaps/hourglass.bmp;
+			name = hourglass.xbm;
+			path = ../bitmaps/hourglass.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F537568F016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = info.bmp;
-			path = ../bitmaps/info.bmp;
+			name = info.xbm;
+			path = ../bitmaps/info.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F5375690016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = questhead.bmp;
-			path = ../bitmaps/questhead.bmp;
+			name = questhead.xbm;
+			path = ../bitmaps/questhead.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F5375691016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = question.bmp;
-			path = ../bitmaps/question.bmp;
+			name = question.xbm;
+			path = ../bitmaps/question.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
 		F5375692016C3F1001DC9062 = {
 			isa = PBXFileReference;
 			lastKnownFileType = image.bmp;
-			name = warning.bmp;
-			path = ../bitmaps/warning.bmp;
+			name = warning.xbm;
+			path = ../bitmaps/warning.xbm;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
@@ -2261,12 +2261,13 @@
 			sourceTree = SOURCE_ROOT;
 		};
 		F9D6747B08E84DC100688CAA = {
-			buildArgumentsString = "-c \"cd \\\"${TK_SRCROOT}/macosx\\\" && ACTION=${ACTION} && gnumake \\${ACTION:+\\${ACTION/clean/distclean}-}${MAKE_TARGET} INSTALL_ROOT=\\\"${DSTROOT}\\\" INSTALL_PATH=\\\"${INSTALL_PATH}\\\" APPLICATION_INSTALL_PATH=\\\"${APPLICATION_INSTALL_PATH}\\\" PREFIX=\\\"${PREFIX}\\\" BINDIR=\\\"${BINDIR}\\\" MANDIR=\\\"${MANDIR}\\\" TCL_BUILD_DIR=\\\"${TCL_BUILD_DIR}\\\" \\${EXTRA_MAKE_FLAGS} ${ALL_SETTINGS}\"";
+			buildArgumentsString = "-c \"cd \\\"${TK_SRCROOT}/macosx\\\"  && ACTION=${ACTION} && CFLAGS=\\\"${CFLAGS}\\\" gnumake \\${ACTION:+\\${ACTION/clean/distclean}-}${MAKE_TARGET} INSTALL_ROOT=\\\"${DSTROOT}\\\" INSTALL_PATH=\\\"${INSTALL_PATH}\\\" PREFIX=\\\"${PREFIX}\\\" BINDIR=\\\"${BINDIR}\\\" MANDIR=\\\"${MANDIR}\\\" TCL_BUILD_DIR=\\\"${TCL_BUILD_DIR}\\\" APPLICATION_INSTALL_PATH=\\\"${APPLICATION_INSTALL_PATH}\\\" \\${EXTRA_MAKE_FLAGS} ${ALL_SETTINGS}\"";
 			buildPhases = (
 			);
 			buildSettings = {
 				APPLICATION_INSTALL_PATH = /Applications/Utilities;
 				BINDIR = "${PREFIX}/bin";
+				CFLAGS = "";
 				INSTALL_PATH = /Library/Frameworks;
 				MANDIR = "${PREFIX}/man";
 				PREFIX = /usr/local;

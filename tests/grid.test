@@ -5,13 +5,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: grid.test,v 1.17.2.4 2006/04/12 22:31:01 pspjuth Exp $
+# RCS: @(#) $Id: grid.test,v 1.31 2007/03/09 00:46:17 jenglish Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 # helper routine to return "." to a sane state after a test
@@ -37,6 +34,7 @@ proc grid_reset {{test ?} {top .}} {
     	grid rowconfigure . $i -weight 0 -minsize 0 -pad 0 -uniform ""
     }
     grid propagate . 1
+    grid anchor . nw
     update
 }
 
@@ -49,7 +47,7 @@ test grid-1.1 {basic argument checking} {
 
 test grid-1.2 {basic argument checking} {
 	list [catch {grid foo bar} msg] $msg
-} {1 {bad option "foo": must be bbox, columnconfigure, configure, forget, info, location, propagate, remove, rowconfigure, size, or slaves}}
+} {1 {bad option "foo": must be anchor, bbox, columnconfigure, configure, forget, info, location, propagate, remove, rowconfigure, size, or slaves}}
 
 test grid-1.3 {basic argument checking} {
 	button .b
@@ -166,7 +164,7 @@ grid_reset 3.2
 test grid-3.3 {configure: basic argument checking} {
     button .b
     list [catch {grid .b -row -1} msg] $msg
-} {1 {bad grid value "-1": must be a non-negative integer}}
+} {1 {bad row value "-1": must be a non-negative integer}}
 grid_reset 3.3
 
 test grid-3.4 {configure: basic argument checking} {
@@ -585,7 +583,7 @@ grid_reset 10.3
 
 test grid-10.4 {column/row configure} {
 	list [catch {grid columnconfigure . nine -weight} msg] $msg
-} {1 {expected integer but got "nine"}}
+} {1 {expected integer but got "nine" (when retreiving options only integer indices are allowed)}}
 grid_reset 10.4
 
 test grid-10.5 {column/row configure} {
@@ -690,6 +688,69 @@ test grid-10.20 {column/row configure} {
 } {foo}
 grid_reset 10.20
 
+test grid-10.21 {column/row configure} {
+    list [catch {grid columnconfigure . .b -weight 1} msg] $msg
+} {1 {grid columnconfigure: illegal index ".b"}}
+grid_reset 10.21
+
+test grid-10.22 {column/row configure} {
+    button .b
+    list [catch {grid columnconfigure . .b -weight 1} msg] $msg
+} {1 {grid columnconfigure: the window ".b" is not managed by "."}}
+grid_reset 10.22
+
+test grid-10.23 {column/row configure} {
+    button .b
+    grid .b -column 1 -columnspan 2
+    grid columnconfigure . .b -weight 1
+    set res {}
+    foreach i {0 1 2 3} {
+        lappend res [grid columnconfigure . $i -weight]
+    }
+    set res
+} {0 1 1 0}
+grid_reset 10.23
+
+test grid-10.24 {column/row configure} {
+    button .b
+    button .c
+    button .d
+    grid .b -column 1 -columnspan 2
+    grid .c -column 2 -columnspan 3
+    grid .d -column 4 -columnspan 2
+    grid columnconfigure . {.b .d} -weight 1
+    grid columnconfigure . .c -weight 2
+    set res {}
+    foreach i {0 1 2 3 4 5 6} {
+        lappend res [grid columnconfigure . $i -weight]
+    }
+    set res
+} {0 1 2 2 2 1 0}
+grid_reset 10.24
+
+test grid-10.25 {column/row configure} {
+    button .b
+    button .c
+    button .d
+    grid .b -row 1 -rowspan 2
+    grid .c -row 2 -rowspan 3
+    grid .d -row 4 -rowspan 2
+    grid rowconfigure . {7 all} -weight 1
+    grid rowconfigure . {1 .d} -weight 2
+    set res {}
+    foreach i {0 1 2 3 4 5 6 7} {
+        lappend res [grid rowconfigure . $i -weight]
+    }
+    set res
+} {0 2 1 1 2 2 0 1}
+grid_reset 10.25
+
+test grid-10.26 {column/row configure} {
+    button .b
+    grid columnconfigure .b 0
+} {-minsize 0 -pad 0 -uniform {} -weight 0}
+grid_reset 10.26
+
 test grid-10.30 {column/row configure - no indices} {
     # Bug 1422430
     set t [toplevel .test]
@@ -713,6 +774,33 @@ test grid-10.33 {column/row configure - invalid indices} {
     list [catch {grid rowconfigure . {0 1 2} -weight} msg] $msg
 } {1 {grid rowconfigure: must specify a single element on retrieval}}
 
+test grid-10.34 {column/row configure - empty 'all' configure} {
+    # Bug 1422430
+    set t [toplevel .test]
+    grid rowconfigure $t all -weight 1
+    destroy $t
+} {}
+
+test grid-10.35 {column/row configure} {
+    # Test that no lingering message is there
+    frame .f
+    set res    [grid columnconfigure .f all -weight 1]
+    append res [grid columnconfigure .f {0 all} -weight 1]
+    frame .f.f
+    grid .f.f
+    append res [grid columnconfigure .f {.f.f} -weight 1]
+    append res [grid columnconfigure .f {.f.f 1} -weight 1]
+    append res [grid columnconfigure .f {2 .f.f} -weight 1]
+    destroy .f
+    set res
+} {}
+grid_reset 10.35
+
+test grid-10.36 {column/row configure} {
+    list [catch {grid columnconfigure . all} msg] $msg
+} {1 {expected integer but got "all" (when retreiving options only integer indices are allowed)}}
+grid_reset 10.36
+
 test grid-10.37 {column/row configure} {
     list [catch {grid columnconfigure . 100000} msg] $msg
 } {0 {-minsize 0 -pad 0 -uniform {} -weight 0}}
@@ -724,14 +812,11 @@ test grid-10.38 {column/row configure} -body {
     # Test different combinations of row/column overflow
     frame .f
     set res {}
-    grid .f -column 0 -columnspan 1 -row 0 -rowspan 1
     lappend res [catch {grid .f -row 10 -column 9999} msg] $msg ; update
     lappend res [catch {grid .f -row 9999 -column 10} msg] $msg ; update
     lappend res [catch {grid .f -columnspan 2 -column 9998} msg] $msg ; update
     lappend res [catch {grid .f -rowspan 2 -row 9998} msg] $msg ; update
-    grid .f -column 0 -columnspan 1 -row 0 -rowspan 1
     lappend res [catch {grid .f -column 9998 -columnspan 2} msg] $msg ; update
-    grid .f -column 0 -columnspan 1 -row 0 -rowspan 1
     lappend res [catch {grid .f -row 9998 -rowspan 2} msg] $msg ; update
     set res
 } -cleanup {destroy .f} -result [lrange {
@@ -750,8 +835,7 @@ test grid-10.39 {column/row configure} -body {
     frame .g
     set res {}
     grid .f -row 9998 -column 0
-    lappend res [catch {grid ^ .g} msg] $msg  ; update
-    grid forget .g
+    lappend res [catch {grid ^ -in .} msg] $msg  ; update
     lappend res [catch {grid .g} msg] $msg  ; update
     grid forget .f .g
     lappend res [catch {grid .f - -column 9998} msg] $msg ; update
@@ -968,6 +1052,41 @@ test grid-11.17 {default widget placement} {
 } {100 50 100}
 grid_reset 11.17
 
+test grid-11.18 {default widget placement} {
+    foreach l {a b c d e} {
+        frame .$l -width 50 -height 50
+    }
+    grid .a .b .c .d -sticky news
+    grid  ^  ^  ^  x -in .           ;# ^ and no child should work with -in.
+    grid rowconfigure . {0 1} -uniform a
+    update
+    set res ""
+    lappend res [winfo height .a]
+    lappend res [winfo height .b]
+    lappend res [winfo height .c]
+    lappend res [winfo height .d]
+} {100 100 100 50}
+grid_reset 11.18
+
+test grid-11.19 {default widget placement} {
+    foreach l {a b c d e} {
+        frame .$l -width 50 -height 50
+    }
+    grid .a .b -sticky news
+    grid .c .d -sticky news
+    grid ^     -in . -row 2
+    grid x  ^  -in . -row 1
+
+    grid rowconfigure . {0 1 2} -uniform a
+    update
+    set res ""
+    lappend res [winfo height .a]
+    lappend res [winfo height .b]
+    lappend res [winfo height .c]
+    lappend res [winfo height .d]
+} {50 100 100 50}
+grid_reset 11.19
+
 test grid-12.1 {-sticky} {
     catch {unset data}
     frame .f -width 200 -height 100 -highlightthickness 0 -bg red
@@ -1022,6 +1141,14 @@ test grid-13.1 {-in} {
     list [catch "grid .f -in .f" msg] $msg
 } {1 {Window can't be managed in itself}}
 grid_reset 13.1
+
+test grid-13.1.1 {-in} {
+    frame .f -bg red
+    list [winfo manager .f] \
+         [catch {grid .f -in .f} err] $err \
+         [winfo manager .f]
+} {{} 1 {Window can't be managed in itself} {}}
+grid_reset 13.1.1
 
 test grid-13.2 {-in} {
     frame .f -bg red
@@ -1270,6 +1397,7 @@ test grid-16.1 {layout centering} {
     	grid .$i -row $i -column $i -sticky nswe
     }
     grid propagate . 0
+    grid anchor . center
     . configure -width 300 -height 250
     update
     grid bbox .
@@ -1421,7 +1549,7 @@ test grid-16.8 {layout internal constraints} {
     	append a "[winfo x .$i] "
     }
     set a
-} {0 30 70 250 280 , 0 30 130 230 260 , 0 30 113 197 280 , 0 30 60 90 120 }
+} {0 30 130 230 280 , 0 30 130 230 260 , 0 30 113 196 280 , 0 30 60 90 120 }
 grid_reset 16.8
 
 test grid-16.9 {layout uniform} {
@@ -1486,7 +1614,7 @@ test grid-16.12 {layout uniform (grow)} {
     grid .f1 .f2 .f3 .f4 -sticky news
     grid columnconfigure . {0 1 2} -uniform a
     # Put weight 2 on the biggest in the group to see that the groups
-    # adapts to one of the smaller.
+    # adapt to one of the smaller.
     grid columnconfigure . 2 -weight 2
     grid columnconfigure . {0 3} -weight 1
     update
@@ -1503,7 +1631,113 @@ test grid-16.12 {layout uniform (grow)} {
         {0 0 70 95} {70 0 50 95} {120 0 140 95} {260 0 90 95}]
 grid_reset 16.12
 
-test grid-16.13 {layout weights (shrinking at minsize)} {
+test grid-16.13 {layout span} {
+    frame .f1 -width 24 -height 20
+    frame .f2 -width 38 -height 20
+    frame .f3 -width 150 -height 20
+
+    grid .f1 - - .f2
+    grid .f3 - - -
+
+    set res {}
+    foreach w {{0 1 0 0} {0 0 1 0} {1 3 4 0} {1 2 1 2} {1 1 1 12}} {
+        for {set c 0} {$c < 4} {incr c} {
+            grid columnconfigure . $c -weight [lindex $w $c]
+        }
+        update
+        set res2 {}
+        for {set c 0} {$c <= 4} {incr c} {
+            lappend res2 [lindex [grid bbox . $c 0] 2]
+        }
+        lappend res $res2
+    }
+    set res
+    # The last result below should ideally be 8 8 8 126 but the current
+    # implementation is not exact enough.
+} [list [list 0 112 0 38 0] [list 0 0 112 38 0] [list 14 42 56 38 0] \
+           [list 18 38 18 76 0] [list 7 8 9 126 0]]
+grid_reset 16.13
+
+test grid-16.14 {layout span} {
+    frame .f1 -width 110 -height 20
+    frame .f2 -width 38 -height 20
+    frame .f3 -width 150 -height 20
+
+    grid .f1 - - .f2
+    grid .f3 - - -
+
+    set res {}
+    foreach w {{0 1 0 0} {0 0 1 0} {1 3 4 0} {1 2 1 3} {1 1 1 12}} {
+        for {set c 0} {$c < 4} {incr c} {
+            grid columnconfigure . $c -weight [lindex $w $c]
+        }
+        update
+        set res2 {}
+        for {set c 0} {$c <= 4} {incr c} {
+            lappend res2 [lindex [grid bbox . $c 0] 2]
+        }
+        lappend res $res2
+    }
+    set res
+} [list [list 0 112 0 38 0] [list 0 0 112 38 0] [list 14 42 56 38 0] \
+           [list 27 55 28 40 0] [list 36 37 37 40 0]]
+grid_reset 16.14
+
+test grid-16.15 {layout span} {
+    frame .f1 -width 24 -height 20
+    frame .f2 -width 38 -height 20
+    frame .f3 -width 150 -height 20
+
+    grid .f1 - - .f2
+    grid x .f3 - -
+
+    set res {}
+    foreach w {{0 1 0 0} {0 0 1 0} {1 0 1 0} {0 0 0 0} {1 0 0 6}} {
+        for {set c 0} {$c < 4} {incr c} {
+            grid columnconfigure . $c -weight [lindex $w $c]
+        }
+        update
+        set res2 {}
+        for {set c 0} {$c <= 4} {incr c} {
+            lappend res2 [lindex [grid bbox . $c 0] 2]
+        }
+        lappend res $res2
+    }
+    set res
+} [list [list 0 112 0 38 0] [list 0 0 112 38 0] [list 0 0 112 38 0] \
+           [list 0 37 37 76 0] [list 0 12 12 126 0]]
+grid_reset 16.15
+
+test grid-16.16 {layout span} {
+    frame .f1 -width 64 -height 20
+    frame .f2 -width 38 -height 20
+    frame .f3 -width 150 -height 20
+    frame .f4 -width 15 -height 20
+    frame .f5 -width 18 -height 20
+    frame .f6 -width 20 -height 20
+
+    grid .f1 - x .f2
+    grid .f3 - - -
+    grid .f4 .f5 .f6
+
+    set res {}
+    foreach w {{1 1 5 1} {0 0 1 0} {1 3 4 0} {1 2 1 2} {1 1 1 12}} {
+        for {set c 0} {$c < 4} {incr c} {
+            grid columnconfigure . $c -weight [lindex $w $c]
+        }
+        update
+        set res2 {}
+        for {set c 0} {$c <= 4} {incr c} {
+            lappend res2 [lindex [grid bbox . $c 0] 2]
+        }
+        lappend res $res2
+    }
+    set res
+} [list [list 30 34 43 43 0] [list 30 34 48 38 0] [list 22 42 48 38 0] \
+           [list 25 39 29 57 0] [list 30 34 22 64 0]]
+grid_reset 16.16
+
+test grid-16.17 {layout weights (shrinking at minsize)} {
     foreach i {0 1 2 3} {
     	frame .$i -bg gray  -width 100 -height 75 -bd 2 -relief ridge
     	grid .$i -row $i -column $i -sticky nswe
@@ -1524,8 +1758,33 @@ test grid-16.13 {layout weights (shrinking at minsize)} {
     }
     set a
 } {25-25-1 25-25-1 100-75-1 100-75-1 25-25-0 25-25-0 100-75-1 100-75-1}
-grid_reset 16.13
+grid_reset 16.17
 
+test grid-16.18 {layout span} {
+    frame .f1 -width 30  -height 20
+    frame .f2 -width 166 -height 20
+    frame .f3 -width 39  -height 20
+    frame .f4 -width 10  -height 20
+
+    grid .f1 .f3 -
+    grid .f2 -   .f4
+    grid columnconfigure . 0 -weight 1
+
+    set res {}
+    foreach w {{1 0 0} {0 1 0} {0 0 1}} {
+        for {set c 0} {$c < 3} {incr c} {
+            grid columnconfigure . $c -weight [lindex $w $c]
+        }
+        update
+        set res2 {}
+        for {set c 0} {$c <= 2} {incr c} {
+            lappend res2 [lindex [grid bbox . $c 0] 2]
+        }
+        lappend res $res2
+    }
+    set res
+} [list [list 137 29 10] [list 30 136 10] [list 98 68 10]]
+grid_reset 16.18
 
 test grid-17.1 {forget and pending idle handlers} {
     # This test is intended to detect a crash caused by a failure to remove
@@ -1618,6 +1877,81 @@ test grid-20.2 {recalculate size after removal (forget)} {
 } {1 1}
 grid_reset 20.2
 
+test grid-21.1 {anchor} {
+    list [catch {grid anchor . 1 xxx} msg] $msg
+} {1 {wrong # args: should be "grid anchor window ?anchor?"}}
+grid_reset 21.1
+
+test grid-21.2 {anchor} {
+    list [catch {grid anchor .} msg] $msg
+} {0 nw}
+grid_reset 21.2
+
+test grid-21.3 {anchor} {
+    list [catch {grid anchor . se;grid anchor .} msg] $msg
+} {0 se}
+grid_reset 21.3
+
+test grid-21.4 {anchor} {
+    list [catch {grid anchor .x} msg] $msg
+} {1 {bad window path name ".x"}}
+grid_reset 21.4
+
+test grid-21.5 {anchor} {
+    list [catch {grid anchor . x} msg] $msg
+} {1 {bad anchor "x": must be n, ne, e, se, s, sw, w, nw, or center}}
+grid_reset 21.5
+
+test grid-21.6 {anchor} {
+    foreach i {0 1 2} {
+    	frame .$i -bg gray  -width 75 -height 50 -bd 2 -relief ridge
+    	grid .$i -row $i -column $i -sticky nswe
+    }
+    grid propagate . 0
+    . configure -width 300 -height 250
+
+    set res {}
+    foreach a {n ne e se s sw w nw center} {
+        grid anchor . $a
+        update
+        lappend res [grid bbox .]
+    }
+    set res
+} [list {37 0 225 150} {75 0 225 150} {75 50 225 150} {75 100 225 150} \
+           {37 100 225 150} {0 100 225 150} {0 50 225 150} {0 0 225 150} \
+           {37 50 225 150}]
+grid_reset 21.6
+
+test grid-21.7 {anchor} {
+    # Test with a non-symmetric internal border.
+    # This only tests vertically, there is currently no way to get
+    # it assymetric horizontally.
+    labelframe .f -bd 0
+    frame .f.x -width 20 -height 20
+    .f configure -labelwidget .f.x
+    pack .f -fill both -expand 1
+
+    foreach i {0 1 2} {
+    	frame .$i -bg gray  -width 75 -height 50 -bd 2 -relief ridge
+    	grid .$i -in .f -row $i -column $i -sticky nswe
+    }
+    pack propagate . 0
+    grid propagate .f 0
+    . configure -width 300 -height 250
+
+    set res {}
+    foreach a {n ne e se s sw w nw center} {
+        grid anchor .f $a
+        update
+        lappend res [grid bbox .f]
+    }
+    pack propagate . 1 ; wm geometry . {}
+    set res
+} [list {37 20 225 150} {75 20 225 150} {75 60 225 150} {75 100 225 150} \
+           {37 100 225 150} {0 100 225 150} {0 60 225 150} {0 20 225 150} \
+           {37 60 225 150}]
+grid_reset 21.7
+
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

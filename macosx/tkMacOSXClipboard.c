@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXClipboard.c,v 1.2.2.7 2007/06/29 03:22:01 das Exp $
+ * RCS: @(#) $Id: tkMacOSXClipboard.c,v 1.12 2007/12/13 15:27:08 dgp Exp $
  */
 
 #include "tkMacOSXPrivate.h"

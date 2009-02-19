@@ -5,14 +5,15 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: menu.test,v 1.13.2.2 2006/11/24 18:11:54 hobbs Exp $
+# RCS: @(#) $Id: menu.test,v 1.20 2006/12/04 15:16:31 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
+
+# find the earth.gif file for use in these tests
+set earthPhotoFile [file join [file dirname [info script]] earth.gif]
+testConstraint hasEarthPhoto [file exists $earthPhotoFile]
 
 test menu-1.1 {Tk_MenuCmd procedure} {
     list [catch menu msg] $msg
@@ -198,7 +199,9 @@ menu .m2
 .m1 add separator
 .m1 add checkbutton -label "checkbutton" -variable check -onvalue on -offvalue off
 .m1 add radiobutton -label "radiobutton" -variable radio
-image create photo image1 -file [file join $tk_library demos images earth.gif]
+if {[testConstraint hasEarthPhoto]} {
+    image create photo image1 -file $earthPhotoFile
+}
 
 foreach configTest {
     {-activebackground 
@@ -491,7 +494,9 @@ foreach configTest {
     	set options [lindex $attempt 1]
     	foreach item {0 1 2 3 4 5} {
     	    catch {unset msg}
-    	    test menu-2.$i [list entry configuration options $name $item $value [.m1 type $item]] {
+	    # OK, it's an overeager constraint, but it should also
+	    # normally hold anyway
+    	    test menu-2.$i [list entry configuration options $name $item $value [.m1 type $item]] hasEarthPhoto {
             	set result [catch {.m1 entryconfigure $item $name $value} msg]
                 if {$result == 1} {
             	    set msg
@@ -504,7 +509,9 @@ foreach configTest {
     }
 }
 
-image delete image1
+if {[testConstraint hasEarthPhoto]} {
+    image delete image1
+}
 destroy .m1
 destroy .m2
 
@@ -890,7 +897,7 @@ test menu-3.67 {MenuWidgetCmd procedure, bad option} {
     catch {destroy .m1}
     menu .m1
     list [catch {.m1 foo} msg] $msg [destroy .m1]
-} {1 {bad option "foo": must be activate, add, cget, clone, configure, delete, entrycget, entryconfigure, index, insert, invoke, post, postcascade, type, unpost, or yposition} {}}
+} {1 {bad option "foo": must be activate, add, cget, clone, configure, delete, entrycget, entryconfigure, index, insert, invoke, post, postcascade, type, unpost, xposition, or yposition} {}}
 test menu-3.68 {MenuWidgetCmd procedure, fix for bug#508988} {
     set t .t
     set m1 .t.m1
@@ -910,6 +917,23 @@ test menu-3.68 {MenuWidgetCmd procedure, fix for bug#508988} {
     destroy $t;
     set l;
 } {1 1}
+test menu-3.69 {MenuWidgetCmd procedure, "xposition" option} -setup {
+    catch {destroy .m1}
+    menu .m1
+} -body {
+    .m1 xposition
+} -cleanup {
+    destroy .m1
+} -returnCodes error -result {wrong # args: should be ".m1 xposition index"}
+test menu-3.70 {MenuWidgetCmd procedure, "xposition" option} -setup {
+    catch {destroy .m1}
+    menu .m1
+} -body {
+    .m1 xposition 1
+    subst {} ;# just checking that the xposition does not produce an error...
+} -cleanup {
+    destroy .m1
+} -result {}
 
 test menu-4.1 {TkInvokeMenu: disabled} {
     catch {destroy .m1}
@@ -1347,10 +1371,10 @@ test menu-8.1 {DestroyMenuEntry} {
     .m1 add cascade -menu .m2
     list [catch {.m1 delete 1} msg] $msg [destroy .m1 .m2]
 } {0 {} {}}
-test menu-8.2 {DestroyMenuEntry} {
+test menu-8.2 {DestroyMenuEntry} hasEarthPhoto {
     catch {image delete image1a}
     catch {destroy .m1}
-    image create photo image1a -file [file join $tk_library demos images earth.gif]
+    image create photo image1a -file $earthPhotoFile
     menu .m1
     .m1 add command -image image1a
     list [catch {.m1 delete 1} msg] $msg [destroy .m1] [image delete image1a]
@@ -1599,32 +1623,32 @@ test menu-11.18 {ConfigureMenuEntry} testImageType {
     image create test image1
     list [catch {.m1 entryconfigure 1 -image image1} msg] $msg [destroy .m1] [image delete image1]
 } {0 {} {} {}}
-test menu-11.19 {ConfigureMenuEntry} testImageType {
+test menu-11.19 {ConfigureMenuEntry} {testImageType hasEarthPhoto} {
     catch {destroy .m1}
     catch {image delete image1}
     catch {image delete image2}
     image create test image1
-    image create photo image2 -file [file join $tk_library demos images earth.gif]
+    image create photo image2 -file $earthPhotoFile
     menu .m1
     .m1 add command -image image1
     list [catch {.m1 entryconfigure 1 -image image2} msg] $msg [destroy .m1] [image delete image1] [image delete image2]
 } {0 {} {} {} {}}
-test menu-11.20 {ConfigureMenuEntry} testImageType {
+test menu-11.20 {ConfigureMenuEntry} {testImageType hasEarthPhoto} {
     catch {destroy .m1}
     catch {image delete image1}
     catch {image delete image2}
-    image create photo image1 -file [file join $tk_library demos images earth.gif]
+    image create photo image1 -file $earthPhotoFile
     image create test image2
     menu .m1
     .m1 add checkbutton -image image1
     list [catch {.m1 entryconfigure 1 -selectimage image2} msg] $msg [destroy .m1] [image delete image1] [image delete image2]
 } {0 {} {} {} {}}
-test menu-11.21 {ConfigureMenuEntry} testImageType {
+test menu-11.21 {ConfigureMenuEntry} {testImageType hasEarthPhoto} {
     catch {destroy .m1}
     catch {image delete image1}
     catch {image delete image2}
     catch {image delete image3}
-    image create photo image1 -file [file join $tk_library demos images earth.gif]
+    image create photo image1 -file $earthPhotoFile
     image create test image2
     image create test image3
     menu .m1
@@ -2044,23 +2068,23 @@ test menu-20.6 {CloneMenu - hooking up bookeeping ptrs} {
     catch {destroy .m2}
     menu .m1
     list [catch {.m1 clone .m2} msg] $msg [destroy .m1]
- } {0 {} {}}
- test menu-20.7 {CloneMenu - hooking up bookeeping ptrs - multiple children} {
+} {0 {} {}}
+test menu-20.7 {CloneMenu - hooking up bookeeping ptrs - multiple children} {
     catch {destroy .m1}
     catch {destroy .m2}
     catch {destroy .m3}
     menu .m1
     .m1 clone .m2
     list [catch {.m1 clone .m3} msg] $msg [destroy .m1]
- } {0 {} {}}
- test menu-20.8 {CloneMenu - cascade entries} {
+} {0 {} {}}
+test menu-20.8 {CloneMenu - cascade entries} {
     catch {destroy .m1}
     catch {destroy .foo}
     menu .m1
     .m1 add cascade -menu .m2
     list [catch {.m1 clone .foo} msg] $msg [destroy .m1]
- } {0 {} {}}
- test menu-20.9 {CloneMenu - cascades entries} {
+} {0 {} {}}
+test menu-20.9 {CloneMenu - cascades entries} {
     catch {destroy .m1}
     catch {destroy .m2}
     catch {destroy .foo}
@@ -2068,7 +2092,7 @@ test menu-20.6 {CloneMenu - hooking up bookeeping ptrs} {
     .m1 add cascade -menu .m2
     menu .m2
     list [catch {.m1 clone .foo} msg] $msg [destroy .m1 .m2]
- } {0 {} {}}
+} {0 {} {}}
 test menu-20.10 {CloneMenu - tearoff fields} {
     catch {destroy .m1}
     catch {destroy .m2}
@@ -2498,5 +2522,5 @@ test menu-36.1 {menu -underline string overruns Bug 1599877} {} {
 
 # cleanup
 deleteWindows
-::tcltest::cleanupTests
+cleanupTests
 return

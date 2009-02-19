@@ -5,18 +5,13 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: window.test,v 1.7.2.1 2004/02/13 01:43:05 hobbs Exp $
+# RCS: @(#) $Id: window.test,v 1.12 2004/06/24 12:45:44 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-namespace import -force tcltest::interpreter
-namespace import -force tcltest::makeFile
-namespace import -force tcltest::removeFile
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
+namespace import -force ::tk::test::loadTkCommand
 update
 
 # XXX This file is woefully incomplete.  Right now it only tests
@@ -82,59 +77,84 @@ test window-2.3 {Tk_DestroyWindow procedure, destroy handler deletes parent} {
 
 test window-2.4 {Tk_DestroyWindow, cleanup half dead window at exit} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         update
         bind . <Destroy> exit
         destroy .
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {}}
 
 test window-2.5 {Tk_DestroyWindow, cleanup half dead windows at exit} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         toplevel .t
         update
         bind .t <Destroy> exit
         destroy .t
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {}}
 
 test window-2.6 {Tk_DestroyWindow, cleanup half dead windows at exit} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         toplevel .t
         update
         bind .t <Destroy> exit
         destroy .
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {}}
 
 test window-2.7 {Tk_DestroyWindow, cleanup half dead windows at exit} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         toplevel .t
         toplevel .t.f
         update
         bind .t.f <Destroy> exit
         destroy .
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {}}
 
 test window-2.8 {Tk_DestroyWindow, cleanup half dead windows at exit} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         toplevel .t1
         toplevel .t2
         toplevel .t3
@@ -143,30 +163,43 @@ test window-2.8 {Tk_DestroyWindow, cleanup half dead windows at exit} \
         bind .t2 <Destroy> {destroy .t1}
         bind .t1 <Destroy> {exit 0}
         destroy .t3
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {}}
 
-test window-2.9 {Tk_DestroyWindow, Destroy bindings evaluated after exit} \
-    unixOrWin {
-    set script [makeFile {
+test window-2.9 {Tk_DestroyWindow, Destroy bindings
+        evaluated after exit} unixOrWin {
+    set code [loadTkCommand]
+    append code {
         toplevel .t1
         toplevel .t2
         update
         bind .t2 <Destroy> {puts "Destroy .t2" ; exit 1}
         bind .t1 <Destroy> {puts "Destroy .t1" ; exit 0}
         destroy .t2
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {Destroy .t2
 Destroy .t1}}
 
-test window-2.10 {Tk_DestroyWindow, Destroy binding evaluated once} unixOrWin {
-    set script [makeFile {
+test window-2.10 {Tk_DestroyWindow, Destroy binding
+        evaluated once} unixOrWin {
+    set code [loadTkCommand]
+    append code {
         update
         bind . <Destroy> {
             puts "Destroy ."
@@ -174,15 +207,21 @@ test window-2.10 {Tk_DestroyWindow, Destroy binding evaluated once} unixOrWin {
             exit 0
         }
         destroy .
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 {Destroy .}}
 
 test window-2.11 {Tk_DestroyWindow, don't reanimate a half-dead window} \
         unixOrWin {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
         toplevel .t1
         toplevel .t2
         update
@@ -195,17 +234,19 @@ test window-2.11 {Tk_DestroyWindow, don't reanimate a half-dead window} \
         }
         bind .t2 <Destroy> {exit}
         destroy .t2
-    } script]
-    set error [catch {exec [interpreter] $script -geometry 10x10+0+0} msg]
+    }
+    set script [makeFile $code script]
+    if {[catch {exec [interpreter] $script -geometry 10x10+0+0} msg]} {
+	set error 1
+    } else {
+	set error 0
+    }
     removeFile script
     list $error $msg
 } {0 YES}
 
-# Some tests require the testmenubar command
-testConstraint testmenubar [llength [info commands testmenubar]]
-
 test window-3.1 {Tk_MakeWindowExist procedure, stacking order and menubars} \
-	{unixOnly testmenubar} {
+	{unix testmenubar} {
     catch {destroy .t}
     toplevel .t -width 300 -height 200
     wm geometry .t +0+0
@@ -216,7 +257,7 @@ test window-3.1 {Tk_MakeWindowExist procedure, stacking order and menubars} \
     # If stacking order isn't handle properly, generates an X error.
 } {}
 test window-3.2 {Tk_MakeWindowExist procedure, stacking order and menubars} \
-	{unixOnly testmenubar} {
+	{unix testmenubar} {
     catch {destroy .t}
     toplevel .t -width 300 -height 200
     wm geometry .t +0+0
@@ -243,7 +284,7 @@ test window-4.2 {Tk_NameToWindow procedure} {testmenubar} {
 } {0 100x50+10+10}
 
 test window-5.1 {Tk_MakeWindowExist procedure, stacking order and menubars} \
-	{unixOnly testmenubar} {
+	{unix testmenubar} {
     catch {destroy .t}
     toplevel .t -width 300 -height 200
     wm geometry .t +0+0
@@ -258,17 +299,5 @@ test window-5.1 {Tk_MakeWindowExist procedure, stacking order and menubars} \
 } {}
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-

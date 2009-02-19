@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: entry.test,v 1.14.2.1 2006/05/29 21:52:47 hobbs Exp $
+# RCS: @(#) $Id: entry.test,v 1.22.2.1 2008/10/09 17:17:55 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 proc scroll args {
@@ -84,16 +81,16 @@ foreach test {
     {-width 402 402 3p {expected integer but got "3p"}}
     {-xscrollcommand {Some command} {Some command} {} {}}
 } {
-    set name [lindex $test 0]
+    lassign $test name goodValue goodResult badValue badResult
     test entry-1.$i {configuration options} {
-	.e configure $name [lindex $test 1]
+	.e configure $name $goodValue
 	list [lindex [.e configure $name] 4] [.e cget $name]
-    } [list [lindex $test 2] [lindex $test 2]]
+    } [list $goodResult $goodResult]
     incr i
-    if {[lindex $test 3] != ""} {
-	test entry-1.$i {configuration options} {
-	    list [catch {.e configure $name [lindex $test 3]} msg] $msg
-	} [list 1 [lindex $test 4]]
+    if {$badValue ne ""} {
+	test entry-1.$i {configuration options} -body {
+	    .e configure $name $badValue
+	} -returnCodes error -result $badResult
     }
     .e configure $name [lindex [.e configure $name] 3]
     incr i
@@ -252,7 +249,7 @@ test entry-3.26 {EntryWidgetCmd procedure, "delete" widget command} {
     .e configure -state normal
     .e get
 } {01234567890}
-test entry-3.27 {EntryWidgetCmd procedure, "delete" widget command} {
+test entry-3.26a {EntryWidgetCmd procedure, "delete" widget command} {
     .e delete 0 end
     .e insert end "01234567890"
     .e configure -state readonly
@@ -316,7 +313,7 @@ test entry-3.40 {EntryWidgetCmd procedure, "insert" widget command} {
     .e configure -state normal
     .e get
 } {01234567890}
-test entry-3.40 {EntryWidgetCmd procedure, "insert" widget command} {
+test entry-3.40a {EntryWidgetCmd procedure, "insert" widget command} {
     .e delete 0 end
     .e insert end "01234567890"
     .e configure -state readonly
@@ -453,7 +450,7 @@ test entry-3.64 {EntryWidgetCmd procedure, "selection" widget command} {
     .e configure -state normal
     list [.e index sel.first] [.e index sel.last]
 } {0 10}
-test entry-3.64 {EntryWidgetCmd procedure, "selection" widget command} {
+test entry-3.64a {EntryWidgetCmd procedure, "selection" widget command} {
     .e delete 0 end
     .e insert end 0123456789
     .e selection range 0 end
@@ -465,13 +462,13 @@ test entry-3.64 {EntryWidgetCmd procedure, "selection" widget command} {
 .e delete 0 end
 .e insert end "This is quite a long text string, so long that it "
 .e insert end "runs off the end of the window quite a bit."
-test entry-3.64 {EntryWidgetCmd procedure, "selection to" widget command} {
+test entry-3.64b {EntryWidgetCmd procedure, "selection to" widget command} {
     list [catch {.e select to 2 3} msg] $msg
 } {1 {wrong # args: should be ".e selection to index"}}
 test entry-3.65 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview 5
-    .e xview
-} {0.0537634 0.268817}
+    format {%.7f %.7f} {*}[.e xview]
+} {0.0537634 0.2688172}
 test entry-3.66 {EntryWidgetCmd procedure, "xview" widget command} {
     list [catch {.e xview gorp} msg] $msg
 } {1 {bad entry index "gorp"}}
@@ -479,7 +476,7 @@ test entry-3.67 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview 0
     .e icursor 10
     .e xview insert
-    .e xview
+    format {%.6f %.6f} {*}[.e xview]
 } {0.107527 0.322581}
 test entry-3.68 {EntryWidgetCmd procedure, "xview" widget command} {
     list [catch {.e xview moveto foo bar} msg] $msg
@@ -489,8 +486,8 @@ test entry-3.69 {EntryWidgetCmd procedure, "xview" widget command} {
 } {1 {expected floating-point number but got "foo"}}
 test entry-3.70 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview moveto 0.5
-    .e xview
-} {0.505376 0.72043}
+    format {%.6f %.6f} {*}[.e xview]
+} {0.505376 0.720430}
 test entry-3.71 {EntryWidgetCmd procedure, "xview" widget command} {
     list [catch {.e xview scroll 24} msg] $msg
 } {1 {wrong # args: should be ".e xview scroll number units|pages"}}
@@ -500,13 +497,13 @@ test entry-3.72 {EntryWidgetCmd procedure, "xview" widget command} {
 test entry-3.73 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview moveto 0
     .e xview scroll 1 pages
-    .e xview
+    format {%.6f %.6f} {*}[.e xview]
 } {0.193548 0.408602}
 test entry-3.74 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview moveto .9
     update
     .e xview scroll -2 p
-    .e xview
+    format {%.6f %.6f} {*}[.e xview]
 } {0.397849 0.612903}
 test entry-3.75 {EntryWidgetCmd procedure, "xview" widget command} {
     .e xview 30
@@ -544,12 +541,12 @@ test entry-3.81 {EntryWidgetCmd procedure, "xview" widget command} {
 
     set x {}
     .e xview moveto .1
-    lappend x [lindex [.e xview] 0]
+    lappend x [format {%.6f} [lindex [.e xview] 0]]
     .e xview moveto .11
-    lappend x [lindex [.e xview] 0]
+    lappend x [format {%.6f} [lindex [.e xview] 0]]
     .e xview moveto .12
-    lappend x [lindex [.e xview] 0]
-} {0.0957447 0.106383 0.117021}
+    lappend x [format {%.6f} [lindex [.e xview] 0]]
+} {0.095745 0.106383 0.117021}
 test entry-3.82 {EntryWidgetCmd procedure} {
     list [catch {.e gorp} msg] $msg
 } {1 {bad option "gorp": must be bbox, cget, configure, delete, get, icursor, index, insert, scan, selection, validate, or xview}}
@@ -641,8 +638,8 @@ test entry-5.7 {ConfigureEntry procedure} {
     .e insert end "01234567890"
     update
     .e configure -width 5
-    set scrollInfo
-} {0 0.363636}
+    format {%.6f %.6f} {*}$scrollInfo
+} {0.000000 0.363636}
 test entry-5.8 {ConfigureEntry procedure} {fonts} {
     catch {destroy .e}
     entry .e -width 0
@@ -676,7 +673,7 @@ test entry-5.11 {ConfigureEntry procedure} {
     pack [entry .e -font {{open look glyph}}]
     .e scan dragto 30
     update
-} {}    
+} {}
 
 # No tests for DisplayEntry.
 
@@ -756,7 +753,7 @@ test entry-6.9 {EntryComputeGeometry procedure} {fonts} {
     update
     list [winfo reqwidth .e] [winfo reqheight .e]
 } {25 39}
-test entry-6.10 {EntryComputeGeometry procedure} {unixOnly fonts} {
+test entry-6.10 {EntryComputeGeometry procedure} {unix fonts} {
     catch {destroy .e}
     entry .e -bd 1 -relief raised -width 0 -show .
     .e insert 0 12345
@@ -768,7 +765,7 @@ test entry-6.10 {EntryComputeGeometry procedure} {unixOnly fonts} {
     .e configure -show ""
     lappend x [winfo reqwidth .e]
 } {23 53 43}
-test entry-6.11 {EntryComputeGeometry procedure} {pcOnly} {
+test entry-6.11 {EntryComputeGeometry procedure} win {
     catch {destroy .e}
     entry .e -bd 1 -relief raised -width 0 -show . -font {helvetica 12}
     .e insert 0 12345
@@ -793,15 +790,15 @@ test entry-7.1 {InsertChars procedure} {
     .e insert 0 abcde
     .e insert 2 XXX
     update
-    list [.e get] $contents $scrollInfo
-} {abXXXcde abXXXcde {0 1}}
+    list [.e get] $contents [format {%.6f %.6f} {*}$scrollInfo]
+} {abXXXcde abXXXcde {0.000000 1.000000}}
 test entry-7.2 {InsertChars procedure} {
     .e delete 0 end
     .e insert 0 abcde
     .e insert 500 XXX
     update
-    list [.e get] $contents $scrollInfo
-} {abcdeXXX abcdeXXX {0 1}}
+    list [.e get] $contents [format {%.6f %.6f} {*}$scrollInfo]
+} {abcdeXXX abcdeXXX {0.000000 1.000000}}
 test entry-7.3 {InsertChars procedure} {
     .e delete 0 end
     .e insert 0 0123456789
@@ -887,22 +884,22 @@ test entry-8.1 {DeleteChars procedure} {
     .e insert 0 abcde
     .e delete 2 4
     update
-    list [.e get] $contents $scrollInfo
-} {abe abe {0 1}}
+    list [.e get] $contents [format {%.6f %.6f} {*}$scrollInfo]
+} {abe abe {0.000000 1.000000}}
 test entry-8.2 {DeleteChars procedure} {
     .e delete 0 end
     .e insert 0 abcde
     .e delete -2 2
     update
-    list [.e get] $contents $scrollInfo
-} {cde cde {0 1}}
+    list [.e get] $contents [format {%.6f %.6f} {*}$scrollInfo]
+} {cde cde {0.000000 1.000000}}
 test entry-8.3 {DeleteChars procedure} {
     .e delete 0 end
     .e insert 0 abcde
     .e delete 3 1000
     update
-    list [.e get] $contents $scrollInfo
-} {abc abc {0 1}}
+    list [.e get] $contents [format {%.6f %.6f} {*}$scrollInfo]
+} {abc abc {0.000000 1.000000}}
 test entry-8.4 {DeleteChars procedure} {
     .e delete 0 end
     .e insert 0 0123456789abcde
@@ -1198,26 +1195,26 @@ test entry-13.9 {GetEntryIndex procedure} {
     list [.e index sel.first] [.e index sel.last]
 } {1 6}
 selection clear .e
-test entry-13.10 {GetEntryIndex procedure} {unixOnly} {
+test entry-13.10 {GetEntryIndex procedure} unix {
     # On unix, when selection is cleared, entry widget's internal 
     # selection range is reset.
 
     list [catch {.e index sel.first} msg] $msg
 } {1 {selection isn't in widget .e}}
-test entry-13.11 {GetEntryIndex procedure} {macOrPc} {
+test entry-13.11 {GetEntryIndex procedure} win {
     # On mac and pc, when selection is cleared, entry widget remembers
     # last selected range.  When selection ownership is restored to 
     # entry, the old range will be rehighlighted.
 
     list [catch {selection get}] [.e index sel.first]
 } {1 1}
-test entry-13.12 {GetEntryIndex procedure} {unixOnly} {
+test entry-13.12 {GetEntryIndex procedure} unix {
     list [catch {.e index sbogus} msg] $msg
 } {1 {selection isn't in widget .e}}
-test entry-13.13 {GetEntryIndex procedure} {macOrPc} {
+test entry-13.13 {GetEntryIndex procedure} win {
     list [catch {.e index sbogus} msg] $msg
 } {1 {bad entry index "sbogus"}}
-test entry-13.14 {GetEntryIndex procedure} {macOrPc} {
+test entry-13.14 {GetEntryIndex procedure} win {
     list [catch {selection get}] [catch {.e index sbogus}]
 } {1 1}
 test entry-13.15 {GetEntryIndex procedure} {
@@ -1316,25 +1313,25 @@ update
 test entry-16.1 {EntryVisibleRange procedure} {fonts} {
     .e delete 0 end
     .e insert 0 .............................
-    .e xview
-} {0 0.827586}
-test entry-15.2 {EntryVisibleRange procedure} {unixOnly fonts} {
+    format {%.6f %.6f} {*}[.e xview]
+} {0.000000 0.827586}
+test entry-16.2 {EntryVisibleRange procedure} {unix fonts} {
     .e configure -show X
     .e delete 0 end
     .e insert 0 .............................
-    .e xview
-} {0 0.275862}
-test entry-15.3 {EntryVisibleRange procedure} {pcOnly} {
+    format {%.6f %.6f} {*}[.e xview]
+} {0.000000 0.275862}
+test entry-16.3 {EntryVisibleRange procedure} win {
     .e configure -show .
     .e delete 0 end
     .e insert 0 XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    .e xview
-} {0 0.827586}
+    format {%.6f %.6f} {*}[.e xview]
+} {0.000000 0.827586}
 .e configure -show ""
-test entry-15.4 {EntryVisibleRange procedure} {
+test entry-16.4 {EntryVisibleRange procedure} {
     .e delete 0 end
-    .e xview
-} {0 1}
+    format {%.6f %.6f} {*}[.e xview]
+} {0.000000 1.000000}
 
 catch {destroy .e}
 entry .e -width 10 -xscrollcommand scroll -font $fixed
@@ -1344,21 +1341,21 @@ test entry-17.1 {EntryUpdateScrollbar procedure} {
     .e delete 0 end
     .e insert 0 123
     update
-    set scrollInfo
-} {0 1}
+    format {%.6f %.6f} {*}$scrollInfo
+} {0.000000 1.000000}
 test entry-17.2 {EntryUpdateScrollbar procedure} {
     .e delete 0 end
     .e insert 0 0123456789abcdef
     .e xview 3
     update
-    set scrollInfo
-} {0.1875 0.8125}
+    format {%.6f %.6f} {*}$scrollInfo
+} {0.187500 0.812500}
 test entry-17.3 {EntryUpdateScrollbar procedure} {
     .e delete 0 end
     .e insert 0 abcdefghijklmnopqrs
     .e xview 6
     update
-    set scrollInfo
+    format {%.6f %.6f} {*}$scrollInfo
 } {0.315789 0.842105}
 test entry-17.4 {EntryUpdateScrollbar procedure} {
     destroy .e
@@ -1373,7 +1370,7 @@ test entry-17.4 {EntryUpdateScrollbar procedure} {
     list $x $errorInfo
 } {{invalid command name "thisisnotacommand"} {invalid command name "thisisnotacommand"
     while executing
-"thisisnotacommand 0 1"
+"thisisnotacommand 0.0 1.0"
     (horizontal scrolling command executed by .e)}}
 
 set l [interp hidden]
@@ -1633,5 +1630,5 @@ destroy .e
 option clear
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

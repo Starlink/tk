@@ -3,7 +3,7 @@
 # This file defines the default bindings for Tk scale widgets and provides
 # procedures that help in implementing the bindings.
 #
-# RCS: @(#) $Id: scale.tcl,v 1.9.2.5 2006/03/17 10:50:11 patthoyts Exp $
+# RCS: @(#) $Id: scale.tcl,v 1.14 2006/03/17 11:13:15 patthoyts Exp $
 #
 # Copyright (c) 1994 The Regents of the University of California.
 # Copyright (c) 1994-1995 Sun Microsystems, Inc.
@@ -272,8 +272,9 @@ proc ::tk::ScaleButton2Down {w x y} {
     variable ::tk::Priv
 
     if {[$w cget -state] eq "disabled"} {
-      return
+	return
     }
+
     $w configure -state active
     $w set [$w get $x $y]
     set Priv(dragging) 1

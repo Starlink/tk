@@ -1,15 +1,15 @@
-/* 
+/*
  * tkWinPixmap.c --
  *
- *	This file contains the Xlib emulation functions pertaining to
- *	creating and destroying pixmaps.
+ *	This file contains the Xlib emulation functions pertaining to creating
+ *	and destroying pixmaps.
  *
  * Copyright (c) 1995 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinPixmap.c,v 1.3 2000/02/01 11:41:44 hobbs Exp $
+ * RCS: @(#) $Id: tkWinPixmap.c,v 1.7 2007/01/11 15:35:41 dkf Exp $
  */
 
 #include "tkWinInt.h"
@@ -32,17 +32,17 @@
  */
 
 Pixmap
-Tk_GetPixmap(display, d, width, height, depth)
-    Display* display;
-    Drawable d;
-    int width;
-    int height;
-    int depth;
+Tk_GetPixmap(
+    Display *display,
+    Drawable d,
+    int width,
+    int height,
+    int depth)
 {
     TkWinDrawable *newTwdPtr, *twdPtr;
     int planes;
     Screen *screen;
-    
+
     display->request++;
 
     newTwdPtr = (TkWinDrawable*) ckalloc(sizeof(TkWinDrawable));
@@ -65,13 +65,14 @@ Tk_GetPixmap(display, d, width, height, depth)
 	planes = (int) screen->ext_data;
 	depth /= planes;
     }
-    newTwdPtr->bitmap.handle = CreateBitmap(width, height, planes, depth, NULL);
+    newTwdPtr->bitmap.handle =
+	    CreateBitmap(width, height, (DWORD) planes, (DWORD) depth, NULL);
 
     if (newTwdPtr->bitmap.handle == NULL) {
 	ckfree((char *) newTwdPtr);
 	return None;
     }
-    
+
     return (Pixmap)newTwdPtr;
 }
 
@@ -92,9 +93,9 @@ Tk_GetPixmap(display, d, width, height, depth)
  */
 
 void
-Tk_FreePixmap(display, pixmap)
-    Display* display;
-    Pixmap pixmap;
+Tk_FreePixmap(
+    Display *display,
+    Pixmap pixmap)
 {
     TkWinDrawable *twdPtr = (TkWinDrawable *) pixmap;
 
@@ -123,9 +124,9 @@ Tk_FreePixmap(display, pixmap)
  */
 
 void
-TkSetPixmapColormap(pixmap, colormap)
-    Pixmap pixmap;
-    Colormap colormap;
+TkSetPixmapColormap(
+    Pixmap pixmap,
+    Colormap colormap)
 {
     TkWinDrawable *twdPtr = (TkWinDrawable *)pixmap;
     twdPtr->bitmap.colormap = colormap;
@@ -136,9 +137,9 @@ TkSetPixmapColormap(pixmap, colormap)
  *
  * XGetGeometry --
  *
- *	Retrieve the geometry of the given drawable.  Note that
- *	this is a degenerate implementation that only returns the
- *	size of a pixmap or window.
+ *	Retrieve the geometry of the given drawable. Note that this is a
+ *	degenerate implementation that only returns the size of a pixmap or
+ *	window.
  *
  * Results:
  *	Returns 0.
@@ -150,17 +151,16 @@ TkSetPixmapColormap(pixmap, colormap)
  */
 
 int
-XGetGeometry(display, d, root_return, x_return, y_return, width_return,
-	height_return, border_width_return, depth_return)
-    Display* display;
-    Drawable d;
-    Window* root_return;
-    int* x_return;
-    int* y_return;
-    unsigned int* width_return;
-    unsigned int* height_return;
-    unsigned int* border_width_return;
-    unsigned int* depth_return;
+XGetGeometry(
+    Display *display,
+    Drawable d,
+    Window *root_return,
+    int *x_return,
+    int *y_return,
+    unsigned int *width_return,
+    unsigned int *height_return,
+    unsigned int *border_width_return,
+    unsigned int *depth_return)
 {
     TkWinDrawable *twdPtr = (TkWinDrawable *)d;
 
@@ -169,30 +169,38 @@ XGetGeometry(display, d, root_return, x_return, y_return, width_return,
 	BITMAPINFO info;
 
 	if (twdPtr->bitmap.handle == NULL) {
-            panic("XGetGeometry: invalid pixmap");
-        }
-        dc = GetDC(NULL);
-        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        info.bmiHeader.biBitCount = 0;
-        if (!GetDIBits(dc, twdPtr->bitmap.handle, 0, 0, NULL, &info,
-                DIB_RGB_COLORS)) {
-            panic("XGetGeometry: unable to get bitmap size");
-        }
-        ReleaseDC(NULL, dc);
+	    Tcl_Panic("XGetGeometry: invalid pixmap");
+	}
+	dc = GetDC(NULL);
+	info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	info.bmiHeader.biBitCount = 0;
+	if (!GetDIBits(dc, twdPtr->bitmap.handle, 0, 0, NULL, &info,
+		DIB_RGB_COLORS)) {
+	    Tcl_Panic("XGetGeometry: unable to get bitmap size");
+	}
+	ReleaseDC(NULL, dc);
 
-        *width_return = info.bmiHeader.biWidth;
-        *height_return = info.bmiHeader.biHeight;
+	*width_return = info.bmiHeader.biWidth;
+	*height_return = info.bmiHeader.biHeight;
     } else if (twdPtr->type == TWD_WINDOW) {
 	RECT rect;
 
-        if (twdPtr->window.handle == NULL) {
-            panic("XGetGeometry: invalid window");
-        }
-        GetClientRect(twdPtr->window.handle, &rect);
-        *width_return = rect.right - rect.left;
-        *height_return = rect.bottom - rect.top;
+	if (twdPtr->window.handle == NULL) {
+	    Tcl_Panic("XGetGeometry: invalid window");
+	}
+	GetClientRect(twdPtr->window.handle, &rect);
+	*width_return = rect.right - rect.left;
+	*height_return = rect.bottom - rect.top;
     } else {
-        panic("XGetGeometry: invalid window");
+	Tcl_Panic("XGetGeometry: invalid window");
     }
     return 1;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

@@ -3,7 +3,7 @@
 # This file defines the default bindings for Tk listbox widgets
 # and provides procedures that help in implementing those bindings.
 #
-# RCS: @(#) $Id: listbox.tcl,v 1.13.2.4 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: listbox.tcl,v 1.18 2007/12/13 15:26:27 dgp Exp $
 #
 # Copyright (c) 1994 The Regents of the University of California.
 # Copyright (c) 1994-1995 Sun Microsystems, Inc.
@@ -35,7 +35,7 @@
 
 bind Listbox <1> {
     if {[winfo exists %W]} {
-	tk::ListboxBeginSelect %W [%W index @%x,%y]
+	tk::ListboxBeginSelect %W [%W index @%x,%y] 1
     }
 }
 
@@ -178,7 +178,8 @@ bind Listbox <B2-Motion> {
 # The MouseWheel will typically only fire on Windows and Mac OS X.
 # However, someone could use the "event generate" command to produce
 # one on other platforms.
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
+
+if {[tk windowingsystem] eq "aqua"} {
     bind Listbox <MouseWheel> {
         %W yview scroll [expr {- (%D)}] units
     }
@@ -226,7 +227,7 @@ if {"x11" eq [tk windowingsystem]} {
 # el -		The element for the selection operation (typically the
 #		one under the pointer).  Must be in numerical form.
 
-proc ::tk::ListboxBeginSelect {w el} {
+proc ::tk::ListboxBeginSelect {w el {focus 1}} {
     variable ::tk::Priv
     if {[$w cget -selectmode] eq "multiple"} {
 	if {[$w selection includes $el]} {
@@ -242,6 +243,10 @@ proc ::tk::ListboxBeginSelect {w el} {
 	set Priv(listboxPrev) $el
     }
     event generate $w <<ListboxSelect>>
+    # check existence as ListboxSelect may destroy us
+    if {$focus && [winfo exists $w] && [$w cget -state] eq "normal"} {
+	focus $w
+    }
 }
 
 # ::tk::ListboxMotion --
@@ -479,7 +484,7 @@ proc ::tk::ListboxCancel w {
     }
     set first [$w index anchor]
     set last $Priv(listboxPrev)
-    if { $last eq "" } {
+    if {$last eq ""} {
 	# Not actually doing any selection right now
 	return
     }

@@ -3,7 +3,7 @@
 # Initialization script normally executed in the interpreter for each
 # Tk-based application.  Arranges class bindings for widgets.
 #
-# RCS: @(#) $Id: tk.tcl,v 1.46.2.7 2007/04/29 02:24:49 das Exp $
+# RCS: @(#) $Id: tk.tcl,v 1.73.2.8 2008/12/21 21:02:58 dgp Exp $
 #
 # Copyright (c) 1992-1994 The Regents of the University of California.
 # Copyright (c) 1994-1996 Sun Microsystems, Inc.
@@ -12,9 +12,12 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-# Insist on running with compatible versions of Tcl and Tk.
-package require -exact Tk  8.4
-package require -exact Tcl 8.4
+package require Tcl 8.5	;# Guard against [source] in an 8.4- interp
+			;# before using 8.5 [package] features.
+# Insist on running with compatible version of Tcl
+package require Tcl 8.5.0-8.6
+# Verify that we have Tk binary and script components from the same release
+package require -exact Tk  8.5.6
 
 # Create a ::tk namespace
 namespace eval ::tk {
@@ -25,7 +28,7 @@ namespace eval ::tk {
             # The msgcat package is not available.  Supply our own
             # minimal replacement.
             proc mc {src args} {
-                return [eval [list format $src] $args]
+                return [format $src {*}$args]
             }
             proc mcmax {args} {
                 set max 0
@@ -46,13 +49,20 @@ namespace eval ::tk {
     }
     namespace import ::tk::msgcat::*
 }
+# and a ::ttk namespace
+namespace eval ::ttk {
+    if {$::tk_library ne ""} {
+	# avoid file join to work in safe interps, but this is also x-plat ok
+	variable library $::tk_library/ttk
+    }
+}
 
-# Add Tk's directory to the end of the auto-load search path, if it
+# Add Ttk & Tk's directory to the end of the auto-load search path, if it
 # isn't already on the path:
 
-if {[info exists ::auto_path] && $::tk_library ne "" && \
-	[lsearch -exact $::auto_path $::tk_library] < 0} {
-    lappend ::auto_path $::tk_library
+if {[info exists ::auto_path] && ($::tk_library ne "")
+    && ($::tk_library ni $::auto_path)} {
+    lappend ::auto_path $::tk_library $::ttk::library
 }
 
 # Turn off strict Motif look and feel as a default.
@@ -79,12 +89,11 @@ proc ::tk::PlaceWindow {w {place ""} {anchor ""}} {
     wm withdraw $w
     update idletasks
     set checkBounds 1
-    set place_len [string length $place]
     if {$place eq ""} {
 	set x [expr {([winfo screenwidth $w]-[winfo reqwidth $w])/2}]
 	set y [expr {([winfo screenheight $w]-[winfo reqheight $w])/2}]
 	set checkBounds 0
-    } elseif {[string equal -length $place_len $place "pointer"]} {
+    } elseif {[string equal -length [string length $place] $place "pointer"]} {
 	## place at POINTER (centered if $anchor == center)
 	if {[string equal -length [string length $anchor] $anchor "center"]} {
 	    set x [expr {[winfo pointerx $w]-[winfo reqwidth $w]/2}]
@@ -93,7 +102,7 @@ proc ::tk::PlaceWindow {w {place ""} {anchor ""}} {
 	    set x [winfo pointerx $w]
 	    set y [winfo pointery $w]
 	}
-    } elseif {[string equal -length $place_len $place "widget"] && \
+    } elseif {[string equal -length [string length $place] $place "widget"] && \
 	    [winfo exists $anchor] && [winfo ismapped $anchor]} {
 	## center about WIDGET $anchor, widget must be mapped
 	set x [expr {[winfo rootx $anchor] + \
@@ -105,10 +114,7 @@ proc ::tk::PlaceWindow {w {place ""} {anchor ""}} {
 	set y [expr {([winfo screenheight $w]-[winfo reqheight $w])/2}]
 	set checkBounds 0
     }
-
-    set windowingsystem [tk windowingsystem]
-
-    if {$windowingsystem eq "win32"} {
+    if {[tk windowingsystem] eq "win32"} {
         # Bug 533519: win32 multiple desktops may produce negative geometry.
         set checkBounds 0
     }
@@ -123,7 +129,7 @@ proc ::tk::PlaceWindow {w {place ""} {anchor ""}} {
 	} elseif {$y > ([winfo screenheight $w]-[winfo reqheight $w])} {
 	    set y [expr {[winfo screenheight $w]-[winfo reqheight $w]}]
 	}
-	if {$windowingsystem eq "classic" || $windowingsystem eq "aqua"} {
+	if {[tk windowingsystem] eq "aqua"} {
 	    # Avoid the native menu bar which sits on top of everything.
 	    if {$y < 22} { set y 22 }
 	}
@@ -311,37 +317,37 @@ proc ::tk::EventMotifBindings {n1 dummy dummy} {
 # using compiled code.
 #----------------------------------------------------------------------
 
-if {[info commands tk_chooseColor] eq ""} {
+if {![llength [info commands tk_chooseColor]]} {
     proc ::tk_chooseColor {args} {
-	return [eval tk::dialog::color:: $args]
+	return [tk::dialog::color:: {*}$args]
     }
 }
-if {[info commands tk_getOpenFile] eq ""} {
+if {![llength [info commands tk_getOpenFile]]} {
     proc ::tk_getOpenFile {args} {
 	if {$::tk_strictMotif} {
-	    return [eval tk::MotifFDialog open $args]
+	    return [tk::MotifFDialog open {*}$args]
 	} else {
-	    return [eval ::tk::dialog::file:: open $args]
+	    return [::tk::dialog::file:: open {*}$args]
 	}
     }
 }
-if {[info commands tk_getSaveFile] eq ""} {
+if {![llength [info commands tk_getSaveFile]]} {
     proc ::tk_getSaveFile {args} {
 	if {$::tk_strictMotif} {
-	    return [eval tk::MotifFDialog save $args]
+	    return [tk::MotifFDialog save {*}$args]
 	} else {
-	    return [eval ::tk::dialog::file:: save $args]
+	    return [::tk::dialog::file:: save {*}$args]
 	}
     }
 }
-if {[info commands tk_messageBox] eq ""} {
+if {![llength [info commands tk_messageBox]]} {
     proc ::tk_messageBox {args} {
-	return [eval tk::MessageBox $args]
+	return [tk::MessageBox {*}$args]
     }
 }
-if {[info command tk_chooseDirectory] eq ""} {
+if {![llength [info command tk_chooseDirectory]]} {
     proc ::tk_chooseDirectory {args} {
-	return [eval ::tk::dialog::file::chooseDir:: $args]
+	return [::tk::dialog::file::chooseDir:: {*}$args]
     }
 }
 
@@ -349,7 +355,7 @@ if {[info command tk_chooseDirectory] eq ""} {
 # Define the set of common virtual events.
 #----------------------------------------------------------------------
 
-switch [tk windowingsystem] {
+switch -exact -- [tk windowingsystem] {
     "x11" {
 	event add <<Cut>> <Control-Key-x> <Key-F20> 
 	event add <<Copy>> <Control-Key-c> <Key-F16>
@@ -390,34 +396,14 @@ switch [tk windowingsystem] {
   	event add <<Undo>> <Command-Key-z>
 	event add <<Redo>> <Command-Key-y>
     }
-    "classic" {
-	event add <<Cut>> <Control-Key-x> <Key-F2> 
-	event add <<Copy>> <Control-Key-c> <Key-F3>
-	event add <<Paste>> <Control-Key-v> <Key-F4>
-	event add <<PasteSelection>> <ButtonRelease-2>
-	event add <<Clear>> <Clear>
-	event add <<Undo>> <Control-Key-z> <Key-F1>
-	event add <<Redo>> <Control-Key-Z>
-    }
 }
 # ----------------------------------------------------------------------
 # Read in files that define all of the class bindings.
 # ----------------------------------------------------------------------
 
 if {$::tk_library ne ""} {
-    if {$tcl_platform(platform) eq "macintosh"} {
-	proc ::tk::SourceLibFile {file} {
-	    if {[catch {
-		namespace eval :: \
-			[list source [file join $::tk_library $file.tcl]]
-	    }]} {
-		namespace eval :: [list source -rsrc $file]
-	    }
-	}
-    } else {
-	proc ::tk::SourceLibFile {file} {
-	    namespace eval :: [list source [file join $::tk_library $file.tcl]]
-	}	
+    proc ::tk::SourceLibFile {file} {
+        namespace eval :: [list source [file join $::tk_library $file.tcl]]
     }
     namespace eval ::tk {
 	SourceLibFile button
@@ -455,20 +441,21 @@ proc ::tk::CancelRepeat {} {
 }
 
 # ::tk::TabToWindow --
-# This procedure moves the focus to the given widget.  If the widget
-# is an entry or a spinbox, it selects the entire contents of the widget.
+# This procedure moves the focus to the given widget.
+# It sends a <<TraverseOut>> virtual event to the previous focus window, 
+# if any, before changing the focus, and a <<TraverseIn>> event
+# to the new focus window afterwards.
 #
 # Arguments:
 # w - Window to which focus should be set.
 
 proc ::tk::TabToWindow {w} {
-    set wclass [winfo class $w]
-
-    if {$wclass eq "Entry" || $wclass eq "Spinbox"} {
-	$w selection range 0 end
-	$w icursor end
+    set focus [focus]
+    if {$focus ne ""} {
+	event generate $focus <<TraverseOut>>
     }
     focus $w
+    event generate $w <<TraverseIn>>
 }
 
 # ::tk::UnderlineAmpersand --
@@ -495,7 +482,7 @@ proc ::tk::UnderlineAmpersand {text} {
     }
     if {$idx >= 0} {
 	regsub -all -- {&([^&])} $text {\1} text
-    } 
+    }
     return [list $text $idx]
 }
 
@@ -504,9 +491,8 @@ proc ::tk::UnderlineAmpersand {text} {
 # sets -text and -underline options for the widget
 #
 proc ::tk::SetAmpText {widget text} {
-    foreach {newtext under} [::tk::UnderlineAmpersand $text] {
-	$widget configure -text $newtext -underline $under
-    }
+    lassign [UnderlineAmpersand $text] newtext under
+    $widget configure -text $newtext -underline $under
 }
 
 # ::tk::AmpWidget --
@@ -514,21 +500,37 @@ proc ::tk::SetAmpText {widget text} {
 # -underline options, returned by ::tk::UnderlineAmpersand.
 #
 proc ::tk::AmpWidget {class path args} {
-    set wcmd [list $class $path]
+    set options {}
     foreach {opt val} $args {
 	if {$opt eq "-text"} {
-	    foreach {newtext under} [::tk::UnderlineAmpersand $val] {
-		lappend wcmd -text $newtext -underline $under
-	    }
+	    lassign [UnderlineAmpersand $val] newtext under
+	    lappend options -text $newtext -underline $under
 	} else {
-	    lappend wcmd $opt $val
+	    lappend options $opt $val
 	}
     }
-    eval $wcmd
-    if {$class eq "button"} {
+    set result [$class $path {*}$options]
+    if {[string match "*button" $class]} {
 	bind $path <<AltUnderlined>> [list $path invoke]
     }
-    return $path
+    return $result
+}
+
+# ::tk::AmpMenuArgs --
+# Processes arguments for a menu entry, turning -label option into
+# -label and -underline options, returned by ::tk::UnderlineAmpersand.
+#
+proc ::tk::AmpMenuArgs {widget add type args} {
+    set options {}
+    foreach {opt val} $args {
+	if {$opt eq "-label"} {
+	    lassign [UnderlineAmpersand $val] newlabel under
+	    lappend options -label $newlabel -underline $under
+	} else {
+	    lappend options $opt $val
+	}
+    }
+    $widget add $type {*}$options
 }
 
 # ::tk::FindAltKeyTarget --
@@ -536,19 +538,21 @@ proc ::tk::AmpWidget {class path args} {
 # to find button or label which has $char as underlined character
 #
 proc ::tk::FindAltKeyTarget {path char} {
-    switch [winfo class $path] {
-	Button -
-	Label {
+    switch -- [winfo class $path] {
+	Button - Label - 
+        TButton - TLabel - TCheckbutton {
 	    if {[string equal -nocase $char \
-		[string index [$path cget -text] \
-		[$path cget -underline]]]} {return $path} else {return {}}
+		  [string index [$path cget -text] [$path cget -underline]]]} {
+		return $path
+	    } else {
+		return {}
+	    }
 	}
 	default {
-	    foreach child \
-		[concat [grid slaves $path] \
-		[pack slaves $path] \
-		[place slaves $path] ] {
-		if {"" ne [set target [::tk::FindAltKeyTarget $child $char]]} {
+	    foreach child [concat [grid slaves $path] \
+		    [pack slaves $path] [place slaves $path]] {
+		set target [FindAltKeyTarget $child $char]
+		if {$target ne ""} {
 		    return $target
 		}
 	    }
@@ -562,7 +566,7 @@ proc ::tk::FindAltKeyTarget {path char} {
 # to button or label which has appropriate underlined character
 #
 proc ::tk::AltKeyInDialog {path key} {
-    set target [::tk::FindAltKeyTarget $path $key]
+    set target [FindAltKeyTarget $path $key]
     if { $target eq ""} return
     event generate $target <<AltUnderlined>>
 }
@@ -574,8 +578,10 @@ proc ::tk::AltKeyInDialog {path key} {
 proc ::tk::mcmaxamp {args} {
     set maxlen 0
     foreach arg $args {
-	set length [string length [lindex [::tk::UnderlineAmpersand [mc $arg]] 0]]
-	if {$length>$maxlen} {
+	# Should we run [mc] in caller's namespace?
+	lassign [UnderlineAmpersand [mc $arg]] msg
+	set length [string length $msg]
+	if {$length > $maxlen} {
 	    set maxlen $length
 	}
     }
@@ -587,4 +593,9 @@ if {[tk windowingsystem] eq "aqua"} {
     namespace eval ::tk::mac {
 	set useCustomMDEF 0
     }
+}
+
+# Run the Ttk themed widget set initialization
+if {$::ttk::library ne ""} {
+    uplevel \#0 [list source $::ttk::library/ttk.tcl]
 }

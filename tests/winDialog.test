@@ -1,3 +1,4 @@
+# -*- tcl -*-
 # This file is a Tcl script to test the Windows specific behavior of
 # the common dialog boxes.  It is organized in the standard
 # fashion for Tcl tests.
@@ -6,18 +7,15 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # Copyright (c) 1998-1999 ActiveState Corporation.
 #
-# RCS: @(#) $Id: winDialog.test,v 1.9 2002/07/13 20:28:36 dgp Exp $
+# RCS: @(#) $Id: winDialog.test,v 1.15.2.2 2008/11/12 22:35:14 patthoyts Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
-testConstraint testwinevent [llength [info commands testwinevent]]
-
-catch {testwinevent debug 1}
+if {[testConstraint testwinevent]} {
+    catch {testwinevent debug 1}
+}
 
 proc start {arg} {
     set ::tk_dialog 0
@@ -60,10 +58,86 @@ proc SetText {button text} {
     return [testwinevent $::tk_dialog $button WM_SETTEXT $text]
 }
 
-test winDialog-1.1 {Tk_ChooseColorObjCmd} {nt} {
-} {}
+test winDialog-1.1.0 {Tk_ChooseColorObjCmd} -constraints {
+    testwinevent
+} -body {
+    start {tk_chooseColor}
+    then {
+        Click cancel
+    }
+} -result {0}
+test winDialog-1.1.1 {Tk_ChooseColorObjCmd} -constraints {
+    testwinevent
+} -body {
+    start {set clr [tk_chooseColor -initialcolor "#ff9933"]}
+    then {
+        set x [Click cancel]
+    }
+    list $x $clr
+} -result {0 {}}
+test winDialog-1.1.2 {Tk_ChooseColorObjCmd} -constraints {
+    testwinevent
+} -body {
+    start {set clr [tk_chooseColor -initialcolor "#ff9933"]}
+    then {
+        set x [Click 1]
+    }
+    list $x $clr
+} -result [list 0 "#ff9933"]
+test winDialog-1.1.3 {Tk_ChooseColorObjCmd: -title} -constraints {
+    testwinevent
+} -setup {unset -nocomplain a x} -body {
+    set x {}
+    start {set clr [tk_chooseColor -initialcolor "#ff9933" -title "Hello"]}
+    then {
+        if {[catch {
+            array set a [testgetwindowinfo $::tk_dialog]
+            if {[info exists a(text)]} {lappend x $a(text)}
+        } err]} { lappend x $err }
+        lappend x [Click 1]
+    }
+    lappend x $clr
+} -result [list Hello 0 "#ff9933"]
+test winDialog-1.1.4 {Tk_ChooseColorObjCmd: -title} -constraints {
+    testwinevent
+} -setup {unset -nocomplain a x} -body {
+    set x {}
+    start {
+        set clr [tk_chooseColor -initialcolor "#ff9933" \
+                     -title "\u041f\u0440\u0438\u0432\u0435\u0442"]
+    }
+    then {
+        if {[catch {
+            array set a [testgetwindowinfo $::tk_dialog]
+            if {[info exists a(text)]} {lappend x $a(text)}
+        } err]} { lappend x $err }
+        lappend x [Click 1]
+    }
+    lappend x $clr
+} -result [list "\u041f\u0440\u0438\u0432\u0435\u0442" 0 "#ff9933"]
+test winDialog-1.1.5 {Tk_ChooseColorObjCmd: -parent} -constraints {
+    testwinevent
+} -setup {unset -nocomplain a x} -body {
+    start {set clr [tk_chooseColor -initialcolor "#ff9933" -parent .]}
+    set x {}
+    then {
+        if {[catch {
+            array set a [testgetwindowinfo $::tk_dialog]
+            if {[info exists a(parent)]} {
+                append x [expr {$a(parent) == [wm frame .]}]
+            }
+        } err]} {lappend x $err}
+        Click 1
+    }
+    list $x $clr
+} -result [list 1 "#ff9933"]
+test winDialog-1.1.6 {Tk_ChooseColorObjCmd: -parent} -constraints {
+    testwinevent
+} -body {
+    tk_chooseColor -initialcolor "#ff9933" -parent .xyzzy12
+} -returnCodes error -match glob -result {bad window path name*}
 
-test winDialog-2.1 {ColorDlgHookProc} {nt} {
+test winDialog-2.1 {ColorDlgHookProc} {emptyTest nt} {
 } {}
 
 test winDialog-3.1 {Tk_GetOpenFileObjCmd} {nt testwinevent} {
@@ -92,7 +166,7 @@ test winDialog-5.1 {GetFileName: no arguments} {nt testwinevent} {
 } {0}
 test winDialog-5.2 {GetFileName: one argument} {nt} {
     list [catch {tk_getOpenFile -foo} msg] $msg
-} {1 {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, or -title}}
+} {1 {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, -title, or -typevariable}}
 test winDialog-5.4 {GetFileName: many arguments} {nt testwinevent} {
     start {tk_getOpenFile -initialdir c:/ -parent . -title test -initialfile foo}
     then {
@@ -101,7 +175,7 @@ test winDialog-5.4 {GetFileName: many arguments} {nt testwinevent} {
 } {0}
 test winDialog-5.5 {GetFileName: Tcl_GetIndexFromObj() != TCL_OK} {nt} {
     list [catch {tk_getOpenFile -foo bar -abc} msg] $msg
-} {1 {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, or -title}}
+} {1 {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, -title, or -typevariable}}
 test winDialog-5.6 {GetFileName: Tcl_GetIndexFromObj() == TCL_OK} {nt testwinevent} {
     start {tk_getOpenFile -title bar}
     then {
@@ -146,15 +220,19 @@ test winDialog-5.11 {GetFileName: file types: MakeFilter() fails} {nt} {
 
     list [catch {tk_getSaveFile -filetypes {{"foo" .foo FOO}}} msg] $msg
 } {1 {bad Macintosh file type "FOO"}}
+if {[info exists ::env(TEMP)]} {
 test winDialog-5.12 {GetFileName: initial directory} {nt testwinevent} {
 #	    case FILE_INITDIR: 
 
-    start {set x [tk_getSaveFile -initialdir c:/ -initialfile "12x 455" -title Foo]}
+    start {set x [tk_getSaveFile \
+                      -initialdir [file normalize $::env(TEMP)] \
+                      -initialfile "12x 455" -title Foo]}
     then {
 	Click 1
     }
     set x
-} {C:/12x 455}
+} [file join [file normalize $::env(TEMP)] "12x 455"]
+}
 test winDialog-5.13 {GetFileName: initial directory: Tcl_TranslateFilename()} \
 	{nt} {
 #		if (Tcl_TranslateFileName(interp, string, &ds) == NULL) 
@@ -174,18 +252,17 @@ test winDialog-5.15 {GetFileName: initial file: Tcl_TranslateFileName()} {nt} {
 #		if (Tcl_TranslateFileName(interp, string, &ds) == NULL) 
     list [catch {tk_getOpenFile -initialfile ~12x/455} msg] $msg
 } {1 {user "12x" doesn't exist}}
-set a aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-append a $a
-append a $a
-append a $a
-append a $a
 test winDialog-5.16 {GetFileName: initial file: long name} {nt testwinevent} {
-    start {set x [tk_getSaveFile -initialfile $a -title Long]}
+    start {
+        set dialogresult [catch {
+            tk_getSaveFile -initialfile [string repeat a 1024] -title Long
+        } x]
+    }
     then {
 	Click 1
     }
-    string totitle $x
-} [string totitle [string range [file join [pwd] $a] 0 257]]
+    list $dialogresult [string match "invalid filename *" $x]
+} {1 1}
 test winDialog-5.17 {GetFileName: parent} {nt} {
 #	    case FILE_PARENT: 
 
@@ -252,14 +329,34 @@ test winDialog-5.23 {GetFileName: call GetSaveFileName} {nt testwinevent} {
     }
     set x
 } {&Save}
+if {[info exists ::env(TEMP)]} {
 test winDialog-5.24 {GetFileName: convert \ to /} {nt testwinevent} {
     start {set x [tk_getSaveFile -title Back]}
     then {
-	SetText 0x480 "c:\\12x 457"
+	SetText 0x480 "$::env(TEMP)\\12x 457"
 	Click 1
     }
     set x
-} {c:/12x 457}
+} [file join [file normalize $::env(TEMP)] "12x 457"]
+}
+test winDialog-5.25 {GetFileName: file types: MakeFilter() succeeds} {nt} {
+    # MacOS type that is correct, but has embedded nulls.
+
+    start {set x [catch {tk_getSaveFile -filetypes {{"foo" .foo {\0\0\0\0}}}}]}
+    then {
+	Click 2
+    }
+    set x
+} {0}
+test winDialog-5.26 {GetFileName: file types: MakeFilter() succeeds} {nt} {
+    # MacOS type that is correct, but has embedded high-bit chars.
+
+    start {set x [catch {tk_getSaveFile -filetypes {{"foo" .foo {\u2022\u2022\u2022\u2022}}}}]}
+    then {
+	Click 2
+    }
+    set x
+} {0}
 
 test winDialog-6.1 {MakeFilter} {emptyTest nt} {} {}
 
@@ -320,8 +417,10 @@ test winDialog-9.8 {Tk_ChooseDirectoryObjCmd:\
     list [catch {tk_chooseDirectory -initialdir ~12x/455} msg] $msg
 } {1 {user "12x" doesn't exist}}
 
-catch {testwinevent debug 0}
+if {[testConstraint testwinevent]} {
+    catch {testwinevent debug 0}
+}
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

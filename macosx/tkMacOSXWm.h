@@ -53,7 +53,7 @@
  *	software in accordance with the terms specified in this
  *	license.
  *
- * RCS: @(#) $Id: tkMacOSXWm.h,v 1.2.2.5 2007/04/29 02:26:51 das Exp $
+ * RCS: @(#) $Id: tkMacOSXWm.h,v 1.8 2007/04/23 21:24:34 das Exp $
  */
 
 #ifndef _TKMACWM

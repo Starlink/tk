@@ -13,7 +13,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXColor.c,v 1.2.2.11 2007/11/09 06:26:55 das Exp $
+ * RCS: @(#) $Id: tkMacOSXColor.c,v 1.15 2007/12/13 15:27:08 dgp Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -641,7 +641,7 @@ TkpGetColorByValue(
     return tkColPtr;
 }
 
-#if 0
+#if !TK_DRAW_IN_CONTEXT
 /*
  *----------------------------------------------------------------------
  *

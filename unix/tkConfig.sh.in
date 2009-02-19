@@ -11,7 +11,7 @@
 #
 # The information in this file is specific to a single platform.
 #
-# RCS: @(#) $Id: tkConfig.sh.in,v 1.8.2.1 2007/09/11 05:17:07 das Exp $
+# RCS: @(#) $Id: tkConfig.sh.in,v 1.13.2.1 2008/08/29 03:35:47 dgp Exp $
 
 # Tk's version number.
 TK_VERSION='@TK_VERSION@'
@@ -25,14 +25,16 @@ TK_DEFS='@DEFS@'
 # Flag, 1: we built a shared lib, 0 we didn't
 TK_SHARED_BUILD=@TK_SHARED_BUILD@
 
-# This indicates if Tk was build with debugging symbols
-TK_DBGX=@TK_DBGX@
+
+# TK_DBGX used to be used to distinguish debug vs. non-debug builds.
+# This was a righteous pain so the core doesn't do that any more.
+TK_DBGX=
 
 # The name of the Tk library (may be either a .a file or a shared library):
 TK_LIB_FILE='@TK_LIB_FILE@'
 
 # Additional libraries to use when linking Tk.
-TK_LIBS='@XLIBSW@ @DL_LIBS@ @LIBS@ @MATH_LIBS@'
+TK_LIBS='@XLIBSW@ @XFT_LIBS@ @LIBS@ @TCL_LIBS@'
 
 # Top-level directory in which Tk's platform-independent files are
 # installed.

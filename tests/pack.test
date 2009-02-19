@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: pack.test,v 1.10.2.1 2006/04/05 17:51:04 dgp Exp $
+# RCS: @(#) $Id: pack.test,v 1.14 2006/04/05 18:04:39 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 # Utility procedures:
@@ -135,7 +132,7 @@ test pack-2.11 {x padding and filling} {
 test pack-2.12 {x padding and filling} {
     pack1 -side top -ipadx 5 -padx 10 -fill x
 } {280x40+10+0 300x160+0+40}
-test pack-2.12 {x padding and filling} {
+test pack-2.12a {x padding and filling} {
     pack1 -side top -ipadx 5 -padx {5 15} -fill x
 } {280x40+5+0 300x160+0+40}
 set pad [winfo pixels .pack 1c]
@@ -615,6 +612,12 @@ test pack-10.2 {retaining/clearing configuration state} {
     pack .pack.a -pady 14
     pack info .pack.a
 } {-in .pack -anchor n -expand 1 -fill both -ipadx 3 -ipady 4 -padx 1 -pady 14 -side bottom}
+test pack-10.3 {bad -in window does not change master} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [winfo manager .pack.a] \
+         [catch {pack .pack.a -in .pack.a} err] $err \
+         [winfo manager .pack.a]
+} {{} 1 {can't pack .pack.a inside itself} {}}
 
 test pack-11.1 {info option} {
     pack4 -in .pack
@@ -1105,5 +1108,5 @@ foreach i {pack1 pack2 pack3 pack4} {
 }
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

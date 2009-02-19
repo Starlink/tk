@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: unixEmbed.test,v 1.11 2002/07/13 21:52:34 dgp Exp $
+# RCS: @(#) $Id: unixEmbed.test,v 1.14 2004/12/04 00:04:42 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 setupbg
@@ -202,7 +199,7 @@ test unixEmbed-3.2 {ContainerEventProc procedure, set size on creation} unix {
     update
     wm geometry .t2
 } {200x200+0+0}
-test unixEmbed-3.2 {ContainerEventProc procedure, disallow position changes} unix {
+test unixEmbed-3.2a {ContainerEventProc procedure, disallow position changes} unix {
     deleteWindows
     frame .f1 -container 1 -width 200 -height 50
     pack .f1
@@ -560,18 +557,5 @@ test unixEmbed-10.2 {geometry propagation in tkUnixWm.c/UpdateGeometryInfo} unix
 # cleanup
 deleteWindows
 cleanupbg
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXInt.h,v 1.3.2.23 2007/11/09 06:26:55 das Exp $
+ * RCS: @(#) $Id: tkMacOSXInt.h,v 1.32 2007/12/13 15:27:09 dgp Exp $
  */
 
 #ifndef _TKMACINT
@@ -123,6 +123,17 @@ MODULE_SCOPE TkMacOSXEmbedHandler *tkMacOSXEmbedHandler;
 #define TK_LOCATION_CHANGED	1
 #define TK_SIZE_CHANGED		2
 #define TK_BOTH_CHANGED		3
+
+/*
+ * Defines for tkTextDisp.c
+ */
+
+#define TK_LAYOUT_WITH_BASE_CHUNKS	1
+#define TK_DRAW_IN_CONTEXT		1
+
+#if !TK_DRAW_IN_CONTEXT
+MODULE_SCOPE int TkMacOSXCompareColors(unsigned long c1, unsigned long c2);
+#endif
 
 /*
  * Globals shared among TkAqua.

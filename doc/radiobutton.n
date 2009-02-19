@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: radiobutton.n,v 1.6.2.1 2004/10/28 10:19:29 dkf Exp $
+'\" RCS: @(#) $Id: radiobutton.n,v 1.16 2007/12/13 15:23:43 dgp Exp $
 '\" 
 .so man.macros
 .TH radiobutton n 4.4 Tk "Tk Built-In Commands"
@@ -36,7 +36,7 @@ Specifies a desired height for the button.
 If an image or bitmap is being displayed in the button then the value is in
 screen units (i.e. any of the forms acceptable to \fBTk_GetPixels\fR);
 for text it is in lines of text.
-If this option isn't specified, the button's desired height is computed
+If this option is not specified, the button's desired height is computed
 from the size of the image or bitmap or text being displayed in it.
 .OP \-indicatoron indicatorOn IndicatorOn
 Specifies whether or not the indicator should be drawn.  Must be a
@@ -54,25 +54,25 @@ whenever the widget is selected.
 If specified as an empty string then no special color is used for
 displaying when the widget is selected.
 .OP \-offrelief offRelief OffRelief
-.VS 8.4
 Specifies the relief for the checkbutton when the indicator is not drawn and
-the checkbutton is off.  The default value is "raised".  By setting this option
-to "flat" and setting -indicatoron to false and -overrelief to raised,
+the checkbutton is off.  The default value is
+.QW raised .
+By setting this option to
+.QW flat
+and setting \fB\-indicatoron\fR to false and \fB\-overrelief\fR to
+.QW raised ,
 the effect is achieved 
 of having a flat button that raises on mouse-over and which is
 depressed when activated.  This is the behavior typically exhibited by
 the Align-Left, Align-Right, and Center radiobuttons on the toolbar of a 
 word-processor, for example.
-.VE 8.4
 .OP \-overrelief overRelief OverRelief
-.VS 8.4
 Specifies an alternative relief for the radiobutton, to be used when the
 mouse cursor is over the widget.  This option can be used to make
 toolbar buttons, by configuring \fB\-relief flat \-overrelief
 raised\fR.  If the value of this option is the empty string, then no
 alternative relief is used when the mouse cursor is over the radiobutton.
 The empty string is the default value.
-.VE 8.4
 .OP \-selectimage selectImage SelectImage
 Specifies an image to display (in place of the \fBimage\fR option)
 when the radiobutton is selected.
@@ -89,6 +89,19 @@ should be insensitive:  the default bindings will refuse to activate
 the widget and will ignore mouse button presses.
 In this state the \fBdisabledForeground\fR and
 \fBbackground\fR options determine how the radiobutton is displayed.
+.OP \-tristateimage tristateImage TristateImage
+.VS 8.5
+Specifies an image to display (in place of the \fBimage\fR option)
+when the radiobutton is selected.
+This option is ignored unless the \fBimage\fR option has been
+specified.
+.VE 8.5
+.OP \-tristatevalue tristateValue Value
+.VS 8.5
+Specifies the value that causes the radiobutton to display the multi-value 
+selection, also known as the tri-state mode.  Defaults to
+.QW "" .
+.VE 8.5
 .OP \-value value Value
 Specifies value to store in the button's associated variable whenever
 this button is selected.
@@ -102,10 +115,9 @@ Specifies a desired width for the button.
 If an image or bitmap is being displayed in the button, the value is in
 screen units (i.e. any of the forms acceptable to \fBTk_GetPixels\fR);
 for text it is in characters.
-If this option isn't specified, the button's desired width is computed
+If this option is not specified, the button's desired width is computed
 from the size of the image or bitmap or text being displayed in it.
 .BE
-
 .SH DESCRIPTION
 .PP
 The \fBradiobutton\fR command creates a new window (given by the
@@ -119,10 +131,8 @@ text, and initial relief.  The \fBradiobutton\fR command returns its
 there must not exist a window named \fIpathName\fR, but
 \fIpathName\fR's parent must exist.
 .PP
-.VS
 A radiobutton is a widget that displays a textual string, bitmap or image
 and a diamond or circle called an \fIindicator\fR.
-.VE
 If text is displayed, it must all be in a single font, but it
 can occupy multiple lines on the screen (if it contains newlines
 or if wrapping occurs because of the \fBwrapLength\fR option) and
@@ -137,7 +147,6 @@ check button.
 .PP
 In addition, radiobuttons can be \fIselected\fR.
 If a radiobutton is selected, the indicator is normally
-.VS
 drawn with a selected appearance, and
 a Tcl variable associated with the radiobutton is set to a particular
 value (normally 1).
@@ -146,15 +155,19 @@ color.  Under Windows, the indicator is drawn with a round mark inside.
 If the radiobutton is not selected, then the indicator is drawn with a
 deselected appearance, and the associated variable is
 set to a different value (typically 0).
-Under Unix, the indicator is drawn with a raised relief and no special
-color.  Under Windows, the indicator is drawn without a round mark inside.
-.VE
+The indicator is drawn without a round mark inside.
 Typically, several radiobuttons share a single variable and the
 value of the variable indicates which radiobutton is to be selected.
 When a radiobutton is selected it sets the value of the variable to
 indicate that fact;  each radiobutton also monitors the value of
 the variable and automatically selects and deselects itself when the
 variable's value changes.
+.VS 8.5
+If the variable's value matches the \fBtristateValue\fR, then the radiobutton is 
+drawn using the tri-state mode.  This mode is used to indicate mixed or 
+multiple values.  (This is used when the radiobutton represents the state 
+of multiple items.)
+.VE 8.5
 By default the variable \fBselectedButton\fR
 is used;  its contents give the name of the button that is
 selected, or the empty string if no button associated with that
@@ -227,14 +240,12 @@ value corresponding to this widget.
 Tk automatically creates class bindings for radiobuttons that give them
 the following default behavior:
 .IP [1]
-.VS
 On Unix systems, a radiobutton activates whenever the mouse passes
 over it and deactivates whenever the mouse leaves the radiobutton.  On
 Mac and Windows systems, when mouse button 1 is pressed over a
 radiobutton, the button activates whenever the mouse pointer is inside
 the button, and deactivates whenever the mouse pointer leaves the
 button.
-.VE
 .IP [2]
 When mouse button 1 is pressed over a radiobutton it is invoked (it
 becomes selected and the command associated with the button is
@@ -248,9 +259,7 @@ actions occur:  the radiobutton is completely non-responsive.
 .PP
 The behavior of radiobuttons can be changed by defining new bindings for
 individual widgets or by redefining the class bindings.
-
 .SH "SEE ALSO"
-checkbutton(n), labelframe(n), listbox(n), options(n), scale(n)
-
+checkbutton(n), labelframe(n), listbox(n), options(n), scale(n), ttk::radiobutton(n)
 .SH KEYWORDS
 radiobutton, widget

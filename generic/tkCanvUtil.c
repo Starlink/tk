@@ -1,31 +1,66 @@
-/* 
+/*
  * tkCanvUtil.c --
  *
- *	This procedure contains a collection of utility procedures
- *	used by the implementations of various canvas item types.
+ *	This file contains a collection of utility functions used by the
+ *	implementations of various canvas item types.
  *
  * Copyright (c) 1994 Sun Microsystems, Inc.
- * Copyright (c) 1994 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkCanvUtil.c,v 1.10 2003/01/17 19:54:09 drh Exp $
+ * RCS: @(#) $Id: tkCanvUtil.c,v 1.19.2.1 2008/12/21 23:52:45 ferrieux Exp $
  */
 
 #include "tkInt.h"
 #include "tkCanvas.h"
-#include "tkPort.h"
 #include <assert.h>
 
+/*
+ * Structures defined only in this file.
+ */
+
+typedef struct SmoothAssocData {
+    struct SmoothAssocData *nextPtr;
+				/* Pointer to next SmoothAssocData. */
+    Tk_SmoothMethod smooth;	/* Name and functions associated with this
+				 * option. */
+} SmoothAssocData;
+
+Tk_SmoothMethod tkBezierSmoothMethod = {
+    "true",
+    TkMakeBezierCurve,
+    (void (*) (Tcl_Interp *interp, Tk_Canvas canvas, double *coordPtr,
+	    int numPoints, int numSteps)) TkMakeBezierPostscript,
+};
+static Tk_SmoothMethod tkRawSmoothMethod = {
+    "raw",
+    TkMakeRawCurve,
+    (void (*) (Tcl_Interp *interp, Tk_Canvas canvas, double *coordPtr,
+	    int numPoints, int numSteps)) TkMakeRawCurvePostscript,
+};
+
+/*
+ * Function forward-declarations.
+ */
+
+static void		SmoothMethodCleanupProc(ClientData clientData,
+			    Tcl_Interp *interp);
+static SmoothAssocData *InitSmoothMethods(Tcl_Interp *interp);
+static int		DashConvert(char *l, CONST char *p, int n,
+			    double width);
+static void		TranslateAndAppendCoords(TkCanvas *canvPtr,
+			    double x, double y, XPoint *outArr, int numOut);
+
+#define ABS(a) ((a>=0)?(a):(-(a)))
 
 /*
  *----------------------------------------------------------------------
  *
  * Tk_CanvasTkwin --
  *
- *	Given a token for a canvas, this procedure returns the
- *	widget that represents the canvas.
+ *	Given a token for a canvas, this function returns the widget that
+ *	represents the canvas.
  *
  * Results:
  *	The return value is a handle for the widget.
@@ -37,8 +72,8 @@
  */
 
 Tk_Window
-Tk_CanvasTkwin(canvas)
-    Tk_Canvas canvas;			/* Token for the canvas. */
+Tk_CanvasTkwin(
+    Tk_Canvas canvas)		/* Token for the canvas. */
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
     return canvasPtr->tkwin;
@@ -49,16 +84,15 @@ Tk_CanvasTkwin(canvas)
  *
  * Tk_CanvasDrawableCoords --
  *
- *	Given an (x,y) coordinate pair within a canvas, this procedure
+ *	Given an (x,y) coordinate pair within a canvas, this function
  *	returns the corresponding coordinates at which the point should
  *	be drawn in the drawable used for display.
  *
  * Results:
- *	There is no return value.  The values at *drawableXPtr and
- *	*drawableYPtr are filled in with the coordinates at which
- *	x and y should be drawn.  These coordinates are clipped
- *	to fit within a "short", since this is what X uses in
- *	most cases for drawing.
+ *	There is no return value. The values at *drawableXPtr and
+ *	*drawableYPtr are filled in with the coordinates at which x and y
+ *	should be drawn. These coordinates are clipped to fit within a
+ *	"short", since this is what X uses in most cases for drawing.
  *
  * Side effects:
  *	None.
@@ -67,11 +101,12 @@ Tk_CanvasTkwin(canvas)
  */
 
 void
-Tk_CanvasDrawableCoords(canvas, x, y, drawableXPtr, drawableYPtr)
-    Tk_Canvas canvas;			/* Token for the canvas. */
-    double x, y;			/* Coordinates in canvas space. */
-    short *drawableXPtr, *drawableYPtr;	/* Screen coordinates are stored
-					 * here. */
+Tk_CanvasDrawableCoords(
+    Tk_Canvas canvas,		/* Token for the canvas. */
+    double x,			/* Coordinates in canvas space. */
+    double y,
+    short *drawableXPtr,	/* Screen coordinates are stored here. */
+    short *drawableYPtr)
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
     double tmp;
@@ -90,7 +125,7 @@ Tk_CanvasDrawableCoords(canvas, x, y, drawableXPtr, drawableYPtr)
 	*drawableXPtr = (short) tmp;
     }
 
-    tmp = y  - canvasPtr->drawableYOrigin;
+    tmp = y - canvasPtr->drawableYOrigin;
     if (tmp > 0) {
 	tmp += 0.5;
     } else {
@@ -110,15 +145,14 @@ Tk_CanvasDrawableCoords(canvas, x, y, drawableXPtr, drawableYPtr)
  *
  * Tk_CanvasWindowCoords --
  *
- *	Given an (x,y) coordinate pair within a canvas, this procedure
- *	returns the corresponding coordinates in the canvas's window.
+ *	Given an (x,y) coordinate pair within a canvas, this function returns
+ *	the corresponding coordinates in the canvas's window.
  *
  * Results:
- *	There is no return value.  The values at *screenXPtr and
- *	*screenYPtr are filled in with the coordinates at which
- *	(x,y) appears in the canvas's window.  These coordinates
- *	are clipped to fit within a "short", since this is what X
- *	uses in most cases for drawing.
+ *	There is no return value. The values at *screenXPtr and *screenYPtr
+ *	are filled in with the coordinates at which (x,y) appears in the
+ *	canvas's window. These coordinates are clipped to fit within a
+ *	"short", since this is what X uses in most cases for drawing.
  *
  * Side effects:
  *	None.
@@ -127,11 +161,12 @@ Tk_CanvasDrawableCoords(canvas, x, y, drawableXPtr, drawableYPtr)
  */
 
 void
-Tk_CanvasWindowCoords(canvas, x, y, screenXPtr, screenYPtr)
-    Tk_Canvas canvas;			/* Token for the canvas. */
-    double x, y;			/* Coordinates in canvas space. */
-    short *screenXPtr, *screenYPtr;	/* Screen coordinates are stored
-					 * here. */
+Tk_CanvasWindowCoords(
+    Tk_Canvas canvas,		/* Token for the canvas. */
+    double x,			/* Coordinates in canvas space. */
+    double y,
+    short *screenXPtr,		/* Screen coordinates are stored here. */
+    short *screenYPtr)
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
     double tmp;
@@ -150,7 +185,7 @@ Tk_CanvasWindowCoords(canvas, x, y, screenXPtr, screenYPtr)
 	*screenXPtr = (short) tmp;
     }
 
-    tmp = y  - canvasPtr->yOrigin;
+    tmp = y - canvasPtr->yOrigin;
     if (tmp > 0) {
 	tmp += 0.5;
     } else {
@@ -174,11 +209,10 @@ Tk_CanvasWindowCoords(canvas, x, y, screenXPtr, screenYPtr)
  *	corresponding to that string.
  *
  * Results:
- *	The return value is a standard Tcl return result.  If
- *	TCL_OK is returned, then everything went well and the
- *	canvas coordinate is stored at *doublePtr;  otherwise
- *	TCL_ERROR is returned and an error message is left in
- *	the interp's result.
+ *	The return value is a standard Tcl return result. If TCL_OK is
+ *	returned, then everything went well and the canvas coordinate is
+ *	stored at *doublePtr; otherwise TCL_ERROR is returned and an error
+ *	message is left in the interp's result.
  *
  * Side effects:
  *	None.
@@ -187,14 +221,15 @@ Tk_CanvasWindowCoords(canvas, x, y, screenXPtr, screenYPtr)
  */
 
 int
-Tk_CanvasGetCoord(interp, canvas, string, doublePtr)
-    Tcl_Interp *interp;		/* Interpreter for error reporting. */
-    Tk_Canvas canvas;		/* Canvas to which coordinate applies. */
-    CONST char *string;		/* Describes coordinate (any screen
-				 * coordinate form may be used here). */
-    double *doublePtr;		/* Place to store converted coordinate. */
+Tk_CanvasGetCoord(
+    Tcl_Interp *interp,		/* Interpreter for error reporting. */
+    Tk_Canvas canvas,		/* Canvas to which coordinate applies. */
+    CONST char *string,		/* Describes coordinate (any screen coordinate
+				 * form may be used here). */
+    double *doublePtr)		/* Place to store converted coordinate. */
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
+
     if (Tk_GetScreenMM(canvasPtr->interp, canvasPtr->tkwin, string,
 	    doublePtr) != TCL_OK) {
 	return TCL_ERROR;
@@ -212,11 +247,10 @@ Tk_CanvasGetCoord(interp, canvas, string, doublePtr)
  *	corresponding to that string.
  *
  * Results:
- *	The return value is a standard Tcl return result.  If
- *	TCL_OK is returned, then everything went well and the
- *	canvas coordinate is stored at *doublePtr;  otherwise
- *	TCL_ERROR is returned and an error message is left in
- *	interp->result.
+ *	The return value is a standard Tcl return result. If TCL_OK is
+ *	returned, then everything went well and the canvas coordinate is
+ *	stored at *doublePtr; otherwise TCL_ERROR is returned and an error
+ *	message is left in interp->result.
  *
  * Side effects:
  *	None.
@@ -225,20 +259,16 @@ Tk_CanvasGetCoord(interp, canvas, string, doublePtr)
  */
 
 int
-Tk_CanvasGetCoordFromObj(interp, canvas, obj, doublePtr)
-    Tcl_Interp *interp;		/* Interpreter for error reporting. */
-    Tk_Canvas canvas;		/* Canvas to which coordinate applies. */
-    Tcl_Obj *obj;		/* Describes coordinate (any screen
-				 * coordinate form may be used here). */
-    double *doublePtr;		/* Place to store converted coordinate. */
+Tk_CanvasGetCoordFromObj(
+    Tcl_Interp *interp,		/* Interpreter for error reporting. */
+    Tk_Canvas canvas,		/* Canvas to which coordinate applies. */
+    Tcl_Obj *obj,		/* Describes coordinate (any screen coordinate
+				 * form may be used here). */
+    double *doublePtr)		/* Place to store converted coordinate. */
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
-    if (Tk_GetMMFromObj(canvasPtr->interp, canvasPtr->tkwin, obj,
-	    doublePtr) != TCL_OK) {
-	return TCL_ERROR;
-    }
-    *doublePtr *= canvasPtr->pixelsPerMM;
-    return TCL_OK;
+
+    return Tk_GetDoublePixelsFromObj(canvasPtr->interp, canvasPtr->tkwin, obj, doublePtr);
 }
 
 /*
@@ -246,9 +276,9 @@ Tk_CanvasGetCoordFromObj(interp, canvas, obj, doublePtr)
  *
  * Tk_CanvasSetStippleOrigin --
  *
- *	This procedure sets the stipple origin in a graphics context
- *	so that stipples drawn with the GC will line up with other
- *	stipples previously drawn in the canvas.
+ *	This function sets the stipple origin in a graphics context so that
+ *	stipples drawn with the GC will line up with other stipples previously
+ *	drawn in the canvas.
  *
  * Results:
  *	None.
@@ -260,12 +290,11 @@ Tk_CanvasGetCoordFromObj(interp, canvas, obj, doublePtr)
  */
 
 void
-Tk_CanvasSetStippleOrigin(canvas, gc)
-    Tk_Canvas canvas;		/* Token for a canvas. */
-    GC gc;			/* Graphics context that is about to be
-				 * used to draw a stippled pattern as
-				 * part of redisplaying the canvas. */
-
+Tk_CanvasSetStippleOrigin(
+    Tk_Canvas canvas,		/* Token for a canvas. */
+    GC gc)			/* Graphics context that is about to be used
+				 * to draw a stippled pattern as part of
+				 * redisplaying the canvas. */
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
 
@@ -278,9 +307,9 @@ Tk_CanvasSetStippleOrigin(canvas, gc)
  *
  * Tk_CanvasSetOffset--
  *
- *	This procedure sets the stipple offset in a graphics
- *	context so that stipples drawn with the GC will
- *	line up with other stipples with the same offset.
+ *	This function sets the stipple offset in a graphics context so that
+ *	stipples drawn with the GC will line up with other stipples with the
+ *	same offset.
  *
  * Results:
  *	None.
@@ -292,12 +321,12 @@ Tk_CanvasSetStippleOrigin(canvas, gc)
  */
 
 void
-Tk_CanvasSetOffset(canvas, gc, offset)
-    Tk_Canvas canvas;		/* Token for a canvas. */
-    GC gc;			/* Graphics context that is about to be
-				 * used to draw a stippled pattern as
-				 * part of redisplaying the canvas. */
-    Tk_TSOffset *offset;	/* offset (may be NULL pointer)*/
+Tk_CanvasSetOffset(
+    Tk_Canvas canvas,		/* Token for a canvas. */
+    GC gc,			/* Graphics context that is about to be used
+				 * to draw a stippled pattern as part of
+				 * redisplaying the canvas. */
+    Tk_TSOffset *offset)	/* Offset (may be NULL pointer)*/
 {
     TkCanvas *canvasPtr = (TkCanvas *) canvas;
     int flags = 0;
@@ -322,17 +351,16 @@ Tk_CanvasSetOffset(canvas, gc, offset)
  *
  * Tk_CanvasGetTextInfo --
  *
- *	This procedure returns a pointer to a structure containing
- *	information about the selection and insertion cursor for
- *	a canvas widget.  Items such as text items save the pointer
- *	and use it to share access to the information with the generic
- *	canvas code.
+ *	This function returns a pointer to a structure containing information
+ *	about the selection and insertion cursor for a canvas widget. Items
+ *	such as text items save the pointer and use it to share access to the
+ *	information with the generic canvas code.
  *
  * Results:
  *	The return value is a pointer to the structure holding text
- *	information for the canvas.  Most of the fields should not
- *	be modified outside the generic canvas code;  see the user
- *	documentation for details.
+ *	information for the canvas. Most of the fields should not be modified
+ *	outside the generic canvas code; see the user documentation for
+ *	details.
  *
  * Side effects:
  *	None.
@@ -341,8 +369,8 @@ Tk_CanvasSetOffset(canvas, gc, offset)
  */
 
 Tk_CanvasTextInfo *
-Tk_CanvasGetTextInfo(canvas)
-    Tk_Canvas canvas;			/* Token for the canvas widget. */
+Tk_CanvasGetTextInfo(
+    Tk_Canvas canvas)		/* Token for the canvas widget. */
 {
     return &((TkCanvas *) canvas)->textInfo;
 }
@@ -352,28 +380,27 @@ Tk_CanvasGetTextInfo(canvas)
  *
  * Tk_CanvasTagsParseProc --
  *
- *	This procedure is invoked during option processing to handle
- *	"-tags" options for canvas items.
+ *	This function is invoked during option processing to handle "-tags"
+ *	options for canvas items.
  *
  * Results:
  *	A standard Tcl return value.
  *
  * Side effects:
- *	The tags for a given item get replaced by those indicated
- *	in the value argument.
+ *	The tags for a given item get replaced by those indicated in the value
+ *	argument.
  *
  *--------------------------------------------------------------
  */
 
 int
-Tk_CanvasTagsParseProc(clientData, interp, tkwin, value, widgRec, offset)
-    ClientData clientData;		/* Not used.*/
-    Tcl_Interp *interp;			/* Used for reporting errors. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    CONST char *value;			/* Value of option (list of tag
-					 * names). */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item (ignored). */
+Tk_CanvasTagsParseProc(
+    ClientData clientData,	/* Not used.*/
+    Tcl_Interp *interp,		/* Used for reporting errors. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    CONST char *value,		/* Value of option (list of tag names). */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset)			/* Offset into item (ignored). */
 {
     register Tk_Item *itemPtr = (Tk_Item *) widgRec;
     int argc, i;
@@ -389,8 +416,7 @@ Tk_CanvasTagsParseProc(clientData, interp, tkwin, value, widgRec, offset)
     }
 
     /*
-     * Make sure that there's enough space in the item to hold the
-     * tag names.
+     * Make sure that there's enough space in the item to hold the tag names.
      */
 
     if (itemPtr->tagSpace < argc) {
@@ -417,16 +443,16 @@ Tk_CanvasTagsParseProc(clientData, interp, tkwin, value, widgRec, offset)
  *
  * Tk_CanvasTagsPrintProc --
  *
- *	This procedure is invoked by the Tk configuration code
- *	to produce a printable string for the "-tags" configuration
- *	option for canvas items.
+ *	This function is invoked by the Tk configuration code to produce a
+ *	printable string for the "-tags" configuration option for canvas
+ *	items.
  *
  * Results:
- *	The return value is a string describing all the tags for
- *	the item referred to by "widgRec".  In addition, *freeProcPtr
- *	is filled in with the address of a procedure to call to free
- *	the result string when it's no longer needed (or NULL to
- *	indicate that the string doesn't need to be freed).
+ *	The return value is a string describing all the tags for the item
+ *	referred to by "widgRec". In addition, *freeProcPtr is filled in with
+ *	the address of a function to call to free the result string when it's
+ *	no longer needed (or NULL to indicate that the string doesn't need to
+ *	be freed).
  *
  * Side effects:
  *	None.
@@ -435,61 +461,55 @@ Tk_CanvasTagsParseProc(clientData, interp, tkwin, value, widgRec, offset)
  */
 
 char *
-Tk_CanvasTagsPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
-    ClientData clientData;		/* Ignored. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Ignored. */
-    Tcl_FreeProc **freeProcPtr;		/* Pointer to variable to fill in with
-					 * information about how to reclaim
-					 * storage for return string. */
+Tk_CanvasTagsPrintProc(
+    ClientData clientData,	/* Ignored. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset,			/* Ignored. */
+    Tcl_FreeProc **freeProcPtr)	/* Pointer to variable to fill in with
+				 * information about how to reclaim storage
+				 * for return string. */
 {
     register Tk_Item *itemPtr = (Tk_Item *) widgRec;
 
     if (itemPtr->numTags == 0) {
-	*freeProcPtr = (Tcl_FreeProc *) NULL;
+	*freeProcPtr = NULL;
 	return "";
     }
     if (itemPtr->numTags == 1) {
-	*freeProcPtr = (Tcl_FreeProc *) NULL;
+	*freeProcPtr = NULL;
 	return (char *) itemPtr->tagPtr[0];
     }
     *freeProcPtr = TCL_DYNAMIC;
     return Tcl_Merge(itemPtr->numTags, (CONST char **) itemPtr->tagPtr);
 }
 
-
-static int	DashConvert _ANSI_ARGS_((char *l, CONST char *p,
-			int n, double width));
-#define ABS(a) ((a>=0)?(a):(-(a)))
-
 /*
  *--------------------------------------------------------------
  *
  * TkCanvasDashParseProc --
  *
- *	This procedure is invoked during option processing to handle
- *	"-dash", "-activedash" and "-disableddash" options for canvas
- *	objects.
+ *	This function is invoked during option processing to handle "-dash",
+ *	"-activedash" and "-disableddash" options for canvas objects.
  *
  * Results:
  *	A standard Tcl return value.
  *
  * Side effects:
- *	The dash list for a given canvas object gets replaced by
- *	those indicated in the value argument.
+ *	The dash list for a given canvas object gets replaced by those
+ *	indicated in the value argument.
  *
  *--------------------------------------------------------------
  */
 
 int
-TkCanvasDashParseProc(clientData, interp, tkwin, value, widgRec, offset)
-    ClientData clientData;		/* Not used.*/
-    Tcl_Interp *interp;			/* Used for reporting errors. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    CONST char *value;			/* Value of option. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item. */
+TkCanvasDashParseProc(
+    ClientData clientData,	/* Not used.*/
+    Tcl_Interp *interp,		/* Used for reporting errors. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    CONST char *value,		/* Value of option. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset)			/* Offset into item. */
 {
     return Tk_GetDash(interp, value, (Tk_Dash *)(widgRec+offset));
 }
@@ -499,16 +519,16 @@ TkCanvasDashParseProc(clientData, interp, tkwin, value, widgRec, offset)
  *
  * TkCanvasDashPrintProc --
  *
- *	This procedure is invoked by the Tk configuration code
- *	to produce a printable string for the "-dash", "-activedash"
- *	and "-disableddash" configuration options for canvas items.
+ *	This function is invoked by the Tk configuration code to produce a
+ *	printable string for the "-dash", "-activedash" and "-disableddash"
+ *	configuration options for canvas items.
  *
  * Results:
- *	The return value is a string describing all the dash list for
- *	the item referred to by "widgRec"and "offset".  In addition,
- *	*freeProcPtr is filled in with the address of a procedure to
- *	call to free the result string when it's no longer needed (or
- *	NULL to indicate that the string doesn't need to be freed).
+ *	The return value is a string describing all the dash list for the item
+ *	referred to by "widgRec"and "offset". In addition, *freeProcPtr is
+ *	filled in with the address of a function to call to free the result
+ *	string when it's no longer needed (or NULL to indicate that the string
+ *	doesn't need to be freed).
  *
  * Side effects:
  *	None.
@@ -517,14 +537,14 @@ TkCanvasDashParseProc(clientData, interp, tkwin, value, widgRec, offset)
  */
 
 char *
-TkCanvasDashPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
-    ClientData clientData;		/* Ignored. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset in record for item. */
-    Tcl_FreeProc **freeProcPtr;		/* Pointer to variable to fill in with
-					 * information about how to reclaim
-					 * storage for return string. */
+TkCanvasDashPrintProc(
+    ClientData clientData,	/* Ignored. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset,			/* Offset in record for item. */
+    Tcl_FreeProc **freeProcPtr)	/* Pointer to variable to fill in with
+				 * information about how to reclaim storage
+				 * for return string. */
 {
     Tk_Dash *dash = (Tk_Dash *) (widgRec+offset);
     char *buffer;
@@ -535,18 +555,18 @@ TkCanvasDashPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
 	i = -i;
 	*freeProcPtr = TCL_DYNAMIC;
 	buffer = (char *) ckalloc((unsigned int) (i+1));
-	p = (i > sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
+	p = (i > (int)sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
 	memcpy(buffer, p, (unsigned int) i);
 	buffer[i] = 0;
 	return buffer;
     } else if (!i) {
-	*freeProcPtr = (Tcl_FreeProc *) NULL;
+	*freeProcPtr = NULL;
 	return "";
     }
     buffer = (char *)ckalloc((unsigned int) (4*i));
     *freeProcPtr = TCL_DYNAMIC;
 
-    p = (i > sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
+    p = (i > (int)sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
     sprintf(buffer, "%d", *p++ & 0xff);
     while(--i) {
 	sprintf(buffer+strlen(buffer), " %d", *p++ & 0xff);
@@ -557,46 +577,80 @@ TkCanvasDashPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
 /*
  *--------------------------------------------------------------
  *
+ * InitSmoothMethods --
+ *
+ *	This function is invoked to set up the initial state of the list of
+ *	"-smooth" methods. It should only be called when the list installed
+ *	in the interpreter is NULL.
+ *
+ * Results:
+ *	Pointer to the start of the list of default smooth methods.
+ *
+ * Side effects:
+ *	A linked list of smooth methods is created and attached to the
+ *	interpreter's association key "smoothMethod"
+ *
+ *--------------------------------------------------------------
+ */
+
+static SmoothAssocData *
+InitSmoothMethods(
+    Tcl_Interp *interp)
+{
+    SmoothAssocData *methods, *ptr;
+
+    methods = (SmoothAssocData *) ckalloc(sizeof(SmoothAssocData));
+    methods->smooth.name = tkRawSmoothMethod.name;
+    methods->smooth.coordProc = tkRawSmoothMethod.coordProc;
+    methods->smooth.postscriptProc = tkRawSmoothMethod.postscriptProc;
+
+    methods->nextPtr = (SmoothAssocData *) ckalloc(sizeof(SmoothAssocData));
+
+    ptr = methods->nextPtr;
+    ptr->smooth.name = tkBezierSmoothMethod.name;
+    ptr->smooth.coordProc = tkBezierSmoothMethod.coordProc;
+    ptr->smooth.postscriptProc = tkBezierSmoothMethod.postscriptProc;
+    ptr->nextPtr = NULL;
+
+    Tcl_SetAssocData(interp, "smoothMethod", SmoothMethodCleanupProc,
+	    (ClientData) methods);
+    return methods;
+}
+
+/*
+ *--------------------------------------------------------------
+ *
  * Tk_CreateSmoothMethod --
  *
- *	This procedure is invoked to add additional values
- *	for the "-smooth" option to the list.
+ *	This function is invoked to add additional values for the "-smooth"
+ *	option to the list.
  *
  * Results:
  *	A standard Tcl return value.
  *
  * Side effects:
- *	In the future "-smooth <name>" will be accepted as
- *	smooth method for the line and polygon.
+ *	In the future "-smooth <name>" will be accepted as smooth method for
+ *	the line and polygon.
  *
  *--------------------------------------------------------------
  */
 
-Tk_SmoothMethod tkBezierSmoothMethod = {
-    "bezier",
-    TkMakeBezierCurve,
-    (void (*) _ANSI_ARGS_((Tcl_Interp *interp, Tk_Canvas canvas,
-	    double *coordPtr, int numPoints, int numSteps)))
-		TkMakeBezierPostscript,
-};
-
-static void SmoothMethodCleanupProc _ANSI_ARGS_((ClientData clientData,
-		Tcl_Interp *interp));
-
-typedef struct SmoothAssocData {
-    struct SmoothAssocData *nextPtr;	/* pointer to next SmoothAssocData */
-    Tk_SmoothMethod smooth;		/* name and functions associated with this
-					 * option */
-} SmoothAssocData;
-
 void
-Tk_CreateSmoothMethod(interp, smooth)
-    Tcl_Interp *interp;
-    Tk_SmoothMethod *smooth;
+Tk_CreateSmoothMethod(
+    Tcl_Interp *interp,
+    Tk_SmoothMethod *smooth)
 {
     SmoothAssocData *methods, *typePtr2, *prevPtr, *ptr;
     methods = (SmoothAssocData *) Tcl_GetAssocData(interp, "smoothMethod",
-	    (Tcl_InterpDeleteProc **) NULL);
+	    NULL);
+
+    /*
+     * Initialize if we were not previously initialized.
+     */
+
+    if (methods == NULL) {
+	methods = InitSmoothMethods(interp);
+    }
 
     /*
      * If there's already a smooth method with the given name, remove it.
@@ -620,15 +674,16 @@ Tk_CreateSmoothMethod(interp, smooth)
     ptr->smooth.postscriptProc = smooth->postscriptProc;
     ptr->nextPtr = methods;
     Tcl_SetAssocData(interp, "smoothMethod", SmoothMethodCleanupProc,
-		(ClientData) ptr);
+	    (ClientData) ptr);
 }
+
 /*
  *----------------------------------------------------------------------
  *
  * SmoothMethodCleanupProc --
  *
- *	This procedure is invoked whenever an interpreter is deleted
- *	to cleanup the smooth methods.
+ *	This function is invoked whenever an interpreter is deleted to
+ *	cleanup the smooth methods.
  *
  * Results:
  *	None.
@@ -640,10 +695,10 @@ Tk_CreateSmoothMethod(interp, smooth)
  */
 
 static void
-SmoothMethodCleanupProc(clientData, interp)
-    ClientData clientData;	/* Points to "smoothMethod" AssocData
-				 * for the interpreter. */
-    Tcl_Interp *interp;		/* Interpreter that is being deleted. */
+SmoothMethodCleanupProc(
+    ClientData clientData,	/* Points to "smoothMethod" AssocData for the
+				 * interpreter. */
+    Tcl_Interp *interp)		/* Interpreter that is being deleted. */
 {
     SmoothAssocData *ptr, *methods = (SmoothAssocData *) clientData;
 
@@ -657,8 +712,8 @@ SmoothMethodCleanupProc(clientData, interp)
  *
  * TkSmoothParseProc --
  *
- *	This procedure is invoked during option processing to handle
- *	the "-smooth" option.
+ *	This function is invoked during option processing to handle the
+ *	"-smooth" option.
  *
  * Results:
  *	A standard Tcl return value.
@@ -671,33 +726,54 @@ SmoothMethodCleanupProc(clientData, interp)
  */
 
 int
-TkSmoothParseProc(clientData, interp, tkwin, value, widgRec, offset)
-    ClientData clientData;		/* some flags.*/
-    Tcl_Interp *interp;			/* Used for reporting errors. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    CONST char *value;			/* Value of option. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item. */
+TkSmoothParseProc(
+    ClientData clientData,	/* some flags.*/
+    Tcl_Interp *interp,		/* Used for reporting errors. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    CONST char *value,		/* Value of option. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset)			/* Offset into item. */
 {
     register Tk_SmoothMethod **smoothPtr =
-	(Tk_SmoothMethod **) (widgRec + offset);
+	    (Tk_SmoothMethod **) (widgRec + offset);
     Tk_SmoothMethod *smooth = NULL;
     int b;
     size_t length;
     SmoothAssocData *methods;
 
     if (value == NULL || *value == 0) {
-	*smoothPtr = (Tk_SmoothMethod *) NULL;
+	*smoothPtr = NULL;
 	return TCL_OK;
     }
     length = strlen(value);
     methods = (SmoothAssocData *) Tcl_GetAssocData(interp, "smoothMethod",
-	    (Tcl_InterpDeleteProc **) NULL);
-    while (methods != (SmoothAssocData *) NULL) {
+	    NULL);
+
+    /*
+     * Not initialized yet; fix that now.
+     */
+
+    if (methods == NULL) {
+	methods = InitSmoothMethods(interp);
+    }
+
+    /*
+     * Backward compatability hack.
+     */
+
+    if (strncmp(value, "bezier", length) == 0) {
+	smooth = &tkBezierSmoothMethod;
+    }
+
+    /*
+     * Search the list of installed smooth methods.
+     */
+
+    while (methods != NULL) {
 	if (strncmp(value, methods->smooth.name, length) == 0) {
-	    if (smooth != (Tk_SmoothMethod *) NULL) {
-		Tcl_AppendResult(interp, "ambigeous smooth method \"", value,
-			"\"", (char *) NULL);
+	    if (smooth != NULL) {
+		Tcl_AppendResult(interp, "ambiguous smooth method \"", value,
+			"\"", NULL);
 		return TCL_ERROR;
 	    }
 	    smooth = &methods->smooth;
@@ -707,19 +783,16 @@ TkSmoothParseProc(clientData, interp, tkwin, value, widgRec, offset)
     if (smooth) {
 	*smoothPtr = smooth;
 	return TCL_OK;
-    } else if (strncmp(value, tkBezierSmoothMethod.name, length) == 0) {
-	/*
-	 * We need to do handle the built-in bezier method.
-	 */
-	*smoothPtr = &tkBezierSmoothMethod;
-	return TCL_OK;
     }
 
+    /*
+     * Did not find it. Try parsing as a boolean instead.
+     */
 
     if (Tcl_GetBoolean(interp, (char *) value, &b) != TCL_OK) {
 	return TCL_ERROR;
     }
-    *smoothPtr = b ? &tkBezierSmoothMethod : (Tk_SmoothMethod*) NULL;
+    *smoothPtr = b ? &tkBezierSmoothMethod : NULL;
     return TCL_OK;
 }
 /*
@@ -727,16 +800,15 @@ TkSmoothParseProc(clientData, interp, tkwin, value, widgRec, offset)
  *
  * TkSmoothPrintProc --
  *
- *	This procedure is invoked by the Tk configuration code
- *	to produce a printable string for the "-smooth"
- *	configuration option.
+ *	This function is invoked by the Tk configuration code to produce a
+ *	printable string for the "-smooth" configuration option.
  *
  * Results:
- *	The return value is a string describing the smooth option for
- *	the item referred to by "widgRec".  In addition, *freeProcPtr
- *	is filled in with the address of a procedure to call to free
- *	the result string when it's no longer needed (or NULL to
- *	indicate that the string doesn't need to be freed).
+ *	The return value is a string describing the smooth option for the item
+ *	referred to by "widgRec". In addition, *freeProcPtr is filled in with
+ *	the address of a function to call to free the result string when it's
+ *	no longer needed (or NULL to indicate that the string doesn't need to
+ *	be freed).
  *
  * Side effects:
  *	None.
@@ -745,16 +817,17 @@ TkSmoothParseProc(clientData, interp, tkwin, value, widgRec, offset)
  */
 
 char *
-TkSmoothPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
-    ClientData clientData;		/* Ignored. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item. */
-    Tcl_FreeProc **freeProcPtr;		/* Pointer to variable to fill in with
-					 * information about how to reclaim
-					 * storage for return string. */
+TkSmoothPrintProc(
+    ClientData clientData,	/* Ignored. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset,			/* Offset into item. */
+    Tcl_FreeProc **freeProcPtr)	/* Pointer to variable to fill in with
+				 * information about how to reclaim storage
+				 * for return string. */
 {
-    register Tk_SmoothMethod **smoothPtr = (Tk_SmoothMethod **) (widgRec + offset);
+    register Tk_SmoothMethod **smoothPtr =
+	    (Tk_SmoothMethod **) (widgRec + offset);
 
     return (*smoothPtr) ? (*smoothPtr)->name : "0";
 }
@@ -763,13 +836,12 @@ TkSmoothPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
  *
  * Tk_GetDash
  *
- *	This procedure is used to parse a string, assuming
- *	it is dash information.
+ *	This function is used to parse a string, assuming it is dash
+ *	information.
  *
  * Results:
- *	The return value is a standard Tcl result:  TCL_OK means
- *	that the dash information was parsed ok, and
- *	TCL_ERROR means it couldn't be parsed.
+ *	The return value is a standard Tcl result: TCL_OK means that the dash
+ *	information was parsed ok, and TCL_ERROR means it couldn't be parsed.
  *
  * Side effects:
  *	Dash information in the dash structure is updated.
@@ -778,29 +850,34 @@ TkSmoothPrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
  */
 
 int
-Tk_GetDash(interp, value, dash)
-    Tcl_Interp *interp;		/* Used for error reporting. */
-    CONST char *value;		/* Textual specification of dash list. */
-    Tk_Dash *dash;		/* Pointer to record in which to
-				 * store dash information. */
+Tk_GetDash(
+    Tcl_Interp *interp,		/* Used for error reporting. */
+    CONST char *value,		/* Textual specification of dash list. */
+    Tk_Dash *dash)		/* Pointer to record in which to store dash
+				 * information. */
 {
     int argc, i;
     CONST char **largv, **argv = NULL;
     char *pt;
 
-    if ((value==(char *) NULL) || (*value==0) ) {
+    if ((value==NULL) || (*value==0) ) {
 	dash->number = 0;
 	return TCL_OK;
     }
-    if ((*value == '.') || (*value == ',') ||
-	    (*value == '-') || (*value == '_')) {
-	i = DashConvert((char *) NULL, value, -1, 0.0);
+
+    /*
+     * switch is usually compiled more efficiently than a chain of conditions.
+     */
+
+    switch (*value) {
+    case '.': case ',': case '-': case '_':
+	i = DashConvert(NULL, value, -1, 0.0);
 	if (i>0) {
 	    i = strlen(value);
 	} else {
 	    goto badDashList;
 	}
-	if (i > sizeof(char *)) {
+	if (i > (int)sizeof(char *)) {
 	    dash->pattern.pt = pt = (char *) ckalloc(strlen(value));
 	} else {
 	    pt = dash->pattern.array;
@@ -809,26 +886,16 @@ Tk_GetDash(interp, value, dash)
 	dash->number = -i;
 	return TCL_OK;
     }
+
     if (Tcl_SplitList(interp, (char *) value, &argc, &argv) != TCL_OK) {
 	Tcl_ResetResult(interp);
-    badDashList:
-	Tcl_AppendResult(interp, "bad dash list \"", value,
-		"\": must be a list of integers or a format like \"-..\"",
-		(char *) NULL);
-    syntaxError:
-	if (argv != NULL) {
-	    ckfree((char *) argv);
-	}
-	if (ABS(dash->number) > sizeof(char *))
-	    ckfree((char *) dash->pattern.pt);
-	dash->number = 0;
-	return TCL_ERROR;
+	goto badDashList;
     }
 
-    if (ABS(dash->number) > sizeof(char *)) {
+    if ((unsigned int)ABS(dash->number) > sizeof(char *)) {
 	ckfree((char *) dash->pattern.pt);
     }
-    if (argc > sizeof(char *)) {
+    if (argc > (int)sizeof(char *)) {
 	dash->pattern.pt = pt = (char *) ckalloc((unsigned int) argc);
     } else {
 	pt = dash->pattern.array;
@@ -836,23 +903,41 @@ Tk_GetDash(interp, value, dash)
     dash->number = argc;
 
     largv = argv;
-    while(argc>0) {
-	if (Tcl_GetInt(interp, *largv, &i) != TCL_OK ||
-	    i < 1 || i>255) {
+    while (argc>0) {
+	if (Tcl_GetInt(interp, *largv, &i) != TCL_OK || i < 1 || i>255) {
 	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "expected integer in the range 1..255 but got \"",
-			 *largv, "\"", (char *) NULL);
+	    Tcl_AppendResult(interp,
+		    "expected integer in the range 1..255 but got \"",
+		    *largv, "\"", NULL);
 	    goto syntaxError;
 	}
 	*pt++ = i;
-	argc--; largv++; 
+	argc--;
+	largv++;
     }
-  
+
     if (argv != NULL) {
 	ckfree((char *) argv);
     }
-
     return TCL_OK;
+
+    /*
+     * Something went wrong. Generate error message, clean up and return.
+     */
+
+  badDashList:
+    Tcl_AppendResult(interp, "bad dash list \"", value,
+	    "\": must be a list of integers or a format like \"-..\"",
+	    NULL);
+  syntaxError:
+    if (argv != NULL) {
+	ckfree((char *) argv);
+    }
+    if ((unsigned int)ABS(dash->number) > sizeof(char *)) {
+	ckfree((char *) dash->pattern.pt);
+    }
+    dash->number = 0;
+    return TCL_ERROR;
 }
 
 /*
@@ -860,8 +945,8 @@ Tk_GetDash(interp, value, dash)
  *
  * Tk_CreateOutline
  *
- *	This procedure initializes the Tk_Outline structure
- *	with default values.
+ *	This function initializes the Tk_Outline structure with default
+ *	values.
  *
  * Results:
  *	None
@@ -872,8 +957,9 @@ Tk_GetDash(interp, value, dash)
  *--------------------------------------------------------------
  */
 
-void Tk_CreateOutline(outline)
-    Tk_Outline *outline;
+void
+Tk_CreateOutline(
+    Tk_Outline *outline)	/* Outline structure to be filled in. */
 {
     outline->gc = None;
     outline->width = 1.0;
@@ -899,8 +985,8 @@ void Tk_CreateOutline(outline)
  *
  * Tk_DeleteOutline
  *
- *	This procedure frees all memory that might be
- *	allocated and referenced in the Tk_Outline structure.
+ *	This function frees all memory that might be allocated and referenced
+ *	in the Tk_Outline structure.
  *
  * Results:
  *	None
@@ -911,20 +997,21 @@ void Tk_CreateOutline(outline)
  *--------------------------------------------------------------
  */
 
-void Tk_DeleteOutline(display, outline)
-    Display *display;			/* Display containing window */
-    Tk_Outline *outline;
+void
+Tk_DeleteOutline(
+    Display *display,		/* Display containing window. */
+    Tk_Outline *outline)
 {
     if (outline->gc != None) {
 	Tk_FreeGC(display, outline->gc);
     }
-    if (ABS(outline->dash.number) > sizeof(char *)) {
+    if ((unsigned int)ABS(outline->dash.number) > sizeof(char *)) {
 	ckfree((char *) outline->dash.pattern.pt);
     }
-    if (ABS(outline->activeDash.number) > sizeof(char *)) {
+    if ((unsigned int)ABS(outline->activeDash.number) > sizeof(char *)) {
 	ckfree((char *) outline->activeDash.pattern.pt);
     }
-    if (ABS(outline->disabledDash.number) > sizeof(char *)) {
+    if ((unsigned int)ABS(outline->disabledDash.number) > sizeof(char *)) {
 	ckfree((char *) outline->disabledDash.pattern.pt);
     }
     if (outline->color != NULL) {
@@ -952,15 +1039,14 @@ void Tk_DeleteOutline(display, outline)
  *
  * Tk_ConfigOutlineGC
  *
- *	This procedure should be called in the canvas object
- *	during the configure command. The graphics context
- *	description in gcValues is updated according to the
- *	information in the dash structure, as far as possible.
+ *	This function should be called in the canvas object during the
+ *	configure command. The graphics context description in gcValues is
+ *	updated according to the information in the dash structure, as far as
+ *	possible.
  *
  * Results:
- *	The return-value is a mask, indicating which
- *	elements of gcValues have been updated.
- *	0 means there is no outline.
+ *	The return-value is a mask, indicating which elements of gcValues have
+ *	been updated. 0 means there is no outline.
  *
  * Side effects:
  *	GC information in gcValues is updated.
@@ -968,11 +1054,12 @@ void Tk_DeleteOutline(display, outline)
  *--------------------------------------------------------------
  */
 
-int Tk_ConfigOutlineGC(gcValues, canvas, item, outline)
-    XGCValues *gcValues;
-    Tk_Canvas canvas;
-    Tk_Item *item;
-    Tk_Outline *outline;
+int
+Tk_ConfigOutlineGC(
+    XGCValues *gcValues,
+    Tk_Canvas canvas,
+    Tk_Item *item,
+    Tk_Outline *outline)
 {
     int mask = 0;
     double width;
@@ -1017,7 +1104,7 @@ int Tk_ConfigOutlineGC(gcValues, canvas, item, outline)
 	if (outline->activeStipple!=None) {
 	    stipple = outline->activeStipple;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (outline->disabledWidth>0) {
 	    width = outline->disabledWidth;
 	}
@@ -1066,15 +1153,12 @@ int Tk_ConfigOutlineGC(gcValues, canvas, item, outline)
  *
  * Tk_ChangeOutlineGC
  *
- *	Updates the GC to represent the full information of
- *	the dash structure. Partly this is already done in
- *	Tk_ConfigOutlineGC().
- *	This function should be called just before drawing
- *	the dashed item.
+ *	Updates the GC to represent the full information of the dash
+ *	structure. Partly this is already done in Tk_ConfigOutlineGC(). This
+ *	function should be called just before drawing the dashed item.
  *
  * Results:
- *	1 if there is a stipple pattern.
- *	0 otherwise.
+ *	1 if there is a stipple pattern, and 0 otherwise.
  *
  * Side effects:
  *	GC is updated.
@@ -1083,10 +1167,10 @@ int Tk_ConfigOutlineGC(gcValues, canvas, item, outline)
  */
 
 int
-Tk_ChangeOutlineGC(canvas, item, outline)
-    Tk_Canvas canvas;
-    Tk_Item *item;
-    Tk_Outline *outline;
+Tk_ChangeOutlineGC(
+    Tk_Canvas canvas,
+    Tk_Item *item,
+    Tk_Outline *outline)
 {
     CONST char *p;
     double width;
@@ -1136,25 +1220,30 @@ Tk_ChangeOutlineGC(canvas, item, outline)
 	return 0;
     }
 
-    if ((dash->number<-1) || ((dash->number == -1) && (dash->pattern.array[1]!=','))) {
+    if ((dash->number<-1) ||
+	    ((dash->number == -1) && (dash->pattern.array[1] != ','))) {
 	char *q;
 	int i = -dash->number;
 
-        p = (i > sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
+	p = (i > (int)sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
 	q = (char *) ckalloc(2*(unsigned int)i);
 	i = DashConvert(q, p, i, width);
-	XSetDashes(((TkCanvas *)canvas)->display, outline->gc, outline->offset, q, i);
+	XSetDashes(((TkCanvas *)canvas)->display, outline->gc,
+		outline->offset, q, i);
 	ckfree(q);
-    } else if ( dash->number>2 || (dash->number==2 &&
-		(dash->pattern.array[0]!=dash->pattern.array[1]))) {
-        p = (char *) (dash->number > sizeof(char *)) ? dash->pattern.pt : dash->pattern.array;
-	XSetDashes(((TkCanvas *)canvas)->display, outline->gc, outline->offset, p, dash->number);
+    } else if (dash->number>2 || (dash->number==2 &&
+	    (dash->pattern.array[0]!=dash->pattern.array[1]))) {
+	p = (dash->number > (int)sizeof(char *))
+		? dash->pattern.pt : dash->pattern.array;
+	XSetDashes(((TkCanvas *)canvas)->display, outline->gc,
+		outline->offset, p, dash->number);
     }
     if (stipple!=None) {
 	int w=0; int h=0;
 	Tk_TSOffset *tsoffset = &outline->tsoffset;
 	int flags = tsoffset->flags;
-	if (!(flags & TK_OFFSET_INDEX) && (flags & (TK_OFFSET_CENTER|TK_OFFSET_MIDDLE))) {
+	if (!(flags & TK_OFFSET_INDEX) &&
+		(flags & (TK_OFFSET_CENTER|TK_OFFSET_MIDDLE))) {
 	    Tk_SizeOfBitmap(((TkCanvas *)canvas)->display, stipple, &w, &h);
 	    if (flags & TK_OFFSET_CENTER) {
 		w /= 2;
@@ -1183,26 +1272,24 @@ Tk_ChangeOutlineGC(canvas, item, outline)
  *
  * Tk_ResetOutlineGC
  *
- *	Restores the GC to the situation before 
- *	Tk_ChangeDashGC() was called.
- *	This function should be called just after the dashed
- *	item is drawn, because the GC is supposed to be
- *	read-only.
+ *	Restores the GC to the situation before Tk_ChangeDashGC() was called.
+ *	This function should be called just after the dashed item is drawn,
+ *	because the GC is supposed to be read-only.
  *
  * Results:
- *	1 if there is a stipple pattern.
- *	0 otherwise.
+ *	1 if there is a stipple pattern, and 0 otherwise.
  *
  * Side effects:
  *	GC is updated.
  *
  *--------------------------------------------------------------
  */
+
 int
-Tk_ResetOutlineGC(canvas, item, outline)
-    Tk_Canvas canvas;
-    Tk_Item *item;
-    Tk_Outline *outline;
+Tk_ResetOutlineGC(
+    Tk_Canvas canvas,
+    Tk_Item *item,
+    Tk_Outline *outline)
 {
     char dashList;
     double width;
@@ -1234,7 +1321,7 @@ Tk_ResetOutlineGC(canvas, item, outline)
 	if (outline->activeStipple!=None) {
 	    stipple = outline->activeStipple;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (outline->disabledWidth>width) {
 	    width = outline->disabledWidth;
 	}
@@ -1253,8 +1340,8 @@ Tk_ResetOutlineGC(canvas, item, outline)
     }
 
     if ((dash->number > 2) || (dash->number < -1) || (dash->number==2 &&
-		(dash->pattern.array[0] != dash->pattern.array[1])) ||
-		((dash->number == -1) && (dash->pattern.array[1] != ','))) {
+	    (dash->pattern.array[0] != dash->pattern.array[1])) ||
+	    ((dash->number == -1) && (dash->pattern.array[1] != ','))) {
 	if (dash->number < 0) {
 	    dashList = (int) (4 * width + 0.5);
 	} else if (dash->number<3) {
@@ -1271,30 +1358,30 @@ Tk_ResetOutlineGC(canvas, item, outline)
     }
     return 0;
 }
-
 
 /*
  *--------------------------------------------------------------
  *
  * Tk_CanvasPsOutline
  *
- *	Creates the postscript command for the correct
- *	Outline-information (width, dash, color and stipple).
+ *	Creates the postscript command for the correct Outline-information
+ *	(width, dash, color and stipple).
  *
  * Results:
  *	TCL_OK if succeeded, otherwise TCL_ERROR.
  *
  * Side effects:
- *	canvas->interp->result contains the postscript string,
- *	or an error message if the result was TCL_ERROR.
+ *	canvas->interp->result contains the postscript string, or an error
+ *	message if the result was TCL_ERROR.
  *
  *--------------------------------------------------------------
  */
+
 int
-Tk_CanvasPsOutline(canvas, item, outline)
-    Tk_Canvas canvas;
-    Tk_Item *item;
-    Tk_Outline *outline;
+Tk_CanvasPsOutline(
+    Tk_Canvas canvas,
+    Tk_Item *item,
+    Tk_Outline *outline)
 {
     char string[41];
     char pattern[11];
@@ -1316,6 +1403,7 @@ Tk_CanvasPsOutline(canvas, item, outline)
     if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
+
     if (((TkCanvas *)canvas)->currentItemPtr == item) {
 	if (outline->activeWidth > width) {
 	    width = outline->activeWidth;
@@ -1344,7 +1432,7 @@ Tk_CanvasPsOutline(canvas, item, outline)
 	}
     }
     sprintf(string, "%.15g setlinewidth\n", width);
-    Tcl_AppendResult(interp, string, (char *) NULL);
+    Tcl_AppendResult(interp, string, NULL);
 
     if (dash->number > 10) {
 	str = (char *)ckalloc((unsigned int) (1 + 4*dash->number));
@@ -1352,38 +1440,40 @@ Tk_CanvasPsOutline(canvas, item, outline)
 	str = (char *)ckalloc((unsigned int) (1 - 8*dash->number));
 	lptr = (char *)ckalloc((unsigned int) (1 - 2*dash->number));
     }
-    ptr = (char *) ((ABS(dash->number) > sizeof(char *)) ) ?
-	dash->pattern.pt : dash->pattern.array;
+    ptr = ((unsigned int)ABS(dash->number) > sizeof(char *)) ?
+	    dash->pattern.pt : dash->pattern.array;
     if (dash->number > 0) {
 	char *ptr0 = ptr;
+
 	sprintf(str, "[%d", *ptr++ & 0xff);
 	i = dash->number-1;
 	while (i--) {
 	    sprintf(str+strlen(str), " %d", *ptr++ & 0xff);
 	}
-	Tcl_AppendResult(interp, str, (char *)NULL);
+	Tcl_AppendResult(interp, str, NULL);
 	if (dash->number&1) {
-	    Tcl_AppendResult(interp, " ", str+1, (char *)NULL);
+	    Tcl_AppendResult(interp, " ", str+1, NULL);
 	}
 	sprintf(str, "] %d setdash\n", outline->offset);
-	Tcl_AppendResult(interp, str, (char *)NULL);
+	Tcl_AppendResult(interp, str, NULL);
 	ptr = ptr0;
     } else if (dash->number < 0) {
 	if ((i = DashConvert(lptr, ptr, -dash->number, width)) != 0) {
 	    char *lptr0 = lptr;
+
 	    sprintf(str, "[%d", *lptr++ & 0xff);
 	    while (--i) {
 		sprintf(str+strlen(str), " %d", *lptr++ & 0xff);
 	    }
-	    Tcl_AppendResult(interp, str, (char *)NULL);
+	    Tcl_AppendResult(interp, str, NULL);
 	    sprintf(str, "] %d setdash\n", outline->offset);
-	    Tcl_AppendResult(interp, str, (char *)NULL);
+	    Tcl_AppendResult(interp, str, NULL);
 	    lptr = lptr0;
 	} else {
-	    Tcl_AppendResult(interp, "[] 0 setdash\n", (char *)NULL);
+	    Tcl_AppendResult(interp, "[] 0 setdash\n", NULL);
 	}
     } else {
-	Tcl_AppendResult(interp, "[] 0 setdash\n", (char *)NULL);
+	Tcl_AppendResult(interp, "[] 0 setdash\n", NULL);
     }
     if (str != string) {
 	ckfree(str);
@@ -1395,32 +1485,28 @@ Tk_CanvasPsOutline(canvas, item, outline)
 	return TCL_ERROR;
     }
     if (stipple != None) {
-	Tcl_AppendResult(interp, "StrokeClip ", (char *) NULL);
+	Tcl_AppendResult(interp, "StrokeClip ", NULL);
 	if (Tk_CanvasPsStipple(interp, canvas, stipple) != TCL_OK) {
 	    return TCL_ERROR;
 	}
     } else {
-	Tcl_AppendResult(interp, "stroke\n", (char *) NULL);
+	Tcl_AppendResult(interp, "stroke\n", NULL);
     }
 
     return TCL_OK;
 }
-
 
 /*
  *--------------------------------------------------------------
  *
  * DashConvert
  *
- *	Converts a character-like dash-list (e.g. "-..")
- *	into an X11-style. l must point to a string that
- *	holds room to at least 2*n characters. if
- *	l == NULL, this function can be used for
- *	syntax checking only.
+ *	Converts a character-like dash-list (e.g. "-..") into an X11-style. l
+ *	must point to a string that holds room to at least 2*n characters. If
+ *	l == NULL, this function can be used for syntax checking only.
  *
  * Results:
- *	The length of the resulting X11 compatible
- *	dash-list. -1 if failed.
+ *	The length of the resulting X11 compatible dash-list. -1 if failed.
  *
  * Side effects:
  *	None
@@ -1429,11 +1515,13 @@ Tk_CanvasPsOutline(canvas, item, outline)
  */
 
 static int
-DashConvert (l, p, n, width)
-    char *l;
-    CONST char *p;
-    int n;
-    double width;
+DashConvert(
+    char *l,			/* Must be at least 2*n chars long, or NULL to
+				 * indicate "just check syntax". */
+    CONST char *p,		/* String to parse. */
+    int n,			/* Length of string to parse, or -1 to
+				 * indicate that strlen() should be used. */
+    double width)		/* Width of line. */
 {
     int result = 0;
     int size, intWidth;
@@ -1447,30 +1535,28 @@ DashConvert (l, p, n, width)
     }
     while (n-- && *p) {
 	switch (*p++) {
-	    case ' ':
-		if (result) {
-		    if (l) {
-			l[-1] += intWidth + 1;
-		    }
-		    continue;
-		} else {
-		    return 0;
+	case ' ':
+	    if (result) {
+		if (l) {
+		    l[-1] += intWidth + 1;
 		}
-		break;
-	    case '_':
-		size = 8;
-		break;
-	    case '-':
-		size = 6;
-		break;
-	    case ',':
-		size = 4;
-		break;
-	    case '.':
-		size = 2;
-		break;
-	    default:
-		return -1;
+		continue;
+	    }
+	    return 0;
+	case '_':
+	    size = 8;
+	    break;
+	case '-':
+	    size = 6;
+	    break;
+	case ',':
+	    size = 4;
+	    break;
+	case '.':
+	    size = 2;
+	    break;
+	default:
+	    return -1;
 	}
 	if (l) {
 	    *l++ = size * intWidth;
@@ -1484,14 +1570,14 @@ DashConvert (l, p, n, width)
 /*
  *----------------------------------------------------------------------
  *
- * translateAndAppendCoords --
+ * TranslateAndAppendCoords --
  *
  *	This is a helper routine for TkCanvTranslatePath() below.
  *
- *	Given an (x,y) coordinate pair within a canvas, this procedure
- *	computes the corresponding coordinates at which the point should
- *	be drawn in the drawable used for display.  Those coordinates are
- *	then written into outArr[numOut*2] and outArr[numOut*2+1].
+ *	Given an (x,y) coordinate pair within a canvas, this function computes
+ *	the corresponding coordinates at which the point should be drawn in
+ *	the drawable used for display. Those coordinates are then written into
+ *	outArr[numOut*2] and outArr[numOut*2+1].
  *
  * Results:
  *	There is no return value.
@@ -1503,11 +1589,12 @@ DashConvert (l, p, n, width)
  */
 
 static void
-translateAndAppendCoords(canvPtr, x, y, outArr, numOut)
-    TkCanvas *canvPtr;			/* The canvas. */
-    double x, y;			/* Coordinates in canvas space. */
-    XPoint *outArr;                     /* Write results into this array */
-    int numOut;                         /* Num of prior entries in outArr[] */
+TranslateAndAppendCoords(
+    TkCanvas *canvPtr,		/* The canvas. */
+    double x,			/* Coordinates in canvas space. */
+    double y,
+    XPoint *outArr,		/* Write results into this array */
+    int numOut)			/* Num of prior entries in outArr[] */
 {
     double tmp;
 
@@ -1519,7 +1606,7 @@ translateAndAppendCoords(canvPtr, x, y, outArr, numOut)
     }
     outArr[numOut].x = (short) tmp;
 
-    tmp = y  - canvPtr->drawableYOrigin;
+    tmp = y - canvPtr->drawableYOrigin;
     if (tmp > 0) {
 	tmp += 0.5;
     } else {
@@ -1533,225 +1620,262 @@ translateAndAppendCoords(canvPtr, x, y, outArr, numOut)
  *
  * TkCanvTranslatePath
  *
- *	Translate a line or polygon path so that all vertices are
- *	within a rectangle that is 1000 pixels larger than the total
- *	size of the canvas window.  This will prevent pixel coordinates
- *	from overflowing the 16-bit integer size limitation imposed by
- *	most windowing systems.
+ *	Translate a line or polygon path so that all vertices are within a
+ *	rectangle that is 1000 pixels larger than the total size of the canvas
+ *	window. This will prevent pixel coordinates from overflowing the
+ *	16-bit integer size limitation imposed by most windowing systems.
  *
- *      coordPtr must point to an array of doubles, two doubles per
- *      vertex.  There are a total of numVertex vertices, or 2*numVertex
- *      entries in coordPtr.  The result vertices written into outArr
- *      have their coordinate origin shifted to canvPtr->drawableXOrigin
- *      by canvPtr->drawableYOrigin.  There might be as many as 3 times
- *      more output vertices than there are input vertices.  The calling
- *      function should allocate space accordingly.
+ *	coordPtr must point to an array of doubles, two doubles per vertex.
+ *	There are a total of numVertex vertices, or 2*numVertex entries in
+ *	coordPtr. The result vertices written into outArr have their
+ *	coordinate origin shifted to canvPtr->drawableXOrigin by
+ *	canvPtr->drawableYOrigin. There might be as many as 3 times more
+ *	output vertices than there are input vertices. The calling function
+ *	should allocate space accordingly.
  *
- *	This routine limits the width and height of a canvas window
- *	to 31767 pixels.  At the highest resolution display devices
- *	available today (210 ppi in Jan 2003) that's a window that is
- *      over 13 feet wide and tall.  Should be enough for the near
- *	future.
+ *	This routine limits the width and height of a canvas window to 31767
+ *	pixels. At the highest resolution display devices available today (210
+ *	ppi in Jan 2003) that's a window that is over 13 feet wide and tall.
+ *	Should be enough for the near future.
  *
  * Results:
- *      Clipped and translated path vertices are written into outArr[].
- *      There might be as many as twice the vertices in outArr[] as there
- *      are in coordPtr[].  The return value is the number of vertices
- *      actually written into outArr[].
+ *	Clipped and translated path vertices are written into outArr[]. There
+ *	might be as many as twice the vertices in outArr[] as there are in
+ *	coordPtr[]. The return value is the number of vertices actually
+ *	written into outArr[].
  *
  * Side effects:
  *	None
  *
  *--------------------------------------------------------------
  */
+
 int
-TkCanvTranslatePath (canvPtr, numVertex, coordArr, closedPath, outArr)
-    TkCanvas *canvPtr;  /* The canvas */
-    int numVertex;      /* Number of vertices specified by coordArr[] */
-    double *coordArr;   /* X and Y coordinates for each vertex */
-    int closedPath;     /* True if this is a closed polygon */
-    XPoint *outArr;     /* Write results here, if not NULL */
+TkCanvTranslatePath(
+    TkCanvas *canvPtr,		/* The canvas */
+    int numVertex,		/* Number of vertices specified by
+				 * coordArr[] */
+    double *coordArr,		/* X and Y coordinates for each vertex */
+    int closedPath,		/* True if this is a closed polygon */
+    XPoint *outArr)		/* Write results here, if not NULL */
 {
-    int numOutput = 0;  /* Number of output coordinates */
-    double lft, rgh;    /* Left and right sides of the bounding box */
-    double top, btm;    /* Top and bottom sizes of the bounding box */
-    double *tempArr;    /* Temporary storage used by the clipper */
-    double *a, *b, *t;  /* Pointers to parts of the temporary storage */
-    int i, j;           /* Loop counters */
-    int maxOutput;      /* Maximum number of outputs that we will allow */
-    double limit[4];          /* Boundries at which clipping occurs */
-    double staticSpace[480];  /* Temp space from the stack */
+    int numOutput = 0;		/* Number of output coordinates */
+    double lft, rgh;		/* Left and right sides of the bounding box */
+    double top, btm;		/* Top and bottom sizes of the bounding box */
+    double *tempArr;		/* Temporary storage used by the clipper */
+    double *a, *b, *t;		/* Pointers to parts of the temporary
+				 * storage */
+    int i, j;			/* Loop counters */
+    int maxOutput;		/* Maximum number of outputs that we will
+				 * allow */
+    double limit[4];		/* Boundries at which clipping occurs */
+    double staticSpace[480];	/* Temp space from the stack */
 
     /*
-    ** Constrain all vertices of the path to be within a box that is no
-    ** larger than 32000 pixels wide or height.  The top-left corner of
-    ** this clipping box is 1000 pixels above and to the left of the top
-    ** left corner of the window on which the canvas is displayed.
-    **
-    ** This means that a canvas will not display properly on a canvas
-    ** window that is larger than 31000 pixels wide or high.  That is not
-    ** a problem today, but might someday become a factor for ultra-high
-    ** resolutions displays.
-    **
-    ** The X11 protocol allows us (in theory) to expand the size of the
-    ** clipping box to 32767 pixels.  But we have found experimentally that
-    ** XFree86 sometimes fails to draw lines correctly if they are longer
-    ** than about 32500 pixels.  So we have left a little margin in the
-    ** size to mask that bug.
-    */
+     * Constrain all vertices of the path to be within a box that is no larger
+     * than 32000 pixels wide or height. The top-left corner of this clipping
+     * box is 1000 pixels above and to the left of the top left corner of the
+     * window on which the canvas is displayed.
+     *
+     * This means that a canvas will not display properly on a canvas window
+     * that is larger than 31000 pixels wide or high. That is not a problem
+     * today, but might someday become a factor for ultra-high resolutions
+     * displays.
+     *
+     * The X11 protocol allows us (in theory) to expand the size of the
+     * clipping box to 32767 pixels. But we have found experimentally that
+     * XFree86 sometimes fails to draw lines correctly if they are longer than
+     * about 32500 pixels. So we have left a little margin in the size to mask
+     * that bug.
+     */
+
     lft = canvPtr->xOrigin - 1000.0;
     top = canvPtr->yOrigin - 1000.0;
     rgh = lft + 32000.0;
     btm = top + 32000.0;
 
-    /* Try the common case first - no clipping.  Loop over the input
-    ** coordinates and translate them into appropriate output coordinates.
-    ** But if a vertex outside of the bounding box is seen, break out of
-    ** the loop.
-    **
-    ** Most of the time, no clipping is needed, so this one loop is 
-    ** sufficient to do the translation.
-    */
-    for(i=0; i<numVertex; i++){
-        double x, y;
-        x = coordArr[i*2];
-        y = coordArr[i*2+1];
-        if( x<lft || x>rgh || y<top || y>btm ) break;
-        translateAndAppendCoords(canvPtr, x, y, outArr, numOutput++);
+    /*
+     * Try the common case first - no clipping. Loop over the input
+     * coordinates and translate them into appropriate output coordinates.
+     * But if a vertex outside of the bounding box is seen, break out of the
+     * loop.
+     *
+     * Most of the time, no clipping is needed, so this one loop is sufficient
+     * to do the translation.
+     */
+
+    for (i=0; i<numVertex; i++){
+	double x, y;
+
+	x = coordArr[i*2];
+	y = coordArr[i*2+1];
+	if (x<lft || x>rgh || y<top || y>btm) {
+	    break;
+	}
+	TranslateAndAppendCoords(canvPtr, x, y, outArr, numOutput++);
     }
-    if( i==numVertex ){
-        assert( numOutput==numVertex );
-        return numOutput;
+    if (i == numVertex){
+	assert(numOutput == numVertex);
+	return numOutput;
     }
 
-    /* If we reach this point, it means that some clipping is required.
-    ** Begin by allocating some working storage - at least 6 times as much space
-    ** as coordArr[] requires.  Divide this space into two separate arrays
-    ** a[] and b[].  Initialize a[] to be equal to coordArr[].
-    */
-    if( numVertex*12 <= sizeof(staticSpace)/sizeof(staticSpace[0]) ){
-        tempArr = staticSpace;
+    /*
+     * If we reach this point, it means that some clipping is required. Begin
+     * by allocating some working storage - at least 6 times as much space as
+     * coordArr[] requires. Divide this space into two separate arrays a[] and
+     * b[]. Initialize a[] to be equal to coordArr[].
+     */
+
+    if (numVertex*12 <= (int)(sizeof(staticSpace)/sizeof(staticSpace[0]))) {
+	tempArr = staticSpace;
     } else {
-        tempArr = (double*)ckalloc( numVertex*12*sizeof(tempArr[0]) );
+	tempArr = (double *)ckalloc(numVertex*12*sizeof(tempArr[0]));
     }
-    for(i=0; i<numVertex*2; i++){
-        tempArr[i] = coordArr[i];
+    for (i=0; i<numVertex*2; i++){
+	tempArr[i] = coordArr[i];
     }
     a = tempArr;
     b = &tempArr[numVertex*6];
 
-    /* We will make four passes through the input data.  On each pass,
-    ** we copy the contents of a[] over into b[].  As we copy, we clip
-    ** any line segments that extend to the right past xClip then we
-    ** rotate the coordinate system 90 degrees clockwise.  After each
-    ** pass is complete, we interchange a[] and b[] in preparation for
-    ** the next pass.
-    **
-    ** Each pass clips line segments that extend beyond a single side
-    ** of the bounding box, and four passes rotate the coordinate system
-    ** back to its original value.  I'm not an expert on graphics 
-    ** algorithms, but I think this is called Cohen-Sutherland polygon
-    ** clipping.
-    **
-    ** The limit[] array contains the xClip value used for each of the
-    ** four passes.
-    */
+    /*
+     * We will make four passes through the input data. On each pass, we copy
+     * the contents of a[] over into b[]. As we copy, we clip any line
+     * segments that extend to the right past xClip then we rotate the
+     * coordinate system 90 degrees clockwise. After each pass is complete, we
+     * interchange a[] and b[] in preparation for the next pass.
+     *
+     * Each pass clips line segments that extend beyond a single side of the
+     * bounding box, and four passes rotate the coordinate system back to its
+     * original value. I'm not an expert on graphics algorithms, but I think
+     * this is called Cohen-Sutherland polygon clipping.
+     *
+     * The limit[] array contains the xClip value used for each of the four
+     * passes.
+     */
+
     limit[0] = rgh;
     limit[1] = -top;
     limit[2] = -lft;
     limit[3] = btm;
 
-    /* This is the loop that makes the four passes through the data.
-    */
+    /*
+     * This is the loop that makes the four passes through the data.
+     */
+
     maxOutput = numVertex*3;
-    for(j=0; j<4; j++){
-        double xClip = limit[j];
-        int inside = a[0]<xClip;
-        double priorY = a[1];
-        numOutput = 0;
+    for (j=0; j<4; j++){
+	double xClip = limit[j];
+	int inside = a[0]<xClip;
+	double priorY = a[1];
+	numOutput = 0;
 
-        /* Clip everything to the right of xClip.  Store the results in
-        ** b[] rotated by 90 degrees clockwise.
-        */
-        for(i=0; i<numVertex; i++){
-            double x = a[i*2];
-            double y = a[i*2+1];
-            if( x>=xClip ){
-                /* The current vertex is to the right of xClip.
-                */
-                if( inside ){
-                    /* If the current vertex is to the right of xClip but
-                    ** the previous vertex was left of xClip, then draw a
-                    ** line segment from the previous vertex to until it
-                    ** intersects the vertical at xClip.
-                    */
-                    double x0, y0, yN;
-                    assert( i>0 );
-                    x0 = a[i*2-2];
-                    y0 = a[i*2-1];
-                    yN = y0 + (y - y0)*(xClip-x0)/(x-x0);
-                    b[numOutput*2] = -yN;
-                    b[numOutput*2+1] = xClip;
-                    numOutput++;
-                    assert( numOutput<=maxOutput );
-                    priorY = yN;
-                    inside = 0;
-                }else if( i==0 ){
-                    /* If the first vertex is to the right of xClip, add
-                    ** a vertex that is the projection of the first vertex
-                    ** onto the vertical xClip line.
-                    */
-                    b[0] = -y;
-                    b[1] = xClip;
-                    numOutput = 1;
-                    priorY = y;
-                }
-            }else{
-                /* The current vertex is to the left of xClip
-                */
-                if( !inside ){
-                    /* If the current vertex is on the left of xClip and
-                    ** one or more prior vertices where to the right, then
-                    ** we have to draw a line segment along xClip that extends
-                    ** from the spot where we first crossed from left to right
-                    ** to the spot where we cross back from right to left.
-                    */
-                    double x0, y0, yN;
-                    assert( i>0 );
-                    x0 = a[i*2-2];
-                    y0 = a[i*2-1];
-                    yN = y0 + (y - y0)*(xClip-x0)/(x-x0);
-                    if( yN!=priorY ){
-                        b[numOutput*2] = -yN;
-                        b[numOutput*2+1] = xClip;
-                        numOutput++;
-                        assert( numOutput<=maxOutput );
-                    }
-                    inside = 1;
-                }
-                b[numOutput*2] = -y;
-                b[numOutput*2+1] = x;
-                numOutput++;
-                assert( numOutput<=maxOutput );
-            }
-        }
+	/*
+	 * Clip everything to the right of xClip. Store the results in b[]
+	 * rotated by 90 degrees clockwise.
+	 */
 
-        /* Interchange a[] and b[] in preparation for the next pass.
-        */
-        t = a;
-        a = b;
-        b = t;
-        numVertex = numOutput;
+	for (i=0; i<numVertex; i++){
+	    double x = a[i*2];
+	    double y = a[i*2+1];
+
+	    if (x >= xClip) {
+		/*
+		 * The current vertex is to the right of xClip.
+		 */
+
+		if (inside) {
+		    /*
+		     * If the current vertex is to the right of xClip but the
+		     * previous vertex was left of xClip, then draw a line
+		     * segment from the previous vertex to until it intersects
+		     * the vertical at xClip.
+		     */
+
+		    double x0, y0, yN;
+
+		    assert(i > 0);
+		    x0 = a[i*2-2];
+		    y0 = a[i*2-1];
+		    yN = y0 + (y - y0)*(xClip-x0)/(x-x0);
+		    b[numOutput*2] = -yN;
+		    b[numOutput*2+1] = xClip;
+		    numOutput++;
+		    assert(numOutput <= maxOutput);
+		    priorY = yN;
+		    inside = 0;
+		} else if (i == 0) {
+		    /*
+		     * If the first vertex is to the right of xClip, add a
+		     * vertex that is the projection of the first vertex onto
+		     * the vertical xClip line.
+		     */
+
+		    b[0] = -y;
+		    b[1] = xClip;
+		    numOutput = 1;
+		    priorY = y;
+		}
+	    } else {
+		/*
+		 * The current vertex is to the left of xClip
+		 */
+		if (!inside) {
+		    /* If the current vertex is on the left of xClip and one
+		     * or more prior vertices where to the right, then we have
+		     * to draw a line segment along xClip that extends from
+		     * the spot where we first crossed from left to right to
+		     * the spot where we cross back from right to left.
+		     */
+
+		    double x0, y0, yN;
+
+		    assert(i > 0);
+		    x0 = a[i*2-2];
+		    y0 = a[i*2-1];
+		    yN = y0 + (y - y0)*(xClip-x0)/(x-x0);
+		    if (yN != priorY) {
+			b[numOutput*2] = -yN;
+			b[numOutput*2+1] = xClip;
+			numOutput++;
+			assert(numOutput <= maxOutput);
+		    }
+		    inside = 1;
+		}
+		b[numOutput*2] = -y;
+		b[numOutput*2+1] = x;
+		numOutput++;
+		assert(numOutput <= maxOutput);
+	    }
+	}
+
+	/*
+	 * Interchange a[] and b[] in preparation for the next pass.
+	 */
+
+	t = a;
+	a = b;
+	b = t;
+	numVertex = numOutput;
     }
 
-    /* All clipping is now finished.  Convert the coordinates from doubles
-    ** into XPoints and translate the origin for the drawable.
-    */
-    for(i=0; i<numVertex; i++){
-        translateAndAppendCoords(canvPtr, a[i*2], a[i*2+1], outArr, i);
+    /*
+     * All clipping is now finished. Convert the coordinates from doubles into
+     * XPoints and translate the origin for the drawable.
+     */
+
+    for (i=0; i<numVertex; i++){
+	TranslateAndAppendCoords(canvPtr, a[i*2], a[i*2+1], outArr, i);
     }
-    if( tempArr!=staticSpace ){
-        ckfree((char *) tempArr);
+    if (tempArr != staticSpace) {
+	ckfree((char *) tempArr);
     }
     return numOutput;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

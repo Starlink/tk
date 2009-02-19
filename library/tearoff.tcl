@@ -2,7 +2,7 @@
 #
 # This file contains procedures that implement tear-off menus.
 #
-# RCS: @(#) $Id: tearoff.tcl,v 1.7.4.2 2007/04/29 02:24:49 das Exp $
+# RCS: @(#) $Id: tearoff.tcl,v 1.11 2007/04/23 21:16:43 das Exp $
 #
 # Copyright (c) 1994 The Regents of the University of California.
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -46,7 +46,8 @@ proc ::tk::TearOffMenu {w {x 0} {y 0}} {
     }
 
     set parent [winfo parent $w]
-    while {[winfo toplevel $parent] ne $parent || [winfo class $parent] eq "Menu"} {
+    while {[winfo toplevel $parent] ne $parent \
+	    || [winfo class $parent] eq "Menu"} {
 	set parent [winfo parent $parent]
     }
     if {$parent eq "."} {
@@ -69,7 +70,7 @@ proc ::tk::TearOffMenu {w {x 0} {y 0}} {
     if {[$menu cget -title] ne ""} {
     	wm title $menu [$menu cget -title]
     } else {
-    	switch [winfo class $parent] {
+    	switch -- [winfo class $parent] {
 	    Menubutton {
 	    	wm title $menu [$parent cget -text]
 	    }

@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkUnixPort.h,v 1.8.2.2 2006/09/06 22:01:26 hobbs Exp $
+ * RCS: @(#) $Id: tkUnixPort.h,v 1.14 2007/12/13 15:28:50 dgp Exp $
  */
 
 #ifndef _UNIXPORT
@@ -68,6 +68,9 @@
 #   else
 #       include <time.h>
 #   endif
+#endif
+#if HAVE_INTTYPES_H
+#    include <inttypes.h>
 #endif
 #ifndef NO_UNISTD_H
 #   include <unistd.h>
@@ -148,9 +151,9 @@
  * needed for X.
  */
 
-#define TkPutImage(colors, ncolors, display, pixels, gc, image, destx, desty, srcx, srcy, width, height) \
-	XPutImage(display, pixels, gc, image, destx, desty, srcx, \
-	srcy, width, height);
+#define TkPutImage(colors, ncolors, display, pixels, gc, image, srcx, srcy, destx, desty, width, height) \
+	XPutImage(display, pixels, gc, image, srcx, srcy, destx, \
+	desty, width, height);
 
 /*
  * Supply macros for seek offsets, if they're not already provided by
@@ -204,10 +207,12 @@
 /*
  * The following declaration is used to get access to a private Tcl interface
  * that is needed for portability reasons.
- */
+ *
+ * Disabled for now to determined whether we really still need this.
 
 #ifndef _TCLINT
 #include <tclInt.h>
 #endif
+ */
 
 #endif /* _UNIXPORT */

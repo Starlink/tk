@@ -4,7 +4,7 @@
 # It also implements keyboard traversal of menus and implements a few
 # other utility procedures related to menus.
 #
-# RCS: @(#) $Id: menu.tcl,v 1.18.2.5 2007/11/09 06:26:54 das Exp $
+# RCS: @(#) $Id: menu.tcl,v 1.26.2.4 2008/09/09 18:17:08 tmh Exp $
 #
 # Copyright (c) 1992-1994 The Regents of the University of California.
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -261,8 +261,10 @@ proc ::tk::MbPost {w {x {}} {y {}}} {
     if {$cur ne ""} {
 	MenuUnpost {}
     }
-    set Priv(cursor) [$w cget -cursor]
-    $w configure -cursor arrow
+    if {$::tk_strictMotif} {
+        set Priv(cursor) [$w cget -cursor]
+        $w configure -cursor arrow
+    }
     if {[tk windowingsystem] ne "aqua"} {
 	set Priv(relief) [$w cget -relief]
 	$w configure -relief raised
@@ -409,7 +411,9 @@ proc ::tk::MenuUnpost menu {
 	    set menu [$mb cget -menu]
 	    $menu unpost
 	    set Priv(postedMb) {}
-	    $mb configure -cursor $Priv(cursor)
+	    if {$::tk_strictMotif} {
+	        $mb configure -cursor $Priv(cursor)
+	    }
 	    if {[tk windowingsystem] ne "aqua"} {
 		$mb configure -relief $Priv(relief)
 	    } else {
@@ -418,7 +422,8 @@ proc ::tk::MenuUnpost menu {
 	} elseif {$Priv(popup) ne ""} {
 	    $Priv(popup) unpost
 	    set Priv(popup) {}
-	} elseif {[$menu cget -type] ne "menubar" && [$menu cget -type] ne "tearoff"} {
+	} elseif {[$menu cget -type] ne "menubar" \
+		&& [$menu cget -type] ne "tearoff"} {
 	    # We're in a cascaded sub-menu from a torn-off menu or popup.
 	    # Unpost all the menus up to the toplevel one (but not
 	    # including the top-level torn-off one) and deactivate the
@@ -426,7 +431,8 @@ proc ::tk::MenuUnpost menu {
 
 	    while {1} {
 		set parent [winfo parent $menu]
-		if {[winfo class $parent] ne "Menu" || ![winfo ismapped $parent]} {
+		if {[winfo class $parent] ne "Menu" \
+			|| ![winfo ismapped $parent]} {
 		    break
 		}
 		$parent activate none
@@ -455,7 +461,9 @@ proc ::tk::MenuUnpost menu {
 	}
 	RestoreOldGrab
 	if {$Priv(menuBar) ne ""} {
-	    $Priv(menuBar) configure -cursor $Priv(cursor)
+	    if {$::tk_strictMotif} {
+		$Priv(menuBar) configure -cursor $Priv(cursor)
+	    }
 	    set Priv(menuBar) {}
 	}
 	if {[tk windowingsystem] ne "x11"} {
@@ -586,10 +594,12 @@ proc ::tk::MenuButtonDown menu {
 	    set menu [winfo parent $menu]
 	}
 
-	if {$Priv(menuBar) eq ""} {
+	if {$Priv(menuBar) eq {}} {
 	    set Priv(menuBar) $menu
-	    set Priv(cursor) [$menu cget -cursor]
-	    $menu configure -cursor arrow
+	    if {$::tk_strictMotif} {
+		set Priv(cursor) [$menu cget -cursor]
+		$menu configure -cursor arrow
+	    }
         }
 
 	# Don't update grab information if the grab window isn't changing.
@@ -627,7 +637,8 @@ proc ::tk::MenuLeave {menu rootx rooty state} {
 	return
     }
     if {[$menu type active] eq "cascade" \
-	    && [winfo containing $rootx $rooty] eq [$menu entrycget active -menu]} {
+	    && [winfo containing $rootx $rooty] eq \
+		[$menu entrycget active -menu]} {
 	return
     }
     $menu activate none
@@ -781,7 +792,8 @@ proc ::tk::MenuNextMenu {menu direction} {
 	} else {
 	    set parent [winfo parent $menu]
 	    while {$parent ne "."} {
-		if {[winfo class $parent] eq "Menu" && [$parent cget -type] eq "menubar"} {
+		if {[winfo class $parent] eq "Menu" \
+			&& [$parent cget -type] eq "menubar"} {
 		    tk_menuSetFocus $parent
 		    MenuNextEntry $parent 1
 		    return
@@ -805,16 +817,14 @@ proc ::tk::MenuNextMenu {menu direction} {
 	}
     }
 
-    # Can't traverse into or out of a cascaded menu.  Go to the next
+    # Can't traverse into or out of a cascaded menu. Go to the next
     # or previous menubutton, if that makes sense.
 
     set m2 [winfo parent $menu]
-    if {[winfo class $m2] eq "Menu"} {
-	if {[$m2 cget -type] eq "menubar"} {
-	    tk_menuSetFocus $m2
-	    MenuNextEntry $m2 -1
-	    return
-	}
+    if {[winfo class $m2] eq "Menu" && [$m2 cget -type] eq "menubar"} {
+	tk_menuSetFocus $m2
+	MenuNextEntry $m2 -1
+	return
     }
 
     set w $Priv(postedMb)
@@ -934,7 +944,8 @@ proc ::tk::MenuFind {w char} {
         if {[winfo toplevel $w] ne [winfo toplevel $child]} {
 	    continue
 	}
-	if {[winfo class $child] eq "Menu" && [$child cget -type] eq "menubar"} {
+	if {[winfo class $child] eq "Menu" && \
+		[$child cget -type] eq "menubar"} {
 	    if {$char eq ""} {
 		return $child
 	    }
@@ -959,7 +970,7 @@ proc ::tk::MenuFind {w char} {
         if {[winfo toplevel $w] ne [winfo toplevel $child]} {
 	    continue
 	}
-	switch [winfo class $child] {
+	switch -- [winfo class $child] {
 	    Menubutton {
 		set char2 [string index [$child cget -text] \
 			[$child cget -underline]]
@@ -999,10 +1010,11 @@ proc ::tk::TraverseToMenu {w char} {
 	return
     }
     while {[winfo class $w] eq "Menu"} {
+	if {[$w cget -type] ne "menubar" && $Priv(postedMb) eq ""} {
+	    return
+	}
 	if {[$w cget -type] eq "menubar"} {
 	    break
-	} elseif {$Priv(postedMb) eq ""} {
-	    return
 	}
 	set w [winfo parent $w]
     }
@@ -1114,15 +1126,15 @@ proc ::tk::MenuFirstEntry menu {
     }
     for {set i 0} {$i <= $last} {incr i} {
 	if {([catch {set state [$menu entrycget $i -state]}] == 0) \
-		&& $state ne "disabled" \
-		&& [$menu type $i] ne "tearoff"} {
+		&& $state ne "disabled" && [$menu type $i] ne "tearoff"} {
 	    $menu activate $i
 	    GenerateMenuSelect $menu
 	    # Only post the cascade if the current menu is a menubar;
 	    # otherwise, if the first entry of the cascade is a cascade,
 	    # we can get an annoying cascading effect resulting in a bunch of
 	    # menus getting posted (bug 676)
-	    if {[$menu type $i] eq "cascade" &&	[$menu cget -type] eq "menubar"} {
+	    if {[$menu type $i] eq "cascade" \
+		    && [$menu cget -type] eq "menubar"} {
 		set cascade [$menu entrycget $i -menu]
 		if {$cascade ne ""} {
 		    $menu postcascade $i
@@ -1190,7 +1202,7 @@ proc ::tk::PostOverPoint {menu x y {entry {}}}  {
 	}
 	incr x [expr {-[winfo reqwidth $menu]/2}]
     }
-    if {$tcl_platform(platform) eq "windows"} {
+    if {$tcl_platform(platform) == "windows"} {
 	# We need to fix some problems with menu posting on Windows,
 	# where, if the menu would overlap top or bottom of screen,
 	# Windows puts it in the wrong place for us.  We must also
@@ -1245,7 +1257,7 @@ proc ::tk::RestoreOldGrab {} {
 	# be visible anymore.
 
 	catch {
-          if {$Priv(grabStatus) eq "global"} {
+	    if {$Priv(grabStatus) eq "global"} {
 		grab set -global $Priv(oldGrab)
 	    } else {
 		grab set $Priv(oldGrab)
@@ -1262,11 +1274,12 @@ proc ::tk_menuSetFocus {menu} {
     }
     focus $menu
 }
-
+    
 proc ::tk::GenerateMenuSelect {menu} {
     variable ::tk::Priv
 
-    if {$Priv(activeMenu) eq $menu && $Priv(activeItem) eq [$menu index active]} {
+    if {$Priv(activeMenu) eq $menu \
+	    && $Priv(activeItem) eq [$menu index active]} {
 	return
     }
 

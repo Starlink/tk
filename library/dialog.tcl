@@ -3,7 +3,7 @@
 # This file defines the procedure tk_dialog, which creates a dialog
 # box containing a bitmap, a message, and one or more buttons.
 #
-# RCS: @(#) $Id: dialog.tcl,v 1.14.2.5 2007/05/30 06:37:03 das Exp $
+# RCS: @(#) $Id: dialog.tcl,v 1.24 2007/12/13 15:26:27 dgp Exp $
 #
 # Copyright (c) 1992-1993 The Regents of the University of California.
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -39,7 +39,6 @@ proc ::tk_dialog {w title text bitmap default args} {
 	    return -code error "default button index greater than number of\
 		    buttons specified for tk_dialog"
 	}
-      # Never call if -strict option is omitted in previous test !
     } elseif {"" eq $default} {
 	set default -1
     } else {
@@ -47,7 +46,7 @@ proc ::tk_dialog {w title text bitmap default args} {
     }
 
     set windowingsystem [tk windowingsystem]
-    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
+    if {$windowingsystem eq "aqua"} {
 	option add *Dialog*background systemDialogBackgroundActive widgetDefault
 	option add *Dialog*Button.highlightBackground \
 		systemDialogBackgroundActive widgetDefault
@@ -73,7 +72,7 @@ proc ::tk_dialog {w title text bitmap default args} {
 	wm transient $w [winfo toplevel [winfo parent $w]]
     }
 
-    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
+    if {$windowingsystem eq "aqua"} {
 	::tk::unsupported::MacWindowStyle style $w moveableModal {}
     }
 
@@ -85,23 +84,19 @@ proc ::tk_dialog {w title text bitmap default args} {
     }
     pack $w.bot -side bottom -fill both
     pack $w.top -side top -fill both -expand 1
+    grid anchor $w.bot center
 
     # 2. Fill the top part with bitmap and message (use the option
     # database for -wraplength and -font so that they can be
     # overridden by the caller).
 
     option add *Dialog.msg.wrapLength 3i widgetDefault
-    if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
-	option add *Dialog.msg.font system widgetDefault
-    } else {
-	option add *Dialog.msg.font {Times 12} widgetDefault
-    }
+    option add *Dialog.msg.font TkCaptionFont widgetDefault
 
     label $w.msg -justify left -text $text
     pack $w.msg -in $w.top -side right -expand 1 -fill both -padx 3m -pady 3m
     if {$bitmap ne ""} {
-	if {($tcl_platform(platform) eq "macintosh"
-	     || $windowingsystem eq "aqua") && ($bitmap eq "error")} {
+	if {$windowingsystem eq "aqua" && $bitmap eq "error"} {
 	    set bitmap "stop"
 	}
 	label $w.bitmap -bitmap $bitmap
@@ -122,7 +117,7 @@ proc ::tk_dialog {w title text bitmap default args} {
 		-padx 10 -pady 4
 	grid columnconfigure $w.bot $i
 	# We boost the size of some Mac buttons for l&f
-	if {$tcl_platform(platform) eq "macintosh" || $windowingsystem eq "aqua"} {
+	if {$windowingsystem eq "aqua"} {
 	    set tmp [string tolower $but]
 	    if {$tmp eq "ok" || $tmp eq "cancel"} {
 		grid columnconfigure $w.bot $i -minsize 90

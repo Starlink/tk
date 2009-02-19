@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXFont.h,v 1.3.2.4 2007/04/29 02:26:49 das Exp $
+ * RCS: @(#) $Id: tkMacOSXFont.h,v 1.5 2007/04/23 21:24:33 das Exp $
  */
 
 #ifndef TKMACOSXFONT_H

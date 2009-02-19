@@ -3,33 +3,38 @@
 # This demonstration script creates a text widget with a bunch of
 # embedded windows.
 #
-# RCS: @(#) $Id: twind.tcl,v 1.3 2001/06/14 10:56:58 dkf Exp $
+# RCS: @(#) $Id: twind.tcl,v 1.11 2007/12/13 15:27:07 dgp Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
 
+package require Tk
+
 set w .twind
 catch {destroy $w}
 toplevel $w
-wm title $w "Text Demonstration - Embedded Windows"
+wm title $w "Text Demonstration - Embedded Windows and Other Features"
 wm iconname $w "Embedded Windows"
 positionWindow $w
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
-frame $w.f -highlightthickness 2 -borderwidth 2 -relief sunken
+frame $w.f -highlightthickness 1 -borderwidth 1 -relief sunken
 set t $w.f.text
 text $t -yscrollcommand "$w.scroll set" -setgrid true -font $font -width 70 \
 	-height 35 -wrap word -highlightthickness 0 -borderwidth 0
 pack $t -expand  yes -fill both
 scrollbar $w.scroll -command "$t yview"
 pack $w.scroll -side right -fill y
-pack $w.f -expand yes -fill both
+panedwindow $w.pane
+pack $w.pane -expand yes -fill both
+$w.pane add $w.f
+# Import to raise given creation order above
+raise $w.f
+
 $t tag configure center -justify center -spacing1 5m -spacing3 5m
 $t tag configure buttons -lmargin1 1c -lmargin2 1c -rmargin 1c \
 	-spacing1 3m -spacing2 0 -spacing3 0
@@ -38,10 +43,12 @@ button $t.on -text "Turn On" -command "textWindOn $w" \
 	-cursor top_left_arrow
 button $t.off -text "Turn Off" -command "textWindOff $w" \
 	-cursor top_left_arrow
-button $t.click -text "Click Here" -command "textWindPlot $t" \
-	-cursor top_left_arrow
-button $t.delete -text "Delete" -command "textWindDel $w" \
-	-cursor top_left_arrow
+
+$t insert end "A text widget can contain many different kinds of items, "
+$t insert end "both active and passive.  It can lay these out in various "
+$t insert end "ways, with wrapping, tabs, centering, etc.  In addition, "
+$t insert end "when the contents are too big for the window, smooth "
+$t insert end "scrolling in all directions is provided.\n\n"
 
 $t insert end "A text widget can contain other widgets embedded "
 $t insert end "it.  These are called \"embedded windows\", "
@@ -56,14 +63,43 @@ $t window create end -window $t.off
 $t insert end " horizontal scrolling and turn back on word wrapping.\n\n"
 
 $t insert end "Or, here is another example.  If you "
-$t window create end -window $t.click
+$t window create end -create {
+    button %W.click -text "Click Here" -command "textWindPlot %W" \
+	    -cursor top_left_arrow}
+
 $t insert end " a canvas displaying an x-y plot will appear right here."
 $t mark set plot insert
 $t mark gravity plot left
 $t insert end "  You can drag the data points around with the mouse, "
 $t insert end "or you can click here to "
-$t window create end -window $t.delete
+$t window create end -create {
+    button %W.delete -text "Delete" -command "textWindDel %W" \
+	    -cursor top_left_arrow
+}
 $t insert end " the plot again.\n\n"
+
+$t insert end "You can also create multiple text widgets each of which "
+$t insert end "display the same underlying text. Click this button to "
+$t window create end \
+  -create {button %W.peer -text "Make A Peer" -command "textMakePeer %W" \
+  -cursor top_left_arrow} -padx 3
+$t insert end " widget.  Notice how peer widgets can have different "
+$t insert end "font settings, and by default contain all the images "
+$t insert end "of the 'parent', but many of the embedded windows, "
+$t insert end "such as buttons will not be there.  The easiest way "
+$t insert end "to ensure they are in all peers is to use '-create' "
+$t insert end "embedded window creation scripts "
+$t insert end "(the plot above and the 'Make A Peer' button are "
+$t insert end "designed to show up in all peers).  A good use of "
+$t insert end "peers is for "
+$t window create end \
+  -create {button %W.split -text "Split Windows" -command "textSplitWindow %W" \
+  -cursor top_left_arrow} -padx 3
+$t insert end " \n\n"
+
+$t insert end "Users of previous versions of Tk will also be interested "
+$t insert end "to note that now cursor movement is now by visual line by "
+$t insert end "default, and that all scrolling of this widget is by pixel.\n\n"
 
 $t insert end "You may also find it useful to put embedded windows in "
 $t insert end "a text without any actual text.  In this case the "
@@ -99,6 +135,63 @@ foreach color {AntiqueWhite3 Bisque1 Bisque2 Bisque3 Bisque4
 }
 $t tag add buttons $t.default end
 
+button $t.bigB -text "Big borders" -command "textWindBigB $t" \
+  -cursor top_left_arrow
+button $t.smallB -text "Small borders" -command "textWindSmallB $t" \
+  -cursor top_left_arrow
+button $t.bigH -text "Big highlight" -command "textWindBigH $t" \
+  -cursor top_left_arrow
+button $t.smallH -text "Small highlight" -command "textWindSmallH $t" \
+  -cursor top_left_arrow
+button $t.bigP -text "Big pad" -command "textWindBigP $t" \
+  -cursor top_left_arrow
+button $t.smallP -text "Small pad" -command "textWindSmallP $t" \
+  -cursor top_left_arrow
+
+set text_normal(border) [$t cget -borderwidth]
+set text_normal(highlight) [$t cget -highlightthickness]
+set text_normal(pad) [$t cget -padx]
+
+$t insert end "\nYou can also change the usual border width and "
+$t insert end "highlightthickness and padding.\n"
+$t window create end -window $t.bigB
+$t window create end -window $t.smallB
+$t window create end -window $t.bigH
+$t window create end -window $t.smallH
+$t window create end -window $t.bigP
+$t window create end -window $t.smallP
+
+$t insert end "\n\nFinally, images fit comfortably in text widgets too:"
+
+$t image create end -image \
+  [image create bitmap -file [file join $tk_demoDirectory images face.xbm]]
+
+
+proc textWindBigB w {
+    $w configure -borderwidth 15 
+}
+
+proc textWindBigH w {
+    $w configure -highlightthickness 15
+}
+
+proc textWindBigP w {
+    $w configure -padx 15 -pady 15
+}
+
+proc textWindSmallB w {
+    $w configure -borderwidth $::text_normal(border)
+}
+
+proc textWindSmallH w {
+    $w configure -highlightthickness $::text_normal(highlight)
+}
+
+proc textWindSmallP w {
+    $w configure -padx $::text_normal(pad) -pady $::text_normal(pad)
+}
+
+
 proc textWindOn w {
     catch {destroy $w.scroll2}
     set t $w.f.text
@@ -118,6 +211,20 @@ proc textWindPlot t {
     if {[winfo exists $c]} {
 	return
     }
+
+    while {[string first [$t get plot] " \t\n"] >= 0} {
+	$t delete plot
+    }
+    $t insert plot "\n"
+
+    $t window create plot -create {createPlot %W}
+    $t tag add center plot
+    $t insert plot "\n"
+}
+
+proc createPlot {t} {
+    set c $t.c
+
     canvas $c -relief sunken -width 450 -height 300 -cursor top_left_arrow
 
     set font {Helvetica 18}
@@ -153,13 +260,7 @@ proc textWindPlot t {
     $c bind point <1> "embPlotDown $c %x %y"
     $c bind point <ButtonRelease-1> "$c dtag selected"
     bind $c <B1-Motion> "embPlotMove $c %x %y"
-    while {[string first [$t get plot] " \t\n"] >= 0} {
-	$t delete plot
-    }
-    $t insert plot "\n"
-    $t window create plot -window $c
-    $t tag add center plot
-    $t insert plot "\n"
+    return $c
 }
 
 set embPlot(lastX) 0
@@ -181,8 +282,7 @@ proc embPlotMove {w x y} {
     set embPlot(lastY) $y
 }
 
-proc textWindDel w {
-    set t $w.f.text
+proc textWindDel t {
     if {[winfo exists $t.c]} {
 	$t delete $t.c
 	while {[string first [$t get plot] " \t\n"] >= 0} {
@@ -194,4 +294,34 @@ proc textWindDel w {
 
 proc embDefBg t {
     $t configure -background [lindex [$t configure -background] 3]
+}
+
+proc textMakePeer {parent} {
+    set n 1
+    while {[winfo exists .peer$n]} { incr n }
+    set w [toplevel .peer$n]
+    wm title $w "Text Peer #$n"
+    frame $w.f -highlightthickness 1 -borderwidth 1 -relief sunken
+    set t [$parent peer create $w.f.text -yscrollcommand "$w.scroll set" \
+	       -borderwidth 0 -highlightthickness 0]
+    pack $t -expand  yes -fill both
+    scrollbar $w.scroll -command "$t yview"
+    pack $w.scroll -side right -fill y
+    pack $w.f -expand yes -fill both
+}
+
+proc textSplitWindow {textW} {
+    if {$textW eq ".twind.f.text"} {
+	if {[winfo exists .twind.peer]} {
+	    destroy .twind.peer
+	} else {
+	    set parent [winfo parent $textW]
+	    set w [winfo parent $parent]
+	    set t [$textW peer create $w.peer \
+	      -yscrollcommand "$w.scroll set"]
+	    $w.pane add $t
+	}
+    } else {
+        return
+    }
 }

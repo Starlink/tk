@@ -7,18 +7,12 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: image.test,v 1.8.2.1 2003/09/17 23:45:05 dgp Exp $
+# RCS: @(#) $Id: image.test,v 1.14 2007/05/14 20:58:27 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
-
-namespace import -force tcltest::interpreter
-namespace import -force tcltest::makeFile
-namespace import -force tcltest::removeFile
+namespace import -force ::tk::test::loadTkCommand
 
 eval image delete [image names]
 canvas .c -highlightthickness 2
@@ -74,26 +68,30 @@ test image-1.9 {Tk_ImageCmd procedure, "create" option} testImageType {
     list [catch {image create test -badName foo} msg] $msg [image names]
 } {1 {bad option name "-badName"} {}}
 test image-1.10 {Tk_ImageCmd procedure, "create" option with same name as main window} {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
 	update
 	puts [list [catch {image create photo .} msg] $msg]
 	exit
-    } script]
+    }
+    set script [makeFile $code script]
     set x [list [catch {exec [interpreter] <$script} msg] $msg]
     removeFile script
     set x
 } {0 {1 {images may not be named the same as the main window}}}
 test image-1.11 {Tk_ImageCmd procedure, "create" option with same name as main window after renaming} {
-    set script [makeFile {
+    set code [loadTkCommand]
+    append code {
 	update
 	puts [list [catch {rename . foo;image create photo foo} msg] $msg]
 	exit
-    } script]
+    }
+    set script [makeFile $code script]
     set x [list [catch {exec [interpreter] <$script} msg] $msg]
     removeFile script
     set x
 } {0 {1 {images may not be named the same as the main window}}}
-test image-1.11 {Tk_ImageCmd, "create" option: do not generated command name in use} -setup {
+test image-1.12 {Tk_ImageCmd, "create" option: do not generated command name in use} -setup {
     set i [image create bitmap]
     regexp {^image(\d+)$} $i -> serial
     incr serial
@@ -177,15 +175,25 @@ test image-5.5 {Tk_ImageCmd procedure, "type" option} testImageType {
     image create test myimage
     .c create image 50 50 -image myimage
     image delete myimage
+    list [catch {image type myimage} msg] $msg
+} {1 {image "myimage" doesn't exist}}
+test image-5.6 {Tk_ImageCmd procedure, "type" option} testOldImageType {
+    image create oldtest myimage
     image type myimage
-} {}
+} {oldtest}
+test image-5.7 {Tk_ImageCmd procedure, "type" option} testOldImageType {
+    image create oldtest myimage
+    .c create image 50 50 -image myimage
+    image delete myimage
+    list [catch {image type myimage} msg] $msg
+} {1 {image "myimage" doesn't exist}}
 
 test image-6.1 {Tk_ImageCmd procedure, "types" option} {
     list [catch {image types x} msg] $msg
 } {1 {wrong # args: should be "image types"}}
 test image-6.2 {Tk_ImageCmd procedure, "types" option} testImageType {
     lsort [image types]
-} {bitmap photo test}
+} {bitmap oldtest photo test}
 
 test image-7.1 {Tk_ImageCmd procedure, "width" option} {
     list [catch {image width} msg] $msg
@@ -273,16 +281,17 @@ test image-11.2 {Tk_FreeImage procedure} testImageType {
     eval image delete [image names]
     image create test foo -variable x
     .c create image 50 50 -image foo -tags i1
+    set names [image names]
     image delete foo
     update
-    set names [image names]
+    set names2 [image names]
     set x {}
     .c delete i1
     pack forget .c
     pack .c
     update
-    list $names [image names] $x
-} {foo {} {}}
+    list $names $names2 [image names] $x
+} {foo {} {} {}}
 
 # Non-portable, apparently due to differences in rounding:
 
@@ -375,10 +384,28 @@ test image-13.2 {DeleteImage procedure} testImageType {
     .c create image 90 100 -image foo -tags i2
     set x {}
     image delete foo
-    lappend x | [image names] |
+    lappend x | [image names] | [catch {image delete foo} msg] | $msg | [image names] |
+} {{foo free} {foo free} {foo delete} | {} | 1 | {image "foo" doesn't exist} | {} |}
+
+test image-13.3 {Tk_SizeOfImage procedure} testOldImageType {
+    eval image delete [image names]
+    image create oldtest foo -variable x
+    set result [list [image width foo] [image height foo]]
+    foo changed 0 0 0 0 85 60
+    lappend result [image width foo] [image height foo]
+} {30 15 85 60}
+
+test image-13.4 {DeleteImage procedure} testOldImageType {
+    .c delete all
+    eval image delete [image names]
+    image create oldtest foo -variable x
+    .c create image 50 50 -image foo -tags i1
+    .c create image 90 100 -image foo -tags i2
+    set x {}
     image delete foo
-    lappend x | [image names] |
-} {{foo free} {foo free} {foo delete} | foo | | foo |}
+    lappend x | [image names] | [catch {image delete foo} msg] | $msg | [image names] |
+} {{foo free} {foo free} {foo delete} | {} | 1 | {image "foo" doesn't exist} | {} |}
+
 
 catch {image delete hidden}
 set l [image names]
@@ -391,10 +418,24 @@ test image-14.1 {image command vs hidden commands} {
     image delete hidden
     list [image names] [interp hidden]
 } [list $l $h]
+
+eval image delete [image names]
+test image-15.1 {deleting image does not make widgets forget about it} {
+    .c delete all
+    image create photo foo -width 10 -height 10
+    .c create image 10 10 -image foo -tags i1 -anchor nw
+    update
+    set x [.c bbox i1]
+    lappend x [image names]
+    image delete foo
+    lappend x [image names]
+    image create photo foo -width 20 -height 20
+    lappend x [.c bbox i1] [image names]
+} {10 10 20 20 foo {} {10 10 30 30} foo}
     
 destroy .c
 eval image delete [image names]
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

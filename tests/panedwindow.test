@@ -6,76 +6,87 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: panedwindow.test,v 1.8.2.4 2005/05/31 05:22:06 hobbs Exp $
+# RCS: @(#) $Id: panedwindow.test,v 1.22 2007/12/13 15:27:54 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 set i 1
 panedwindow .p
-foreach test {
-    {-background "#ff0000" "#ff0000" non-existent 
-	{unknown color name "non-existent"}}
-    {-bd 4 4 badValue {bad screen distance "badValue"}}
-    {-bg "#ff0000" "#ff0000" non-existent {unknown color name "non-existent"}}
-    {-borderwidth 1.3 1 badValue {bad screen distance "badValue"}}
-    {-cursor arrow arrow badValue {bad cursor spec "badValue"}}
-    {-handlesize 20 20 badValue {bad screen distance "badValue"}}
-    {-height 20 20 badValue {bad screen distance "badValue"}}
-    {-opaqueresize true 1 foo {expected boolean value but got "foo"}}
-    {-orient horizontal horizontal badValue 
-	{bad orient "badValue": must be horizontal or vertical}}
-    {-relief groove groove 1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}}
-    {-sashcursor arrow arrow badValue {bad cursor spec "badValue"}}
-    {-sashpad 1.3 1 badValue {bad screen distance "badValue"}}
-    {-sashrelief groove groove 1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}}
-    {-sashwidth 10 10 badValue {bad screen distance "badValue"}}
-    {-showhandle true 1 foo {expected boolean value but got "foo"}}
-    {-width 402 402 badValue {bad screen distance "badValue"}}
+foreach {testName testData} {
+    panedwindow-1.1 {-background
+	"#ff0000" "#ff0000" non-existent {unknown color name "non-existent"}}
+    panedwindow-1.2 {-bd
+	4 4 badValue {bad screen distance "badValue"}}
+    panedwindow-1.3 {-bg
+	"#ff0000" "#ff0000" non-existent {unknown color name "non-existent"}}
+    panedwindow-1.4 {-borderwidth
+	1.3 1 badValue {bad screen distance "badValue"}}
+    panedwindow-1.5 {-cursor
+	arrow arrow badValue {bad cursor spec "badValue"}}
+    panedwindow-1.6 {-handlesize
+	20 20 badValue {bad screen distance "badValue"}}
+    panedwindow-1.7 {-height
+	20 20 badValue {bad screen distance "badValue"}}
+    panedwindow-1.8 {-opaqueresize
+	true 1 foo {expected boolean value but got "foo"}}
+    panedwindow-1.9 {-orient
+	horizontal horizontal
+	badValue {bad orient "badValue": must be horizontal or vertical}}
+    panedwindow-1.10 {-relief
+	groove groove
+	1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}}
+    panedwindow-1.11 {-sashcursor
+	arrow arrow badValue {bad cursor spec "badValue"}}
+    panedwindow-1.12 {-sashpad
+	1.3 1 badValue {bad screen distance "badValue"}}
+    panedwindow-1.13 {-sashrelief
+	groove groove
+	1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}}
+    panedwindow-1.14 {-sashwidth
+	10 10 badValue {bad screen distance "badValue"}}
+    panedwindow-1.15 {-showhandle
+	true 1 foo {expected boolean value but got "foo"}}
+    panedwindow-1.16 {-width
+	402 402 badValue {bad screen distance "badValue"}}
 } {
-    set name [lindex $test 0]
-    test panedwindow-1.$i {configuration options} {
-	.p configure $name [lindex $test 1]
-	list [lindex [.p configure $name] 4] [.p cget $name]
-    } [list [lindex $test 2] [lindex $test 2]]
-    incr i
-    if {[lindex $test 3] != ""} {
-	test panedwindow-1.$i {configuration options} {
-	    list [catch {.p configure $name [lindex $test 3]} msg] $msg
-	} [list 1 [lindex $test 4]]
-    }
-    .p configure $name [lindex [.p configure $name] 3]
-    incr i
+    lassign $testData optionName goodIn goodOut badIn badOut
+    test ${testName}(good) "configuration options: $optionName" {
+	.p configure $optionName $goodIn
+	list [lindex [.p configure $optionName] 4] [.p cget $optionName]
+    } [list $goodOut $goodOut]
+    test ${testName}(bad) "configuration options: $optionName" -body {
+	.p configure $optionName $badIn
+    } -returnCodes error -result $badOut
+    # Reset to default
+    .p configure $optionName [lindex [.p configure $optionName] 3]
 }
 .p add [button .b]
 .p add [button .c]
-foreach test {
-    {-after .c .c badValue {bad window path name "badValue"}}
-    {-before .c .c badValue {bad window path name "badValue"}}
-    {-height 10 10 badValue {bad screen distance "badValue"}}
-    {-minsize 10 10 badValue {bad screen distance "badValue"}}
-    {-padx 1.3 1 badValue {bad screen distance "badValue"}}
-    {-pady 1.3 1 badValue {bad screen distance "badValue"}}
-    {-sticky nsew nesw abcd {bad stickyness value "abcd": must be a string containing zero or more of n, e, s, and w}}
-    {-width 10 10 badValue {bad screen distance "badValue"}}
+foreach {testName testData} {
+    panedwindow-1a.1 {-after .c .c badValue {bad window path name "badValue"}}
+    panedwindow-1a.2 {-before .c .c badValue {bad window path name "badValue"}}
+    panedwindow-1a.3 {-height 10 10 badValue {bad screen distance "badValue"}}
+    panedwindow-1a.4 {-hide false 0 foo {expected boolean value but got "foo"}}
+    panedwindow-1a.5 {-minsize 10 10 badValue {bad screen distance "badValue"}}
+    panedwindow-1a.6 {-padx 1.3 1 badValue {bad screen distance "badValue"}}
+    panedwindow-1a.7 {-pady 1.3 1 badValue {bad screen distance "badValue"}}
+    panedwindow-1a.8 {-sticky nsew nesw abcd {bad stickyness value "abcd": must be a string containing zero or more of n, e, s, and w}}
+    panedwindow-1a.9 {-stretch alw always foo {bad stretch "foo": must be always, first, last, middle, or never}}
+    panedwindow-1a.10 {-width 10 10 badValue {bad screen distance "badValue"}}
 } {
-    set name [lindex $test 0]
-    test panedwindow-1.$i {configuration options} {
-	.p paneconfigure .b $name [lindex $test 1]
-	list [lindex [.p paneconfigure .b $name] 4] [.p panecget .b $name]
-    } [list [lindex $test 2] [lindex $test 2]]
-    incr i
-    if {[lindex $test 3] != ""} {
-	test panedwindow-1.$i {configuration options} {
-	    list [catch {.p paneconfigure .b $name [lindex $test 3]} msg] $msg
-	} [list 1 [lindex $test 4]]
-    }
-    .p paneconfigure .b $name [lindex [.p paneconfigure .b $name] 3]
-    incr i
+    lassign $testData optionName goodIn goodOut badIn badOut
+    test ${testName}(good) "configuration options: $optionName" {
+	.p paneconfigure .b $optionName $goodIn
+	list [lindex [.p paneconfigure .b $optionName] 4] \
+	    [.p panecget .b $optionName]
+    } [list $goodOut $goodOut]
+    test ${testName}(bad) "configuration options: $optionName" -body {
+	.p paneconfigure .b $optionName $badIn
+    } -returnCodes error -result $badOut
+    # Reset to default
+    .p paneconfig .b $optionName [lindex [.p paneconfig .b $optionName] 3]
 }
 destroy .p .b .c
 
@@ -1938,7 +1949,7 @@ test panedwindow-22.16 {ArrangePanes, last pane grows} {
 		[winfo width .f4] [winfo width .p]
     }
     -cleanup {destroy .p .f1 .f2 .f3 .f4}
-    -result {50 150 1 1 222 50 150 1 78 300}
+    -result {50 150 1 1 211 50 150 1 89 300}
 }
 
 
@@ -2248,6 +2259,178 @@ test panedwindow-24.28 {ConfigurePanes, restrict possible panes} {
     destroy .f .f.f .f.f.f .f.f.f.p .b
     set result
 } [list 0 ""]
+test panedwindow-24.29.1 {ConfigurePanes, -hide works} {
+    -body {
+	panedwindow .p -showhandle false
+	frame .f1 -width 40 -height 100 -bg red
+	frame .f2 -width 40 -height 100 -bg white
+	frame .f3 -width 40 -height 100 -bg blue
+	frame .f4 -width 40 -height 100 -bg green
+	.p add .f1 .f2 .f3 .f4
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo ismapped .f1] [winfo ismapped .f2] \
+		[winfo ismapped .f3] [winfo ismapped .f4]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4] [winfo width .p]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo ismapped .f1] [winfo ismapped .f2] \
+		[winfo ismapped .f3] [winfo ismapped .f4]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4] [winfo width .p]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {1 1 1 1 40 40 40 40 171 1 0 1 1 40 40 40 40 128}
+}
+test panedwindow-24.29.2 {ConfigurePanes, -hide works} {
+    -body {
+	panedwindow .p -showhandle false -width 130 -height 100
+	frame .f1 -width 40 -bg red
+	frame .f2 -width 40 -bg white
+	frame .f3 -width 40 -bg blue
+	frame .f4 -width 40 -bg green
+	.p add .f1 .f2 .f3 .f4
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo ismapped .f1] [winfo ismapped .f2] \
+		[winfo ismapped .f3] [winfo ismapped .f4]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4] [winfo width .p]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo ismapped .f1] [winfo ismapped .f2] \
+		[winfo ismapped .f3] [winfo ismapped .f4]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4] [winfo width .p]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {1 1 1 0 39 40 40 1 130 1 0 1 1 40 40 40 42 130}
+}
+test panedwindow-24.29.3 {ConfigurePanes, -hide works, last pane stretches} {
+    -body {
+	panedwindow .p -showhandle false -width 200 -height 200 -borderwidth 0
+	frame .f1 -width 50 -bg red
+	frame .f2 -width 50 -bg green
+	frame .f3 -width 50 -bg blue
+	.p add .f1 .f2 .f3
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3}
+    -result {50 50 94 50 50 147}
+}
+test panedwindow-24.29.4 {ConfigurePanes, -hide works, last pane stretches} {
+    -body {
+	panedwindow .p -showhandle false -width 200 -height 200 \
+		-borderwidth 0 -orient vertical
+	frame .f1 -height 50 -bg red
+	frame .f2 -height 50 -bg green
+	frame .f3 -height 50 -bg blue
+	.p add .f1 .f2 .f3
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo height .f1] [winfo height .f2] [winfo height .f3]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo height .f1] [winfo height .f2] [winfo height .f3]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3}
+    -result {50 50 94 50 50 147}
+}
+
+test panedwindow-24.30 {ConfigurePanes, -stretch first} {
+    -body {
+	panedwindow .p -showhandle false -height 100 -width 182
+	frame .f1 -width 40 -bg red
+	frame .f2 -width 40 -bg white
+	frame .f3 -width 40 -bg blue
+	frame .f4 -width 40 -bg green
+	.p add .f1 .f2 .f3 .f4 -stretch first
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {51 40 40 40 94 40 40 40}
+}
+test panedwindow-24.31 {ConfigurePanes, -stretch middle} {
+    -body {
+	panedwindow .p -showhandle false -height 100 -width 182
+	frame .f1 -width 40 -bg red
+	frame .f2 -width 40 -bg white
+	frame .f3 -width 40 -bg blue
+	frame .f4 -width 40 -bg green
+	.p add .f1 .f2 .f3 .f4 -stretch middle
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {40 45 46 40 40 45 94 40}
+}
+test panedwindow-24.32 {ConfigurePanes, -stretch always} {
+    -body {
+	panedwindow .p -showhandle false -height 100 -width 182
+	frame .f1 -width 40 -bg red
+	frame .f2 -width 40 -bg white
+	frame .f3 -width 40 -bg blue
+	frame .f4 -width 40 -bg green
+	.p add .f1 .f2 .f3 .f4 -stretch always
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {42 43 43 43 58 43 58 58}
+}
+test panedwindow-24.33 {ConfigurePanes, -stretch never} {
+    -body {
+	panedwindow .p -showhandle false -height 100 -width 182
+	frame .f1 -width 40 -bg red
+	frame .f2 -width 40 -bg white
+	frame .f3 -width 40 -bg blue
+	frame .f4 -width 40 -bg green
+	.p add .f1 .f2 .f3 .f4 -stretch never
+	pack .p
+	update
+	set result [list]
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+	.p paneconfigure .f2 -hide 1
+	update
+	lappend result [winfo width .f1] [winfo width .f2] [winfo width .f3] \
+		[winfo width .f4]
+    }
+    -cleanup {destroy .p .f1 .f2 .f3 .f4}
+    -result {40 40 40 40 40 40 40 40}
+}
 
 test panedwindow-25.1 {Unlink, remove a paned with -before/-after refs} {
     # Bug 928413
@@ -2589,5 +2772,5 @@ test panedwindow-30.2 {display on depths other than the default one} {
 }
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

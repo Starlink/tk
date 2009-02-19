@@ -12,25 +12,20 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: unixFont.test,v 1.7 2002/07/13 20:28:35 dgp Exp $
+# RCS: @(#) $Id: unixFont.test,v 1.10 2004/06/17 22:38:57 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
-testConstraint hasArial 1
-testConstraint hasCourierNew 1
-testConstraint hasTimesNew 1
 set xlsf [auto_execok xlsfonts]
-if {[llength $xlsf]} {
-    foreach {constraint font} {
-	hasArial	arial
-	hasCourierNew	"courier new"
-	hasTimesNew	"times new roman"
-    } {
+foreach {constraint font} {
+    hasArial	arial
+    hasCourierNew	"courier new"
+    hasTimesNew	"times new roman"
+} {
+    testConstraint $constraint 1
+    if {[llength $xlsf]} {
 	if {![catch {eval exec $xlsf [list *-$font-*]} res]
 		&& ![string match *unmatched* $res]} {
 	    # Newer Unix systems have more default fonts installed, 
@@ -315,18 +310,5 @@ test unixfont-9.2 {GetControlCharSubst procedure: 4 chars subst} unix {
 } {0 1 1 1 1 2}
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3,7 +3,7 @@
 # This file defines the default bindings for Tk entry widgets and provides
 # procedures that help in implementing those bindings.
 #
-# RCS: @(#) $Id: entry.tcl,v 1.21.2.2 2007/10/30 18:53:01 hobbs Exp $
+# RCS: @(#) $Id: entry.tcl,v 1.26 2007/12/13 15:26:27 dgp Exp $
 #
 # Copyright (c) 1992-1994 The Regents of the University of California.
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -68,6 +68,11 @@ bind Entry <<PasteSelection>> {
 	|| !$tk::Priv(mouseMoved)} {
 	tk::EntryPaste %W %x
     }
+}
+
+bind Entry <<TraverseIn>> {
+    %W selection range 0 end 
+    %W icursor end 
 }
 
 # Standard Motif bindings:
@@ -205,8 +210,8 @@ bind Entry <Escape> {# nothing}
 bind Entry <Return> {# nothing}
 bind Entry <KP_Enter> {# nothing}
 bind Entry <Tab> {# nothing}
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
-	bind Entry <Command-KeyPress> {# nothing}
+if {[tk windowingsystem] eq "aqua"} {
+    bind Entry <Command-KeyPress> {# nothing}
 }
 
 # On Windows, paste is done using Shift-Insert.  Shift-Insert already
@@ -333,7 +338,9 @@ proc ::tk::EntryButton1 {w x} {
     set Priv(pressX) $x
     $w icursor [EntryClosestGap $w $x]
     $w selection from insert
-    if {"disabled" ne [$w cget -state]} {focus $w}
+    if {"disabled" ne [$w cget -state]} {
+	focus $w
+    }
 }
 
 # ::tk::EntryMouseSelect --
@@ -404,7 +411,9 @@ proc ::tk::EntryMouseSelect {w x} {
 proc ::tk::EntryPaste {w x} {
     $w icursor [EntryClosestGap $w $x]
     catch {$w insert insert [::tk::GetSelection $w PRIMARY]}
-    if {"disabled" ne [$w cget -state]} {focus $w}
+    if {"disabled" ne [$w cget -state]} {
+	focus $w
+    }
 }
 
 # ::tk::EntryAutoScan --
@@ -420,7 +429,9 @@ proc ::tk::EntryPaste {w x} {
 proc ::tk::EntryAutoScan {w} {
     variable ::tk::Priv
     set x $Priv(x)
-    if {![winfo exists $w]} return
+    if {![winfo exists $w]} {
+	return
+    }
     if {$x >= [winfo width $w]} {
 	$w xview scroll 2 units
 	EntryMouseSelect $w $x
@@ -488,7 +499,9 @@ proc ::tk::EntryBackspace w {
 	$w delete sel.first sel.last
     } else {
 	set x [expr {[$w index insert] - 1}]
-	if {$x >= 0} {$w delete $x}
+	if {$x >= 0} {
+	    $w delete $x
+	}
 	if {[$w index @0] >= [$w index insert]} {
 	    set range [$w xview]
 	    set left [lindex $range 0]

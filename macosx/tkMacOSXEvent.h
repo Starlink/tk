@@ -54,7 +54,7 @@
  *	software in accordance with the terms specified in this
  *	license.
  *
- * RCS: @(#) $Id: tkMacOSXEvent.h,v 1.3.2.8 2007/04/29 02:26:49 das Exp $
+ * RCS: @(#) $Id: tkMacOSXEvent.h,v 1.12 2007/04/23 21:24:33 das Exp $
  */
 
 #ifndef _TKMACEVENT

@@ -7,13 +7,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: button.test,v 1.13 2002/09/02 23:32:35 hobbs Exp $
+# RCS: @(#) $Id: button.test,v 1.20 2004/12/07 21:22:19 dgp Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 proc bogusTrace args {
@@ -45,7 +42,9 @@ foreach test {
 	    {unknown color name "non-existent"} {1 1 1 1}}
     {-activeforeground #ff0000 #ff0000 non-existent
 	    {unknown color name "non-existent"} {1 1 1 1}}
-    {-anchor nw nw bogus {bad anchor "bogus": must be n, ne, e, se, s, sw, w, nw, or center} {1 1 1 1}}
+    {-anchor nw nw bogus
+	    {bad anchor "bogus": must be n, ne, e, se, s, sw, w, nw, or center}
+	    {1 1 1 1}}
     {-background #ff0000 #ff0000 non-existent
 	    {unknown color name "non-existent"} {1 1 1 1}}
     {-bd 4 4 badValue {bad screen distance "badValue"} {1 1 1 1}}
@@ -55,7 +54,9 @@ foreach test {
 	    {1 1 1 1}}
     {-borderwidth 1.3 1.3 badValue {bad screen distance "badValue"} {1 1 1 1}}
     {-command "set x" {set x} {} {} {0 1 1 1}}
-    {-compound left left bogus {bad compound "bogus": must be bottom, center, left, none, right, or top} {1 1 1 1}}
+    {-compound left left bogus
+	    {bad compound "bogus": must be bottom, center, left, none, right, or top}
+	    {1 1 1 1}}
     {-cursor arrow arrow badValue {bad cursor spec "badValue"} {1 1 1 1}}
     {-default active active huh?
 	    {bad default "huh?": must be active, disabled, or normal}
@@ -75,51 +76,70 @@ foreach test {
     {-image image1 image1 bogus {image "bogus" doesn't exist} {1 1 1 1}}
     {-indicatoron yes 1 no_way {expected boolean value but got "no_way"}
 	    {0 0 1 1}}
-    {-justify right right bogus {bad justification "bogus": must be left, right, or center} {1 1 1 1}}
-    {-offrelief flat flat 1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken} {0 0 1 1}}
+    {-justify right right bogus
+	    {bad justification "bogus": must be left, right, or center}
+	    {1 1 1 1}}
+    {-offrelief flat flat 1.5
+	    {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}
+	    {0 0 1 1}}
     {-offvalue lousy lousy {} {} {0 0 1 0}}
-    {-offvalue fantastic fantastic {} {} {0 0 1 0}}
-    {-overrelief "" "" 1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken} {0 1 1 1}}
+    {-onvalue fantastic fantastic {} {} {0 0 1 0}}
+    {-overrelief "" "" 1.5
+	    {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}
+	    {0 1 1 1}}
     {-padx 12m 12m 420x {bad screen distance "420x"} {1 1 1 1}}
     {-pady 12m 12m 420x {bad screen distance "420x"} {1 1 1 1}}
     {-repeatdelay 100 100 foo {expected integer but got "foo"} {0 1 0 0}}
     {-repeatinterval 100 100 foo {expected integer but got "foo"} {0 1 0 0}}
-    {-relief flat flat 1.5 {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken} {1 1 1 1}}
+    {-relief flat flat 1.5
+	    {bad relief "1.5": must be flat, groove, raised, ridge, solid, or sunken}
+	    {1 1 1 1}}
     {-selectcolor #110022 #110022 bogus {unknown color name "bogus"} {0 0 1 1}}
     {-selectimage image1 image1 bogus {image "bogus" doesn't exist} {0 0 1 1}}
-    {-state normal normal bogus {bad state "bogus": must be active, disabled, or normal} {1 1 1 1}}
+    {-state normal normal bogus
+	    {bad state "bogus": must be active, disabled, or normal}
+	    {1 1 1 1}}
     {-takefocus "any string" "any string" {} {} {1 1 1 1}}
     {-text "Sample text" {Sample text} {} {} {1 1 1 1}}
     {-textvariable i i {} {} {1 1 1 1}}
+    {-tristateimage image1 image1 bogus {image "bogus" doesn't exist}
+	    {0 0 1 1}}
+    {-tristatevalue unknowable unknowable {} {} {0 0 1 1}}
     {-underline 5 5 3p {expected integer but got "3p"} {1 1 1 1}}
     {-value anyString anyString {} {} {0 0 0 1}}
     {-width 402 402 3p {expected integer but got "3p"} {1 1 1 1}}
     {-wraplength 100 100 6x {bad screen distance "6x"} {1 1 1 1}}
 } {
-    set name [lindex $test 0]
-    set classes [lindex $test 5]
-    foreach w {.l .b .c .r} hasOption [lindex $test 5] {
-	if $hasOption {
-	    test button-1.$i {configuration options} testImageType {
-		$w configure $name [lindex $test 1]
-		lindex [$w configure $name] 4
-	    } [lindex $test 2]
+    lassign $test name value okResult badValue badResult classes
+    foreach w {.l .b .c .r} hasOption $classes {
+	set classname [winfo class $w]
+	if {$hasOption} {
+	    test button-1.$i "configuration option $name for $classname" \
+		-constraints testImageType -body "
+		    $w configure $name [list $value]
+		    lindex \[$w configure $name] 4
+		" -result $okResult
 	    incr i
-	    if {[lindex $test 3] != ""} {
-		test button-1.$i {configuration options} testImageType {
-		    list [catch {$w configure $name [lindex $test 3]} msg] $msg
-		} [list 1 [lindex $test 4]]
+	    if {$badValue ne ""} {
+		test button-1.$i "configuration option $name for $classname" \
+		    -constraints testImageType \
+		    -body [list $w configure $name $badValue] \
+		    -returnCodes error -result $badResult
+		incr i
 	    }
 	    $w configure $name [lindex [$w configure $name] 3]
 	} else {
-	    test button-1.$i {configuration options} testImageType {
-		list [catch {$w configure $name [lindex $test 1]} msg] $msg
-	    } "1 {unknown option \"$name\"}"
+	    test button-1.$i "configuration option $name for $classname" \
+		-constraints testImageType \
+		-body [list $w configure $name $value] \
+		-returnCodes error -result "unknown option \"$name\""
+	    incr i
 	}
     }
-    incr i
 }
 test button-1.$i {configuration options} {
+    # Additional check to make sure that -selectcolor may be empty in
+    # checkbox widgets
     .c configure -selectcolor {}
 } {}
 
@@ -218,7 +238,7 @@ test button-4.13 {ButtonWidgetCmd procedure, "cget" option} {
 } {1 {unknown option "-onvalue"}}
 test button-4.14 {ButtonWidgetCmd procedure, "configure" option} {
     llength [.c configure]
-} {39}
+} {41}
 test button-4.15 {ButtonWidgetCmd procedure, "configure" option} {
     list [catch {.b configure -gorp} msg] $msg
 } {1 {unknown option "-gorp"}}
@@ -256,23 +276,25 @@ test button-4.23 {ButtonWidgetCmd procedure, "deselect" option} {
     .r deselect
     set value2
 } {}
-test button-4.24 {ButtonWidgetCmd procedure, "deselect" option} {
+test button-4.24 {ButtonWidgetCmd procedure, "deselect" option} -body {
     set value 1
     trace variable value w bogusTrace
     set result [list [catch {.c deselect} msg] $msg $errorInfo $value]
     trace vdelete value w bogusTrace
     set result
-} {1 {can't set "value": trace aborted} {can't set "value": trace aborted
+} -match glob -result {1 {can't set "value": trace aborted} {*trace aborted
     while executing
+*
 ".c deselect"} 0}
-test button-4.25 {ButtonWidgetCmd procedure, "deselect" option} {
+test button-4.25 {ButtonWidgetCmd procedure, "deselect" option} -body {
     set value2 red
     trace variable value2 w bogusTrace
     set result [list [catch {.r deselect} msg] $msg $errorInfo $value2]
     trace vdelete value2 w bogusTrace
     set result
-} {1 {can't set "value2": trace aborted} {can't set "value2": trace aborted
+} -match glob -result {1 {can't set "value2": trace aborted} {*trace aborted
     while executing
+*
 ".r deselect"} {}}
 test button-4.26 {ButtonWidgetCmd procedure, "flash" option} {
     list [catch {.b flash foo} msg] $msg
@@ -343,14 +365,15 @@ test button-4.41 {ButtonWidgetCmd procedure, "select" option} {
     .r select
     set value2
 } {red}
-test button-4.42 {ButtonWidgetCmd procedure, "select" option} {
+test button-4.42 {ButtonWidgetCmd procedure, "select" option} -body {
     set value2 yellow
     trace variable value2 w bogusTrace
     set result [list [catch {.r select} msg] $msg $errorInfo $value2]
     trace vdelete value2 w bogusTrace
     set result
-} {1 {can't set "value2": trace aborted} {can't set "value2": trace aborted
+} -match glob -result {1 {can't set "value2": trace aborted} {*trace aborted
     while executing
+*
 ".r select"} red}
 test button-4.43 {ButtonWidgetCmd procedure, "toggle" option} {
     list [catch {.l toggle} msg] $msg
@@ -374,25 +397,27 @@ test button-4.47 {ButtonWidgetCmd procedure, "toggle" option} {
     .c toggle
     lappend result $value
 } {sunshine rain sunshine}
-test button-4.48 {ButtonWidgetCmd procedure, "toggle" option} {
+test button-4.48 {ButtonWidgetCmd procedure, "toggle" option} -body {
     .c configure -onvalue xyz -offvalue abc
     set value xyz
     trace variable value w bogusTrace
     set result [list [catch {.c toggle} msg] $msg $errorInfo $value]
     trace vdelete value w bogusTrace
     set result
-} {1 {can't set "value": trace aborted} {can't set "value": trace aborted
+} -match glob -result {1 {can't set "value": trace aborted} {*trace aborted
     while executing
+*
 ".c toggle"} abc}
-test button-4.49 {ButtonWidgetCmd procedure, "toggle" option} {
+test button-4.49 {ButtonWidgetCmd procedure, "toggle" option} -body {
     .c configure -onvalue xyz -offvalue abc
     set value abc
     trace variable value w bogusTrace
     set result [list [catch {.c toggle} msg] $msg $errorInfo $value]
     trace vdelete value w bogusTrace
     set result
-} {1 {can't set "value": trace aborted} {can't set "value": trace aborted
+} -match glob -result {1 {can't set "value": trace aborted} {*trace aborted
     while executing
+*
 ".c toggle"} xyz}
 test button-4.50 {ButtonWidgetCmd procedure, "toggle" option} {
     catch {unset value}; set value(1) 1;
@@ -432,7 +457,7 @@ test button-6.2 {ConfigureButton - textvariable trace} {
     set x New
     lindex [.b1 configure -text] 4
 } {From-y}
-test button-6.2 {ConfigureButton - variable traces} {
+test button-6.2a {ConfigureButton - variable traces} {
     catch {destroy .b1}
     catch {unset x}
     checkbutton .b1 -variable x
@@ -628,7 +653,7 @@ test button-9.4 {TkInvokeButton procedure} {
     .b1 invoke
     lappend result $x
 } {0 red red}
-test button-9.5 {TkInvokeButton procedure} {
+test button-9.5 {TkInvokeButton procedure} -body {
     catch {destroy .b1}
     radiobutton .b1 -variable x -value red
     set x green
@@ -636,8 +661,9 @@ test button-9.5 {TkInvokeButton procedure} {
     set result [list [catch {.b1 invoke} msg] $msg $errorInfo $x]
     trace vdelete x w bogusTrace
     set result
-} {1 {can't set "x": trace aborted} {can't set "x": trace aborted
+} -match glob -result {1 {can't set "x": trace aborted} {*trace aborted
     while executing
+*
 ".b1 invoke"} red}
 test button-9.6 {TkInvokeButton procedure} {
     deleteWindows
@@ -808,5 +834,5 @@ deleteWindows
 option clear
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

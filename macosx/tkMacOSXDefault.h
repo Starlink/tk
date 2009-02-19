@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXDefault.h,v 1.2.2.7 2007/11/09 06:26:55 das Exp $
+ * RCS: @(#) $Id: tkMacOSXDefault.h,v 1.15 2007/12/13 15:27:08 dgp Exp $
  */
 
 #ifndef _TKMACDEFAULT
@@ -64,7 +64,7 @@
 #define DEF_BUTTON_DISABLED_FG_MONO	""
 #define DEF_BUTTON_FG			"systemButtonText"
 #define DEF_CHKRAD_FG			DEF_BUTTON_FG
-#define DEF_BUTTON_FONT			"system"
+#define DEF_BUTTON_FONT			"TkDefaultFont"
 #define DEF_BUTTON_HEIGHT		"0"
 #define DEF_BUTTON_HIGHLIGHT_BG_COLOR	DEF_BUTTON_BG_COLOR
 #define DEF_BUTTON_HIGHLIGHT_BG_MONO	DEF_BUTTON_BG_MONO
@@ -76,6 +76,7 @@
 #define DEF_BUTTON_JUSTIFY		"center"
 #define DEF_BUTTON_OFF_VALUE		"0"
 #define DEF_BUTTON_ON_VALUE		"1"
+#define DEF_BUTTON_TRISTATE_VALUE	""
 #define DEF_BUTTON_OVER_RELIEF		""
 #define DEF_BUTTON_PADX			"12"
 #define DEF_LABCHKRAD_PADX		"1"
@@ -159,7 +160,7 @@
 #define DEF_ENTRY_DISABLED_BG_MONO	WHITE
 #define DEF_ENTRY_DISABLED_FG		DISABLED
 #define DEF_ENTRY_EXPORT_SELECTION	"1"
-#define DEF_ENTRY_FONT			"Helvetica 12"
+#define DEF_ENTRY_FONT			"TkTextFont"
 #define DEF_ENTRY_FG			BLACK
 #define DEF_ENTRY_HIGHLIGHT_BG		NORMAL_BG
 #define DEF_ENTRY_HIGHLIGHT		BLACK
@@ -220,7 +221,7 @@
 #define DEF_LABELFRAME_CLASS		"Labelframe"
 #define DEF_LABELFRAME_RELIEF		"groove"
 #define DEF_LABELFRAME_FG		"systemButtonText"
-#define DEF_LABELFRAME_FONT		"system"
+#define DEF_LABELFRAME_FONT		"TkDefaultFont"
 #define DEF_LABELFRAME_TEXT		""
 #define DEF_LABELFRAME_LABELANCHOR	"nw"
 
@@ -235,7 +236,7 @@
 #define DEF_LISTBOX_CURSOR		""
 #define DEF_LISTBOX_DISABLED_FG		DISABLED
 #define DEF_LISTBOX_EXPORT_SELECTION	"1"
-#define DEF_LISTBOX_FONT		"application"
+#define DEF_LISTBOX_FONT		"TkTextFont"
 #define DEF_LISTBOX_FG			BLACK
 #define DEF_LISTBOX_HEIGHT		"10"
 #define DEF_LISTBOX_HIGHLIGHT_BG	NORMAL_BG
@@ -333,7 +334,7 @@
 #define DEF_MENUBUTTON_DIRECTION	"below"
 #define DEF_MENUBUTTON_DISABLED_FG_COLOR DISABLED
 #define DEF_MENUBUTTON_DISABLED_FG_MONO	""
-#define DEF_MENUBUTTON_FONT		"system"
+#define DEF_MENUBUTTON_FONT		"TkDefaultFont"
 #define DEF_MENUBUTTON_FG		BLACK
 #define DEF_MENUBUTTON_HEIGHT		"0"
 #define DEF_MENUBUTTON_HIGHLIGHT_BG_COLOR DEF_MENUBUTTON_BG_COLOR
@@ -367,7 +368,7 @@
 #define DEF_MESSAGE_BORDER_WIDTH	"1"
 #define DEF_MESSAGE_CURSOR		""
 #define DEF_MESSAGE_FG			BLACK
-#define DEF_MESSAGE_FONT		"system"
+#define DEF_MESSAGE_FONT		"TkDefaultFont"
 #define DEF_MESSAGE_HIGHLIGHT_BG	NORMAL_BG
 #define DEF_MESSAGE_HIGHLIGHT		BLACK
 #define DEF_MESSAGE_HIGHLIGHT_WIDTH	"0"
@@ -412,6 +413,8 @@
 #define DEF_PANEDWINDOW_PANE_PADY	"0"
 #define DEF_PANEDWINDOW_PANE_STICKY	"nsew"
 #define DEF_PANEDWINDOW_PANE_WIDTH	""
+#define DEF_PANEDWINDOW_PANE_HIDE	"0"
+#define DEF_PANEDWINDOW_PANE_STRETCH	"last"
 
 /*
  * Defaults for scales:
@@ -426,7 +429,7 @@
 #define DEF_SCALE_COMMAND		""
 #define DEF_SCALE_CURSOR		""
 #define DEF_SCALE_DIGITS		"0"
-#define DEF_SCALE_FONT			"system"
+#define DEF_SCALE_FONT			"TkDefaultFont"
 #define DEF_SCALE_FG_COLOR		BLACK
 #define DEF_SCALE_FG_MONO		BLACK
 #define DEF_SCALE_FROM			"0"
@@ -486,11 +489,12 @@
 #define DEF_TEXT_AUTO_SEPARATORS	"1"
 #define DEF_TEXT_BG_COLOR		NORMAL_BG
 #define DEF_TEXT_BG_MONO		WHITE
+#define DEF_TEXT_BLOCK_CURSOR		"0"
 #define DEF_TEXT_BORDER_WIDTH		"0"
 #define DEF_TEXT_CURSOR			"xterm"
 #define DEF_TEXT_FG			BLACK
 #define DEF_TEXT_EXPORT_SELECTION	"1"
-#define DEF_TEXT_FONT			"Courier 12"
+#define DEF_TEXT_FONT			"TkFixedFont"
 #define DEF_TEXT_HEIGHT			"24"
 #define DEF_TEXT_HIGHLIGHT_BG		NORMAL_BG
 #define DEF_TEXT_HIGHLIGHT		BLACK
@@ -505,6 +509,7 @@
 #define DEF_TEXT_PADX			"1"
 #define DEF_TEXT_PADY			"1"
 #define DEF_TEXT_RELIEF			"flat"
+#define DEF_TEXT_INACTIVE_SELECT_COLOR	INACTIVE_SELECT_BG
 #define DEF_TEXT_SELECT_COLOR		SELECT_BG
 #define DEF_TEXT_SELECT_MONO		BLACK
 #define DEF_TEXT_SELECT_BD_COLOR	"1"
@@ -518,6 +523,7 @@
 #define DEF_TEXT_SPACING3		"0"
 #define DEF_TEXT_STATE			"normal"
 #define DEF_TEXT_TABS			""
+#define DEF_TEXT_TABSTYLE		"tabular"
 #define DEF_TEXT_TAKE_FOCUS		(char *) NULL
 #define DEF_TEXT_UNDO			"0"
 #define DEF_TEXT_WIDTH			"80"
@@ -529,7 +535,7 @@
  * Defaults for canvas text:
  */
 
-#define DEF_CANVTEXT_FONT		"Helvetica 12"
+#define DEF_CANVTEXT_FONT		"TkDefaultFont"
 
 /*
  * Defaults for toplevels (most of the defaults for frames also apply

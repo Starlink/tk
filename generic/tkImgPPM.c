@@ -6,22 +6,21 @@
  * Copyright (c) 1994 The Australian National University.
  * Copyright (c) 1994-1997 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
  * Author: Paul Mackerras (paulus@cs.anu.edu.au),
- *	   Department of Computer Science,
- *	   Australian National University.
+ *	Department of Computer Science,
+ *	Australian National University.
  *
- * RCS: @(#) $Id: tkImgPPM.c,v 1.10.2.3 2007/11/26 20:53:57 kennykb Exp $
+ * RCS: @(#) $Id: tkImgPPM.c,v 1.21 2007/12/13 15:24:14 dgp Exp $
  */
 
 #include "tkInt.h"
-#include "tkPort.h"
 
 /*
- * The maximum amount of memory to allocate for data read from the
- * file.  If we need more than this, we do it in pieces.
+ * The maximum amount of memory to allocate for data read from the file. If we
+ * need more than this, we do it in pieces.
  */
 
 #define MAX_MEMORY	10000		/* don't allocate > 10KB */
@@ -37,28 +36,23 @@
  * The format record for the PPM file format:
  */
 
-static int		FileMatchPPM _ANSI_ARGS_((Tcl_Channel chan,
+static int		FileMatchPPM(Tcl_Channel chan, CONST char *fileName,
+			    Tcl_Obj *format, int *widthPtr, int *heightPtr,
+			    Tcl_Interp *interp);
+static int		FileReadPPM(Tcl_Interp *interp, Tcl_Channel chan,
 			    CONST char *fileName, Tcl_Obj *format,
-			    int *widthPtr, int *heightPtr,
-			    Tcl_Interp *interp));
-static int		FileReadPPM  _ANSI_ARGS_((Tcl_Interp *interp,
-			    Tcl_Channel chan, CONST char *fileName,
+			    Tk_PhotoHandle imageHandle, int destX, int destY,
+			    int width, int height, int srcX, int srcY);
+static int		FileWritePPM(Tcl_Interp *interp, CONST char *fileName,
+			    Tcl_Obj *format, Tk_PhotoImageBlock *blockPtr);
+static int		StringWritePPM(Tcl_Interp *interp, Tcl_Obj *format,
+			    Tk_PhotoImageBlock *blockPtr);
+static int		StringMatchPPM(Tcl_Obj *dataObj, Tcl_Obj *format,
+			    int *widthPtr, int *heightPtr, Tcl_Interp *interp);
+static int		StringReadPPM(Tcl_Interp *interp, Tcl_Obj *dataObj,
 			    Tcl_Obj *format, Tk_PhotoHandle imageHandle,
 			    int destX, int destY, int width, int height,
-			    int srcX, int srcY));
-static int		FileWritePPM _ANSI_ARGS_((Tcl_Interp *interp,
-			    CONST char *fileName, Tcl_Obj *format,
-			    Tk_PhotoImageBlock *blockPtr));
-static int		StringWritePPM _ANSI_ARGS_((Tcl_Interp *interp,
-			    Tcl_Obj *format, Tk_PhotoImageBlock *blockPtr));
-static int		StringMatchPPM _ANSI_ARGS_((Tcl_Obj *dataObj,
-			    Tcl_Obj *format, int *widthPtr, int *heightPtr,
-			    Tcl_Interp *interp));
-static int		StringReadPPM _ANSI_ARGS_((Tcl_Interp *interp,
-			    Tcl_Obj *dataObj, Tcl_Obj *format,
-			    Tk_PhotoHandle imageHandle, int destX, int destY,
-			    int width, int height, int srcX, int srcY));
-
+			    int srcX, int srcY);
 
 Tk_PhotoImageFormat tkImgFmtPPM = {
     "ppm",			/* name */
@@ -71,28 +65,26 @@ Tk_PhotoImageFormat tkImgFmtPPM = {
 };
 
 /*
- * Prototypes for local procedures defined in this file:
+ * Prototypes for local functions defined in this file:
  */
 
-static int		ReadPPMFileHeader _ANSI_ARGS_((Tcl_Channel chan,
-			    int *widthPtr, int *heightPtr,
-			    int *maxIntensityPtr));
-static int		ReadPPMStringHeader _ANSI_ARGS_((Tcl_Obj *dataObj,
-			    int *widthPtr, int *heightPtr,
-			    int *maxIntensityPtr,
-			    unsigned char **dataBufferPtr, int *dataSizePtr));
+static int		ReadPPMFileHeader(Tcl_Channel chan, int *widthPtr,
+			    int *heightPtr, int *maxIntensityPtr);
+static int		ReadPPMStringHeader(Tcl_Obj *dataObj, int *widthPtr,
+			    int *heightPtr, int *maxIntensityPtr,
+			    unsigned char **dataBufferPtr, int *dataSizePtr);
 
 /*
  *----------------------------------------------------------------------
  *
  * FileMatchPPM --
  *
- *	This procedure is invoked by the photo image type to see if
- *	a file contains image data in PPM format.
+ *	This function is invoked by the photo image type to see if a file
+ *	contains image data in PPM format.
  *
  * Results:
- *	The return value is >0 if the first characters in file "f" look
- *	like PPM data, and 0 otherwise.
+ *	The return value is >0 if the first characters in file "f" look like
+ *	PPM data, and 0 otherwise.
  *
  * Side effects:
  *	The access position in f may change.
@@ -101,14 +93,15 @@ static int		ReadPPMStringHeader _ANSI_ARGS_((Tcl_Obj *dataObj,
  */
 
 static int
-FileMatchPPM(chan, fileName, format, widthPtr, heightPtr, interp)
-    Tcl_Channel chan;		/* The image file, open for reading. */
-    CONST char *fileName;	/* The name of the image file. */
-    Tcl_Obj *format;		/* User-specified format string, or NULL. */
-    int *widthPtr, *heightPtr;	/* The dimensions of the image are
-				 * returned here if the file is a valid
-				 * raw PPM file. */
-    Tcl_Interp *interp;
+FileMatchPPM(
+    Tcl_Channel chan,		/* The image file, open for reading. */
+    CONST char *fileName,	/* The name of the image file. */
+    Tcl_Obj *format,		/* User-specified format string, or NULL. */
+    int *widthPtr, int *heightPtr,
+				/* The dimensions of the image are returned
+				 * here if the file is a valid raw PPM
+				 * file. */
+    Tcl_Interp *interp)		/* unused */
 {
     int dummy;
 
@@ -120,35 +113,33 @@ FileMatchPPM(chan, fileName, format, widthPtr, heightPtr, interp)
  *
  * FileReadPPM --
  *
- *	This procedure is called by the photo image type to read
- *	PPM format data from a file and write it into a given
- *	photo image.
+ *	This function is called by the photo image type to read PPM format
+ *	data from a file and write it into a given photo image.
  *
  * Results:
- *	A standard TCL completion code.  If TCL_ERROR is returned
- *	then an error message is left in the interp's result.
+ *	A standard TCL completion code. If TCL_ERROR is returned then an error
+ *	message is left in the interp's result.
  *
  * Side effects:
- *	The access position in file f is changed, and new data is
- *	added to the image given by imageHandle.
+ *	The access position in file f is changed, and new data is added to the
+ *	image given by imageHandle.
  *
  *----------------------------------------------------------------------
  */
 
 static int
-FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
-	width, height, srcX, srcY)
-    Tcl_Interp *interp;		/* Interpreter to use for reporting errors. */
-    Tcl_Channel chan;		/* The image file, open for reading. */
-    CONST char *fileName;	/* The name of the image file. */
-    Tcl_Obj *format;		/* User-specified format string, or NULL. */
-    Tk_PhotoHandle imageHandle;	/* The photo image to write into. */
-    int destX, destY;		/* Coordinates of top-left pixel in
-				 * photo image to be written to. */
-    int width, height;		/* Dimensions of block of photo image to
-				 * be written to. */
-    int srcX, srcY;		/* Coordinates of top-left pixel to be used
-				 * in image being read. */
+FileReadPPM(
+    Tcl_Interp *interp,		/* Interpreter to use for reporting errors. */
+    Tcl_Channel chan,		/* The image file, open for reading. */
+    CONST char *fileName,	/* The name of the image file. */
+    Tcl_Obj *format,		/* User-specified format string, or NULL. */
+    Tk_PhotoHandle imageHandle,	/* The photo image to write into. */
+    int destX, int destY,	/* Coordinates of top-left pixel in photo
+				 * image to be written to. */
+    int width, int height,	/* Dimensions of block of photo image to be
+				 * written to. */
+    int srcX, int srcY)		/* Coordinates of top-left pixel to be used in
+				 * image being read. */
 {
     int fileWidth, fileHeight, maxIntensity;
     int nLines, nBytes, h, type, count;
@@ -187,14 +178,13 @@ FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
     }
 
     if (type == PGM) {
-        block.pixelSize = 1;
-        block.offset[0] = 0;
+	block.pixelSize = 1;
+	block.offset[0] = 0;
 	block.offset[1] = 0;
 	block.offset[2] = 0;
-    }
-    else {
-        block.pixelSize = 3;
-        block.offset[0] = 0;
+    } else {
+	block.pixelSize = 3;
+	block.offset[0] = 0;
 	block.offset[1] = 1;
 	block.offset[2] = 2;
     }
@@ -202,7 +192,10 @@ FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
     block.width = width;
     block.pitch = block.pixelSize * fileWidth;
 
-    Tk_PhotoExpand(imageHandle, destX + width, destY + height);
+    if (Tk_PhotoExpand(interp, imageHandle,
+	    destX + width, destY + height) != TCL_OK) {
+	return TCL_ERROR;
+    }
 
     if (srcY > 0) {
 	Tcl_Seek(chan, (Tcl_WideInt)(srcY * block.pitch), SEEK_CUR);
@@ -241,8 +234,11 @@ FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
 	    }
 	}
 	block.height = nLines;
-	Tk_PhotoPutBlock(imageHandle, &block, destX, destY, width, nLines,
-		TK_PHOTO_COMPOSITE_SET);
+	if (Tk_PhotoPutBlock(interp, imageHandle, &block, destX, destY,
+		width, nLines, TK_PHOTO_COMPOSITE_SET) != TCL_OK) {
+	    ckfree((char *) pixelPtr);
+	    return TCL_ERROR;
+	}
 	destY += nLines;
     }
 
@@ -255,12 +251,12 @@ FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
  *
  * FileWritePPM --
  *
- *	This procedure is invoked to write image data to a file in PPM
- *	format.
+ *	This function is invoked to write image data to a file in PPM format
+ *	(although we can read PGM files, we never write them).
  *
  * Results:
- *	A standard TCL completion code.  If TCL_ERROR is returned
- *	then an error message is left in the interp's result.
+ *	A standard TCL completion code. If TCL_ERROR is returned then an error
+ *	message is left in the interp's result.
  *
  * Side effects:
  *	Data is written to the file given by "fileName".
@@ -269,15 +265,14 @@ FileReadPPM(interp, chan, fileName, format, imageHandle, destX, destY,
  */
 
 static int
-FileWritePPM(interp, fileName, format, blockPtr)
-    Tcl_Interp *interp;
-    CONST char *fileName;
-    Tcl_Obj *format;
-    Tk_PhotoImageBlock *blockPtr;
+FileWritePPM(
+    Tcl_Interp *interp,
+    CONST char *fileName,
+    Tcl_Obj *format,
+    Tk_PhotoImageBlock *blockPtr)
 {
     Tcl_Channel chan;
-    int w, h;
-    int greenOffset, blueOffset, nBytes;
+    int w, h, greenOffset, blueOffset, nBytes;
     unsigned char *pixelPtr, *pixLinePtr;
     char header[16 + TCL_INTEGER_SPACE * 2];
 
@@ -314,9 +309,9 @@ FileWritePPM(interp, fileName, format, blockPtr)
 	for (h = blockPtr->height; h > 0; h--) {
 	    pixelPtr = pixLinePtr;
 	    for (w = blockPtr->width; w > 0; w--) {
-		if ((Tcl_Write(chan, (char *) &pixelPtr[0], 1) == -1)
-			|| (Tcl_Write(chan, (char *) &pixelPtr[greenOffset], 1) == -1)
-			|| (Tcl_Write(chan, (char *) &pixelPtr[blueOffset], 1) == -1)) {
+		if (    Tcl_Write(chan,(char *)&pixelPtr[0], 1) == -1 ||
+			Tcl_Write(chan,(char *)&pixelPtr[greenOffset],1)==-1 ||
+			Tcl_Write(chan,(char *)&pixelPtr[blueOffset],1) ==-1) {
 		    goto writeerror;
 		}
 		pixelPtr += blockPtr->pixelSize;
@@ -330,7 +325,7 @@ FileWritePPM(interp, fileName, format, blockPtr)
     }
     chan = NULL;
 
- writeerror:
+  writeerror:
     Tcl_AppendResult(interp, "error writing \"", fileName, "\": ",
 	    Tcl_PosixError(interp), NULL);
     if (chan != NULL) {
@@ -344,12 +339,12 @@ FileWritePPM(interp, fileName, format, blockPtr)
  *
  * StringWritePPM --
  *
- *	This procedure is invoked to write image data to a string in PPM
+ *	This function is invoked to write image data to a string in PPM
  *	format.
  *
  * Results:
- *	A standard TCL completion code.  If TCL_ERROR is returned
- *	then an error message is left in the interp's result.
+ *	A standard TCL completion code. If TCL_ERROR is returned then an error
+ *	message is left in the interp's result.
  *
  * Side effects:
  *	None.
@@ -358,10 +353,10 @@ FileWritePPM(interp, fileName, format, blockPtr)
  */
 
 static int
-StringWritePPM(interp, format, blockPtr)
-    Tcl_Interp *interp;
-    Tcl_Obj *format;
-    Tk_PhotoImageBlock *blockPtr;
+StringWritePPM(
+    Tcl_Interp *interp,
+    Tcl_Obj *format,
+    Tk_PhotoImageBlock *blockPtr)
 {
     int w, h, size, greenOffset, blueOffset;
     unsigned char *pixLinePtr, *byteArray;
@@ -369,10 +364,12 @@ StringWritePPM(interp, format, blockPtr)
     Tcl_Obj *byteArrayObj;
 
     sprintf(header, "P6\n%d %d\n255\n", blockPtr->width, blockPtr->height);
+
     /*
      * Construct a byte array of the right size with the header and
      * get a pointer to the data part of it.
      */
+
     size = strlen(header);
     byteArrayObj = Tcl_NewByteArrayObj((unsigned char *)header, size);
     byteArray = Tcl_SetByteArrayLength(byteArrayObj,
@@ -386,6 +383,7 @@ StringWritePPM(interp, format, blockPtr)
     /*
      * Check if we can do the data move in single action.
      */
+
     if ((greenOffset == 1) && (blueOffset == 2) && (blockPtr->pixelSize == 3)
 	    && (blockPtr->pitch == (blockPtr->width * 3))) {
 	memcpy(byteArray, pixLinePtr,
@@ -407,6 +405,7 @@ StringWritePPM(interp, format, blockPtr)
     /*
      * Return the object in the interpreter result.
      */
+
     Tcl_SetObjResult(interp, byteArrayObj);
     return TCL_OK;
 }
@@ -416,12 +415,12 @@ StringWritePPM(interp, format, blockPtr)
  *
  * StringMatchPPM --
  *
- *	This procedure is invoked by the photo image type to see if
- *	a string contains image data in PPM format.
+ *	This function is invoked by the photo image type to see if a string
+ *	contains image data in PPM format.
  *
  * Results:
- *	The return value is >0 if the first characters in file "f" look
- *	like PPM data, and 0 otherwise.
+ *	The return value is >0 if the first characters in file "f" look like
+ *	PPM data, and 0 otherwise.
  *
  * Side effects:
  *	The access position in f may change.
@@ -430,13 +429,14 @@ StringWritePPM(interp, format, blockPtr)
  */
 
 static int
-StringMatchPPM(dataObj, format, widthPtr, heightPtr, interp)
-    Tcl_Obj *dataObj;		/* The image data. */
-    Tcl_Obj *format;		/* User-specified format string, or NULL. */
-    int *widthPtr, *heightPtr;	/* The dimensions of the image are
-				 * returned here if the file is a valid
-				 * raw PPM file. */
-    Tcl_Interp *interp;		/* unused */
+StringMatchPPM(
+    Tcl_Obj *dataObj,		/* The image data. */
+    Tcl_Obj *format,		/* User-specified format string, or NULL. */
+    int *widthPtr, int *heightPtr,
+				/* The dimensions of the image are returned
+				 * here if the file is a valid raw PPM
+				 * file. */
+    Tcl_Interp *interp)		/* unused */
 {
     int dummy;
 
@@ -449,13 +449,12 @@ StringMatchPPM(dataObj, format, widthPtr, heightPtr, interp)
  *
  * StringReadPPM --
  *
- *	This procedure is called by the photo image type to read
- *	PPM format data from a string and write it into a given
- *	photo image.
+ *	This function is called by the photo image type to read PPM format
+ *	data from a string and write it into a given photo image.
  *
  * Results:
- *	A standard TCL completion code.  If TCL_ERROR is returned
- *	then an error message is left in the interp's result.
+ *	A standard TCL completion code. If TCL_ERROR is returned then an error
+ *	message is left in the interp's result.
  *
  * Side effects:
  *	New data is added to the image given by imageHandle.
@@ -464,18 +463,17 @@ StringMatchPPM(dataObj, format, widthPtr, heightPtr, interp)
  */
 
 static int
-StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
-	width, height, srcX, srcY)
-    Tcl_Interp *interp;		/* Interpreter to use for reporting errors. */
-    Tcl_Obj *dataObj;		/* The image data. */
-    Tcl_Obj *format;		/* User-specified format string, or NULL. */
-    Tk_PhotoHandle imageHandle;	/* The photo image to write into. */
-    int destX, destY;		/* Coordinates of top-left pixel in
-				 * photo image to be written to. */
-    int width, height;		/* Dimensions of block of photo image to
-				 * be written to. */
-    int srcX, srcY;		/* Coordinates of top-left pixel to be used
-				 * in image being read. */
+StringReadPPM(
+    Tcl_Interp *interp,		/* Interpreter to use for reporting errors. */
+    Tcl_Obj *dataObj,		/* The image data. */
+    Tcl_Obj *format,		/* User-specified format string, or NULL. */
+    Tk_PhotoHandle imageHandle,	/* The photo image to write into. */
+    int destX, int destY,	/* Coordinates of top-left pixel in photo
+				 * image to be written to. */
+    int width, int height,	/* Dimensions of block of photo image to be
+				 * written to. */
+    int srcX, int srcY)		/* Coordinates of top-left pixel to be used in
+				 * image being read. */
 {
     int fileWidth, fileHeight, maxIntensity;
     int nLines, nBytes, h, type, count, dataSize;
@@ -516,13 +514,13 @@ StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
     }
 
     if (type == PGM) {
-        block.pixelSize = 1;
-        block.offset[0] = 0;
+	block.pixelSize = 1;
+	block.offset[0] = 0;
 	block.offset[1] = 0;
 	block.offset[2] = 0;
     } else {
-        block.pixelSize = 3;
-        block.offset[0] = 0;
+	block.pixelSize = 3;
+	block.offset[0] = 0;
 	block.offset[1] = 1;
 	block.offset[2] = 2;
     }
@@ -537,21 +535,23 @@ StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
 
     if (maxIntensity == 255) {
 	/*
-	 * We have all the data in memory, so write everything in one
-	 * go.
+	 * We have all the data in memory, so write everything in one go.
 	 */
+
 	if (block.pitch*height > dataSize) {
 	    Tcl_AppendResult(interp, "truncated PPM data", NULL);
 	    return TCL_ERROR;
 	}
 	block.pixelPtr = dataBuffer + srcX * block.pixelSize;
 	block.height = height;
-	Tk_PhotoPutBlock(imageHandle, &block, destX, destY, width, height,
-		TK_PHOTO_COMPOSITE_SET);
-	return TCL_OK;
+	return Tk_PhotoPutBlock(interp, imageHandle, &block, destX, destY,
+		width, height, TK_PHOTO_COMPOSITE_SET);
     }
 
-    Tk_PhotoExpand(imageHandle, destX + width, destY + height);
+    if (Tk_PhotoExpand(interp, imageHandle,
+	    destX + width, destY + height) != TCL_OK) {
+	return TCL_ERROR;
+    }
 
     nLines = (MAX_MEMORY + block.pitch - 1) / block.pitch;
     if (nLines > height) {
@@ -581,8 +581,11 @@ StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
 	}
 	dataSize -= nBytes;
 	block.height = nLines;
-	Tk_PhotoPutBlock(imageHandle, &block, destX, destY, width, nLines,
-		TK_PHOTO_COMPOSITE_SET);
+	if (Tk_PhotoPutBlock(interp, imageHandle, &block, destX, destY,
+		width, nLines, TK_PHOTO_COMPOSITE_SET) != TCL_OK) {
+	    ckfree((char *) pixelPtr);
+	    return TCL_ERROR;
+	}
 	destY += nLines;
     }
 
@@ -595,16 +598,15 @@ StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
  *
  * ReadPPMFileHeader --
  *
- *	This procedure reads the PPM header from the beginning of a
- *	PPM file and returns information from the header.
+ *	This function reads the PPM header from the beginning of a PPM file
+ *	and returns information from the header.
  *
  * Results:
- *	The return value is PGM if file "f" appears to start with
- *	a valid PGM header, PPM if "f" appears to start with a valid
- *      PPM header, and 0 otherwise.  If the header is valid,
- *	then *widthPtr and *heightPtr are modified to hold the
- *	dimensions of the image and *maxIntensityPtr is modified to
- *	hold the value of a "fully on" intensity value.
+ *	The return value is PGM if file "f" appears to start with a valid PGM
+ *	header, PPM if "f" appears to start with a valid PPM header, and 0
+ *	otherwise. If the header is valid, then *widthPtr and *heightPtr are
+ *	modified to hold the dimensions of the image and *maxIntensityPtr is
+ *	modified to hold the value of a "fully on" intensity value.
  *
  * Side effects:
  *	The access position in f advances.
@@ -613,22 +615,21 @@ StringReadPPM(interp, dataObj, format, imageHandle, destX, destY,
  */
 
 static int
-ReadPPMFileHeader(chan, widthPtr, heightPtr, maxIntensityPtr)
-    Tcl_Channel chan;		/* Image file to read the header from */
-    int *widthPtr, *heightPtr;	/* The dimensions of the image are
-				 * returned here. */
-    int *maxIntensityPtr;	/* The maximum intensity value for
-				 * the image is stored here. */
+ReadPPMFileHeader(
+    Tcl_Channel chan,		/* Image file to read the header from. */
+    int *widthPtr, int *heightPtr,
+				/* The dimensions of the image are returned
+				 * here. */
+    int *maxIntensityPtr)	/* The maximum intensity value for the image
+				 * is stored here. */
 {
 #define BUFFER_SIZE 1000
-    char buffer[BUFFER_SIZE];
-    int i, numFields;
-    int type = 0;
-    char c;
+    char buffer[BUFFER_SIZE], c;
+    int i, numFields, type = 0;
 
     /*
-     * Read 4 space-separated fields from the file, ignoring
-     * comments (any line that starts with "#").
+     * Read 4 space-separated fields from the file, ignoring comments (any
+     * line that starts with "#").
      */
 
     if (Tcl_Read(chan, &c, 1) != 1) {
@@ -674,7 +675,8 @@ ReadPPMFileHeader(chan, widthPtr, heightPtr, maxIntensityPtr)
 	    i++;
 	}
     }
-    done:
+
+  done:
     buffer[i] = 0;
 
     /*
@@ -700,16 +702,16 @@ ReadPPMFileHeader(chan, widthPtr, heightPtr, maxIntensityPtr)
  *
  * ReadPPMStringHeader --
  *
- *	This procedure reads the PPM header from the beginning of a
- *	PPM-format string and returns information from the header.
+ *	This function reads the PPM header from the beginning of a PPM-format
+ *	string and returns information from the header.
  *
  * Results:
- *	The return value is PGM if the string appears to start with
- *	a valid PGM header, PPM if the string appears to start with
- *      a valid PPM header, and 0 otherwise.  If the header is valid,
- *	then *widthPtr and *heightPtr are modified to hold the
- *	dimensions of the image and *maxIntensityPtr is modified to
- *	hold the value of a "fully on" intensity value.
+ *	The return value is PGM if the string appears to start with a valid
+ *	PGM header, PPM if the string appears to start with a valid PPM
+ *	header, and 0 otherwise. If the header is valid, then *widthPtr and
+ *	*heightPtr are modified to hold the dimensions of the image and
+ *	*maxIntensityPtr is modified to hold the value of a "fully on"
+ *	intensity value.
  *
  * Side effects:
  *	None
@@ -718,28 +720,26 @@ ReadPPMFileHeader(chan, widthPtr, heightPtr, maxIntensityPtr)
  */
 
 static int
-ReadPPMStringHeader(dataPtr, widthPtr, heightPtr, maxIntensityPtr,
-	dataBufferPtr, dataSizePtr)
-    Tcl_Obj *dataPtr;		/* Object to read the header from. */
-    int *widthPtr, *heightPtr;	/* The dimensions of the image are
-				 * returned here. */
-    int *maxIntensityPtr;	/* The maximum intensity value for
-				 * the image is stored here. */
-    unsigned char **dataBufferPtr;
-    int *dataSizePtr;
+ReadPPMStringHeader(
+    Tcl_Obj *dataPtr,		/* Object to read the header from. */
+    int *widthPtr, int *heightPtr,
+				/* The dimensions of the image are returned
+				 * here. */
+    int *maxIntensityPtr,	/* The maximum intensity value for the image
+				 * is stored here. */
+    unsigned char **dataBufferPtr,
+    int *dataSizePtr)
 {
 #define BUFFER_SIZE 1000
-    char buffer[BUFFER_SIZE];
-    int i, numFields, dataSize;
-    int type = 0;
-    char c;
+    char buffer[BUFFER_SIZE], c;
+    int i, numFields, dataSize, type = 0;
     unsigned char *dataBuffer;
 
     dataBuffer = Tcl_GetByteArrayFromObj(dataPtr, &dataSize);
 
     /*
-     * Read 4 space-separated fields from the string, ignoring
-     * comments (any line that starts with "#").
+     * Read 4 space-separated fields from the string, ignoring comments (any
+     * line that starts with "#").
      */
 
     if (dataSize-- < 1) {
@@ -789,7 +789,8 @@ ReadPPMStringHeader(dataPtr, widthPtr, heightPtr, maxIntensityPtr,
 	    i++;
 	}
     }
-    done:
+
+  done:
     buffer[i] = 0;
 
     /*
@@ -813,3 +814,11 @@ ReadPPMStringHeader(dataPtr, widthPtr, heightPtr, maxIntensityPtr,
     }
     return type;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

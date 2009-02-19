@@ -2,7 +2,7 @@ This file summarizes all changes made to Tk since version 1.0 was
 released on March 13, 1991.  Changes that aren't backward compatible
 are marked specially.
 
-RCS: @(#) $Id: changes,v 1.64.2.55 2008/04/11 16:55:47 dgp Exp $
+RCS: @(#) $Id: changes,v 1.130.2.10 2008/12/22 18:49:24 dgp Exp $
 
 3/16/91 (bug fix) Modified tkWindow.c to remove Tk's Tcl commands from
 the interpreter when the main window is deleted (otherwise there will
@@ -5616,12 +5616,62 @@ with spaces in their names.
 
 2004-02-18 (bug fix)[899246] fix shrinking grid geometry calculations
 
-2004-02-23 (platform support)[809157] Mac OS X: Add alpha blending for
+2003-02-23 (platform support)[809157] Mac OS X: Add alpha blending for
 images with partial transparency.
 
 2004-03-01 (platform support)[218561] Allow 64-bit configure on IRIX64-6.5*
 
 --- Released 8.4.6, March 1, 2004 --- See ChangeLog for details ---
+
+Changes to 8.5a1 include all changes to the 8.4 line through 8.4.6,
+plus the following, which focuses on the high-level feature changes
+in this changeset (new minor version) rather than bug fixes:
+
+ * Tk is no longer guaranteed to work for Win95 (not tested 8.5+)
+
+ * configure scripts now require autoconf 2.57 for regeneration
+
+ * added support for anti-aliased test under X11 (already existed for
+   Win/Mac) using --enable-xft
+
+ * improved speed of 'photo put' handling
+
+ * updated demos for consistency and improved look & feel
+
+ * improve 3D line drawing for sunken widgets on Windows
+
+ * [792387] reworked 'grid' to handle some tricky geometry computations
+   better
+
+ * [TIP #109] updated look of radiobuttons and checkbuttons on X11
+
+ * [TIP #110] tristate value option for checkbuttons and radiobuttons
+
+ * [TIP #113] add multi-line searching and -all searching to the text widget
+   Full Tcl_Obj-ification of the text widget
+ * [TIP #155] add 'count' and 'replace' subcommands and a '-blockcursor'
+   option to text widgets and support smooth-scrolling of them
+	*** POTENTIAL INCOMPATIBILITY ***
+   Negative or decreasing tab-stops are explicitly disallowed
+
+ * [TIP #116] more safety for large image creation through use of attempted
+   allocation of large memory blocks
+
+ * [TIP #137/151] add -encoding option to 'wish' executable (through
+   Tk_MainEX())
+	*** POTENTIAL INCOMPATIBILITY ***
+   For Tk embedders that build on Tk_MainEx() and make use of Tk_MainEx's
+   former ability to pass a leading "-encoding" option to interactive shell
+   operations, this will now be consumed by Tk.
+
+ * [TIP #146] added 'grid anchor' subcommand for overall grid anchoring
+
+ * [TIP #147] recognize widget names and "all" as keywords in grid's
+   'columnconfigure' and 'rowconfigure' subcommands
+
+ * [TIP #150] make 'send' available on Windows
+
+--- Released 8.5a1, March 3, 2004 --- See ChangeLog for details ---
 
 2004-03-17 (platform support) Mac OS X: Grab the Command-H &
 Command-Shift-H keys and use them for Hide and Hide Others before passing
@@ -5742,21 +5792,176 @@ compositing of partially transparent areas.
 
 --- Released 8.4.9, December 6, 2004 --- See ChangeLog for details ---
 
-2004-12-09 (performance)[1081966] BMP, JPG image load speed (fellows)
+Changes to 8.5a2 include all changes to the 8.4 line through 8.4.9, plus
+the following, which focuses on the 8.5-only changes since 8.5a1:
 
-2004-12-29 (platform support)[1092952,1091967] MSVC7, gcc OPT compiles (hobbs)
+2004-03-16 (bug fix)[915330] correct crash condition for new
+radio/checkbuttons when colors are exhausted (griffin)
 
-2005-01-11 (bug fix)[1098779] -pady accept all lists (fellows,kirkham)
+2004-03-18 (platform removal)[918139] Removed support for Mac OS Classic
+platform (steffen)
+	*** POTENTIAL INCOMPATIBILITY ***
 
-2005-01-14 (bug fix)[959973] Set _NET_WM_NAME and _NET_WM_ICON_NAME
+2004-03-26 (new feature)[FRQ 540375] support for
+[image create photo -format PPM -data] (fellows)
+
+2004-05-14 (bug fix)[TIP 152] -detail option for tk_messageBox (fellows)
+
+2004-06-04 (bug fix)[965398] Fix to shimmering infinite loop scrolling in
+text widget under rare circumstances (darley)
+
+2004-06-04 (bug fix) Fixed mousewheel bindings for OS X/Aqua (darley)
+
+2004-06-07 (bug fix)[965186] Fix text widget's record of
+partial-line-height calculations for very long wrapped lines, correcting
+scrollbar-text interactions (darley)
+
+2004-06-08 (bug fix)[968725] Fix text rendering problem with canvas text
+items that have a selected region. (dejong)
+
+2004-06-09 (bug fix) Fix multi-line regexp search bugs in text widget
+(darley)
+
+2004-06-15 (feature enhancement) Add 3D highlight to disabled *buttons and
+labels, as is done for disabled menu entries (kovalenko)
+
+2004-06-16 (bug fix)[742882] Fix potential division by zero in gridded wm
+geometry (english)
+
+2004-06-26 (bug fix)[756840] Fix Tk console cleanup on exit/reinit
+(mistachkin)
+
+2004-06-30 (new feature)[TIP 153] enhanced 'winfo toplevel' to recognize
+non-Tk windows (mckay)
+
+2004-07-02 (bug fix) Button 4 and 5 masks synchronized with Tk display
+(staplin)
+
+2004-07-05 (bug fix)[959973] Set _NET_WM_NAME and _NET_WM_ICON_NAME
 (freedesktop.org) in addition to WM_NAME and WM_ICON_NAME (ICCCM).  Allows
 Unicode characters in wm titlebar on X11. (english)
 
-2005-01-14 (bug fix)[742882] division by zero in gridded wm geometry (english)
+2004-07-05 (new feature)[TIP 158][797404] Allow Win apps to distinguish
+keys on the keypad using the Extended modifier (grossbauer, kenny)
 
-2005-01-14 (bug fix)[632816] cannot remove transient (english)
+2004-07-20 (feature enhancement)[922727] add install-private-headers target
+(steffen)
 
-2005-01-14 (bug fix)[568861] [wm minsize|maxsize] fix (dejong,english)
+2004-07-27 (bug fix) Fix segfault in case of premature end of GIF image
+data (steffen)
+
+2004-08-11 (feature)[979101] [tk_getOpenFile] consults env vars (fellows)
+
+2004-08-19 (new feature)[TIP 168] Add -smooth method for alternative bezier
+curve implementations on canvas items (hellstroem, fellows)
+
+2004-08-29 (new feature)[TIP 165] Add %d binding substitution for
+user-controlled data field (fellows)
+
+2004-09-10 (new feature)[TIP 169] Allow for text peering with '$text peer'
+widget subcommand (griffin, darley)
+
+2004-10-08 (new feature)[TIP 205] Use pkgconfig Database to register Xft
+support (english)
+
+2004-10-11 (new language) Swedish message catalog from Mats Bengtsson
+
+2004-10-19 (new feature)[TIP 204][976928] Virtual events for keyboard
+traversal (english)
+
+2004-10-24 (new feature)[TIP 177, 179][983886] Add -hide and -stretch
+options to panedwindow widget (griffin)
+
+2004-10-26 (bug fix)[919066] Improve region handling functions
+
+2004-10-28 (bug fix)[220927] Fix scale labels to stay in window (schlenker,
+thoyts)
+
+2004-11-07 (bug fix)[962589] Made handling of ^ more consistent in grid
+(spjuth)
+
+2004-11-28 (bug fix)[942320] Fix short integer overflow in x,y coordinates
+for long lines using unix AA fonts (english)
+
+Updated test suite, documentation, and demos.
+
+--- Released 8.5a2, December 7, 2004 --- See ChangeLog for details ---
+
+2004-12-09 (performance)[1081966] BMP, JPG image load speed (fellows)
+
+2004-12-17 (feature change) Modified DisplayFrame to draw a container's 
+background when the embedded window is NULL (chengyemao)
+
+2004-12-17 (bug fix)[842945][831627] Fixed a bug in ContainerEventProc  
+to handle ConfigureNotify event properly; Changed CleanupContainList to 
+TkWinCleanupContainerList to be invoked in TkWinXCleanup; Changed Intialize 
+and CreateTopLevelWindow to create the DeleteWindowsExitProc after TkpInit 
+so that finalization will be done in a proper sequence (to avoid painics 
+and potential crashes in exit). (chengyemao)
+
+2004-12-17 (platform support) Added TkWinClenupContainerList into stublib. 
+(chengyemao)
+
+2004-12-18 (buf fix)[222677] Close the embedded window (of a different 
+process) when its container is destroyed. (chengyemao)
+
+2004-12-19 (Windows feature implementation of embedded/embedding 
+Tk and bug fix) Implemented container identification, focus, raise, set 
+title of and move window so that an embedded widget is able to identify 
+a container, to get focus and to receive key press input. Fixed bugs include 
+[1024364][1096047] and an incorrect wm overrideredirect for an embedded 
+window. (chengyemao)
+
+2004-12-20 (Windows feature implementation of embedded/embedding Tk) 
+Implemented overrideredirect for an embedded toplevel; correctly updated a 
+frame's upper left x and y of an embedded toplevel after its container 
+(of another process) moved. (chengyemao) 
+
+2004-12-28 (feature implementatoin of embedded/embedding Tk of Windows) 
+Implemented embedded/embedding toplevel menu. A menu may be embedded in 
+a container of either the same process or a different process. Working 
+fine with Windows 98. But having a problem when invoked with a mouse click 
+(Windows XP): if an embedded menu is in a different process, the menu items 
+may show as a blank window at the pull-down time and require the mouse 
+moves over the menu items to complete display. (chengyemao)
+
+2004-12-29 (platform support)[1092952,1091967] MSVC7, gcc OPT compiles (hobbs)
+
+2005-01-03 (feature implementation of embedded/embedding Tk of Windows) Added
+a separated window handler for an embedded menu; solved the problem of 
+a blank menu display with a mouse click in XP. (chengyemao)
+
+2005-01-07 (feature implementation of embedded/embedding Tk of Window) Added
+TK_STATE message (Windows) to support {wm state} for embedded windows; forced
+redraw of container after the embedded window detached; removed unnecessary
+panic in using embedded window; embeded toplevel menu of an embedded window
+automatically in wrapper updating.  Modified and added functions: WmStateCmd,
+UpdateWrapper, TkpWmGetState (added) in tkWinWm.c; TkpUseWindow, 
+TkWinEmbeddedEventProc in tkWinEmbed.c; TkWinChildProc in tkWinX.c. 
+(chengyemao) 
+
+2005-01-08 (bug fix)[1098625] Wrong toplevel geometry when created with a menu;
+[637653] Deleting a popup menu crashes wish (chengyemao)
+
+2005-01-09 (feature implementation of embedded/embedding Tk of Windows)
+Changed FrameWidgetObjCmd (tkFrame.c), TkpUseWindow (tkMacOSXEmbed.c,
+tkUnixEmbed.c, tkWinEmbed.c) to make implementation ready for a
+configurable toplevel -use option and completed the implementation for
+Windows (tkWinWm.c, tkWinEmbed.c, tkWinInt.h). Embedding with a frame
+container needs further debugging (chengyemao).
+
+2005-01-10 (enhancement)[1081595] stopped use of TK_DBGX (english)
+
+2005-01-11 (bug fix)[1098779] -pady accept all lists (fellows,kirkham)
+
+2005-01-11 (bug fix)[1093631] [text] scroll long wrapped line (darley)
+
+2005-01-18 (feature implementation of embedded/embedding Tk of Windows)
+Simplified TkpUseWindow, added Tk_DetachEmbeddedWindow and got rid of code
+for saving an embedded window object which is never used. Fixed a bug in
+TkWinHandleMenuEvent for processing WM_MENUSELECT. Wish crashed due to an
+invalid index in a case of MF_POPUP. The -use option of a toplevel can be
+configured after the toplevel is created.
 
 2005-01-18 (bug fix) dialog visibility in demos (nash,fellows)
 
@@ -5764,7 +5969,7 @@ Unicode characters in wm titlebar on X11. (english)
 
 2005-01-31 (enhancement)[1111213] msg catalog for Spain's Spanish. (poser)
 
-2005-02-10 (platform support) Correct gcc builds for AIX-4+, HP-UX-11 (hobbs)
+2005-02-03 (bug fix)[1114977] UID thread-safety in canvas (fellows)
 
 2005-02-11 (bug fix)[949792] Fix error during panedwindow destroy (hobbs)
 
@@ -5773,21 +5978,57 @@ segfault (hobbs)
 
 2005-02-11 (bug fix)[1119460] Disabled canvas bmap/bbox segfault (hobbs)
 
+2005-02-11 (platform support) Correct gcc builds for AIX-4+, HP-UX-11 (hobbs)
+
+2005-02-14 (bug fix)[443848] [text] elide newline, but not line (darley)
+
+2005-02-16 (new feature)[TIP 223] Windows: [wm attributes -fullscreen] (dejong)
+
 2005-02-22 (bug fix)[1146057] Aqua: [tk_getOpenFile] encoding (steffen)
 
 2005-02-28 (bug fix)[1118340] Fix Mousewheel %A translation (davis,hobbs)
+
+2005-03-09 (bug fix) Mac OS X: remote debugging under Xcode (ingham)
 
 2005-03-10 (bug fix)[1160025] Aqua: offset in mouse coords (davies,ingham)
 
 2005-03-10 (bug fix)[1124237] Aqua: floating window focus (davies,ingham)
 
+2005-03-14 (bug fix)[1162356] ClientMessageHandlers work now (petasis,fellows)
+
+2005-03-14 (bug fix)[1124237] Aqua: (un)map of subwindows (ingham)
+
+2005-03-14 (bug fix)[700305] Aqua: child window updates before creation
+(ingham)
+
 2005-03-15 (platform support) OpenBSD ports patch (thoyts)
 
-2005-03-24 (enhancment) Aqua: native L&F for entry and spinbox (ingham)
+2005-03-15 (bug fix)[1143776] [text] display panic (revar,darley)
+
+2005-03-19 (bug fix)[1016385] allow [rename console] (fellows)
+
+2005-03-23 (enhancment) Aqua: native L&F for entry and spinbox (ingham)
+
+2005-03-23 (new feature) Aqua: [wm attributes -notify] (ingham)
 
 2005-03-29 (platform support) Allow msys builds without cygwin (hobbs)
 
-2005-04-12 (bug fix)[1122671] font encoding alignment issue (brubaker,hobbs)
+2005-04-03 (bug fix)[1175092] grid geometry calculations (spjuth)
+
+2005-04-04 (bug fix)[1174269] [text] elide search (darley)
+
+2005-04-04 (bug fix)[1169429] [text] invisible cursor (darley)
+
+2005-04-04 (bug fix)[1083878] \0 char in [tk_getOpenFile -filetypes] (darley)
+
+2005-04-07 (bug fix)[1152809] [wm stackorder] panic; multi-DISPLAY (dejong)
+
+2005-04-14 (bug fix)[1122671] font encoding alignment issue (brubaker,hobbs)
+
+2005-04-18 (bug fix) [text] <Home> and <End> bindings (darley)
+
+2005-04-18 (bug fix)[1185640] [text] passed bogus utf-8 to Tk_MeasureChars
+(petasis,english)
 
 2005-04-25 (platform support) Fix builds on Mac OS X 10.1 (steffen)
 
@@ -5805,40 +6046,36 @@ support (hobbs)
 
 2005-05-15 (bug fix)[1202223] Aqua: [text] window -> scroll lock (kirkham)
 
+2005-05-22 (bug fix)[1206133] TkGetFileFilters: add all (dionizio,fellows)
+
 2005-05-24 (platform support) Darwin/Aqua builds merged into unix (steffen)
 
 2005-05-27 (behavior change) tk_popup menus now "sticky" (helfter)
+
+2005-05-28 (new feature)[TIP 245] [tk inactive] (max,fellows)
 
 2005-05-30 (bug fix)[1161543,1010941,795869,690169] panedwindow
 display/resizing (south)
 
 2005-05-30 (bug fix)[1159367] [menu] creation segfault (schofield,hobbs)
 
-2005-05-31 (bug fix)[1152809] [wm stackorder] panic; multi-DISPLAY (dejong)
-
 Documentation improvements [1087842,1081527,1115907,etc.]
 
---- Released 8.4.10, June 4, 2005 --- See ChangeLog for details ---
-
-2005-06-03 (bug fix)[1016385] allow [rename console] (fellows)
-
-2005-06-04 (bug fix)[1114977] UID thread-safety in canvas (fellows)
-
-2005-06-20 (bug fix) Eliminate buffer overflow in GIF decoder (fellows)
+--- Released 8.5a3, June 4, 2005 --- See ChangeLog for details ---
 
 2005-06-23 (bug fix)[1176610] Aqua: default [entry] borderwidth (steffen)
 
-2005-06-23 (bug fix)[756840] Fix Tk console cleanup on exit/reinit (mistachkin)
+2005-07-18 (bug fix)[1240221] [$text mark prev] crash (darley)
 
---- Released 8.4.11, June 28, 2005 --- See ChangeLog for details ---
-
-2005-07-24 (enhancement)[1244153] use SC_PROG_TCLSH, SC_BUILD_TCLSH (dejong)
+2005-07-22 (platform support) msys build now requires msys_mingw7.zip (dejong)
 
 2005-08-09 (Aqua enhancement) Carbon events (steffen)
 
-2005-08-11 (bug fix)[1252702] portable Tcl_GetStringFromObj() calls (fellows)
+2005-08-10 (bug fix)[1252702] portable Tcl_GetStringFromObj() calls (fellows)
 
-2005-08-16 (bug fix)[749908] per-thread Tk_ConfigSpec tables (fellows)
+2005-08-12 (bug fix)[749908] per-thread Tk_ConfigSpec tables (fellows)
+
+2005-08-23 (enhancement)[1244153] use SC_PROG_TCLSH, SC_BUILD_TCLSH (dejong)
 
 2005-08-23 (bug fix)[1235544] adopt Tcl's SEH implementation (kenny,dejong)
 
@@ -5848,38 +6085,53 @@ Documentation improvements [1087842,1081527,1115907,etc.]
 
 2005-10-04 (bug fix)[1309218] [tk_chooseDirectory -mustexist] (lemburg,hobbs)
 
+2005-10-04 (bug fix)[1311734] Fixed the problems that an embedded windows failed
+to respond to display changes (Windows platform) (chengyemao)
+
+2005-10-10 (new feature)[TIP 256] [$text config -tabstyle] (darley)
+
 2005-10-10 (bug fix)[1319720] Tk_DeleteOptionTable() mem leak (melbardis)
+
+2005-10-12 (new feature) one directory test suite (starpackable) (zolli,fellows)
 
 2005-10-18 (bug fix)[1328926] $argv encoding and list formatting (porter)
 
 2005-11-06 (platform support) OpenBSD missing LIBS (thoyts)
 
+2005-11-10 (bug fix)[1353022] minor potential memleaks (fellows)
+
 2005-11-22 (bug fix)[1353414] [selection get] compat w/OpenOffice.org (fellows)
+
+2005-11-14 (feature change) [bgerror] msg truncation at 45 chars (english)
+
+2005-11-15 (new feature)[TIP 231] [wm attributes] on X11 (english)
 
 2005-11-22 (bug fix)[1335485] dialog and space in widget name (taylor,fellows)
 
-2005-11-29 (enhancement)[1369597] Win 64: --enable-64bit=amd64|ia64 (hobbs)
+2005-11-27 (platform support) Darwin 64bit, Tiger copyfile(), and
+Max OSX universal binaries support (steffen)
 
 2005-11-29 (bug fix)[1252259] clear initial % from console (lawlor,hobbs)
 
-2005-11-30 (bug fix)[1289565] ClientMessage handling (staplin,hobbs)
-
 2005-11-30 (bug fix)[1086049] [wm attributes -topmost] fix (courtney,hobbs)
 
-2005-12-01 (bug fix)[1353416] [tk_popup] wrong post location (fvogelnew1,hobbs)
+2005-12-08 (enhancement)[1369597] Win 64: --enable-64bit=amd64|ia64 (hobbs)
 
-2005-12-01 (workaround)[905830] Disable SCIM usage by Tk until properly
-handled (max)
-
---- Released 8.4.12, December 5, 2005 --- See ChangeLog for details ---
+2005-12-08 (bug fix)[1374935] [$text tag names] crash with peer (hobbs)
 
 2005-12-12 (bug fix)[1377619] configure syntax error exposed in bash-3.1 (hobbs)
 
-2005-12-13 (Aqua) MouseWheel bindings; kEventMouseScroll events (steffen) 
+2005-12-13 (Aqua) MouseWheel bindings; kEventMouseScroll events (steffen)
+
+2005-12-28 (bug fix)[1380427] text widget undo/redo crash (callewaert)
+
+2006-01-12 (new feature)[TIP 260] canvas text item -underline option (fellows)
 
 2006-01-20 (bug fix)[905830] all events to XFilterEvent (SCIM compat) (english)
 
 2006-01-25 (feature enhance)[1237759] update script lib to 8.4 (fradin,porter)
+
+2006-01-25 (feature enhance)[1409264] I10N of [bgerror] dialog (fellows)
 
 2006-02-27 (bug fix)[480862] [$img configure -data] no display change (fellows)
 
@@ -5893,22 +6145,16 @@ handled (max)
 
 2006-03-17 (bug fix)[1451587] no abbreviations in script library (thoyts)
 
-2006-03-20 (bug fix)[1380427] crash in undo stack (lz_ufo,callewaert,fellows)
+2006-03-21 (enhancement)[638966] Aqua: ATSUI text render (reifenstahl,steffen)
+
+2006-03-23 (platform support) new tk.spec file (max)
+
+2006-03-26 (bug fix)[1414171] crash in [$text dump -command] (macdonald,darley)
 
 2006-03-27 (bug fix)[1458234] crash in animated GIFs (bron,fellows)
 
 2006-03-29 (platform support)[917433] tolerate X servers that do not
 accept the color names "Black" and "White" (porter)
-
-2006-04-05 (bug fix) several finalization issues corrected (hobbs)
-
-2006-04-05 (bug fix)[1442102] crash on full -elide [text] (hobbs)
-
-2006-04-05 (bug fix)[1374119] default keyboard charset init (hobbs)
-
-2006-04-05 (bug fix)[1414171] stop $text dump if change detected (hobbs)
-
-2006-04-05 (bug fix)[1422430] [grid] empty index list crash (hobbs)
 
 2006-04-06 (bug fix)[1455241] Aqua: [wm attributes -titlepath] fix (steffen)
 
@@ -5927,13 +6173,13 @@ accept the color names "Black" and "White" (porter)
 2006-04-11 (enhancement)[1105284] Aqua: call ::tk::mac::* procs for all
 registered applevents (steffen)
 
-2006-04-11 (bug fix)[1212056] fix panic on safe window exit on Windows (hobbs)
-
 2006-04-12 (bug fix)[1432666] grid row/col out of bounds crash (spjuth)
 
---- Released 8.4.13, April 19, 2006 --- See ChangeLog for details ---
+2006-04-25 (bug fix)[1475865] crash on invalid font name (fellows)
 
-2006-04-25 (bug fix)[1475865] crash on invalid font name from XServer (fellows)
+Documentation improvements [1224983,1247835,1151523,1357575,1083838]
+
+--- Released 8.5a4, April 27, 2006 --- See ChangeLog for details ---
 
 2006-04-28 (bug fix)[1243318] Aqua: incorrect cursor pos in bindings (steffen)
 
@@ -5957,15 +6203,11 @@ registered applevents (steffen)
 
 2006-06-01 (bug fix)[912571] [console] std chan refcount (mistachkin,hobbs)
 
-2006-06-05 (bug fix)[1188340] [console] thread safety (porter)
-
 2006-06-14 (bug fix)[950121] Aqua: crash in draw of very wide images (steffen)
 
 2006-06-14 (bug fix)[1501922] Aqua: invalid clip regions on redraw (steffen)
 
 2006-06-14 (bug fix)[891141] excess variable writes by [scale] (porter)
-
-2006-06-15 (platform support)[1424909] MS VS2005 support (thoyts)
 
 2006-07-20 (platform support) Mac OS X weak linking (steffen)
 
@@ -5983,8 +6225,6 @@ registered applevents (steffen)
 
 2006-08-30 (new feature)[1518677] WM_UNICHAR window message (hobbs,petasis)
 
-2006-09-06 (bug fix)[1456342] speedier [text] delete (hobbs)
-
 2006-09-10 (bug fix) Aqua: active/inactive text selection color&relief (steffen)
 
 2006-09-10 (bug fix)[1472624] Aqua: mouse events in overrideredir wins (steffen)
@@ -5993,20 +6233,29 @@ registered applevents (steffen)
 
 2006-09-22 (bug fix)[1562528] NULL terminates variadic calls (fellows,ryazanov)
 
-2006-09-26 (platform support) MSVC8 AMD64 support (thoyts)
+2006-09-22 (new feature)[TIP 268] [package provide] full patchlevel (kupries)
 
 2006-10-05 (bug fix)[1122671] alignment fixes in ucs-2be encoding routines
 (hobbs,staplin)
 
+2006-10-08 (new feature)[TIP 264] New public routine Tk_Interp() (thoyts)
+
 2006-10-16 (bug fix)[1558051] Aqua: CG drawing matches X11 (steffen)
 
---- Released 8.4.14, October 19, 2006 --- See ChangeLog for details ---
+--- Released 8.5a5, October 20, 2006 --- See ChangeLog for details ---
 
-2006-10-31 (platform support)[1582769] Fix build with VC2003 (thoyts)
+2006-10-30 (new feature)[TIP 48] Addition of themed tk widgets to Tk as Ttk
+(themed Tk).  Adds ttk::notebook, ttk::sizegrip, ttk::combobox,
+ttk::panedwindow, ttk::progressbar, ttk::menubutton, ttk::button,
+ttk::radiobutton, ttk::checkbutton, ttk::treeview, ttk::separator,
+ttk::scrollbar, ttk::entry, ttk::frame and ttk::labelframe widgets.  Adds
+ttk::style command.
 
-2006-11-02 (enhancement) Improve OS X Carbon Update event handling (steffen).
+2006-11-02 (enhancement) Improve OS X Carbon Update event handling (steffen)
 
-2006-11-23 (bug fix)[1599877] Win: multibyte menu item underlines (hobbs)
+2006-11-07 (configure change) Unix --enable-xft is enabled by default (kenny)
+
+2006-11-23 (bug fix)[1599877] Fix unicode character underline in menus (hobbs)
 
 2006-11-24 (bug fix)[1487701] Better handling of tcl_interactive on OS X to
 control display of console (hobbs, steffen)
@@ -6015,17 +6264,21 @@ control display of console (hobbs, steffen)
 
 2006-11-30 (bug fix) Fix handling of Escape binding on OS X dialogs (steffen)
 
-2006-12-01 (new feature) Win: [wm attributes -transparentcolor] (hobbs)
+2006-12-01 (new feature) Add -transparentcolor wm attribute on Windows (hobbs)
 
-2006-12-04 (performance)[1608046] [$listbox itemconfigure] (rezic,hobbs)
+2006-12-01 (new feature)[TIP 300] Added [font actual $font $char] (kenny)
 
-2006-12-22 (bug fix)[1522467] use fd_mask for 64bit support (fellow,vriezen)
+2006-12-04 (new feature)[TIP 286] Added [$menu xposition] subcommand (bron)
+
+2006-12-11 (enhancement) Improved EWMH support for _NET_WM_PID and
+_NET_WM_PING (fellows)
 
 2007-01-25 (configure change) ensure CPPFLAGS env var used when set (steffen)
 
-2007-01-30 (enhancement) new target: `install-private-headers` (hobbs, steffen)
+2007-02-19 (configure change) Use SHLIB_SUFFIX=".so" on HP-UX IA64 (was
+".sl") (hobbs)
 
-2007-02-19 (bug fix)[1662959] [tk_getOpenFile] in empty dir (hobbs)
+2007-04-10 (platform support) Correctly handle theming on Vista/Aero (english)
 
 2007-04-23 (enhancement) Allow empty value for -selectforeground opt (steffen)
 
@@ -6072,9 +6325,15 @@ window class of already existing windows (steffen)
 2007-04-23 (platform support) Aqua: add tcl document extensions and mime type
 to Wish.app's Info.plist (steffen)
 
-2007-05-15 (bug fix)[1677608] list shimmer crash [grid *configure] (porter)
+--- Released 8.5a6, April 25, 2007 --- See ChangeLog for details ---
 
---- Released 8.4.15, May 25, 2007 --- See ChangeLog for details ---
+2007-05-04 (new feature)[TIP 145] Enhanced font handling (thoyts)
+
+2007-05-14 (bug fix)[1712081] restored USE_OLD_IMAGE support (porter)
+
+2007-05-15 (bug fix)[1717830,800149] memory leaks (jenglish)
+
+2007-05-15 (bug fix)[1677608] [grid *configure] crash (porter)
 
 2007-05-31 (platform support) Aqua: improve interaction of Expose events and
 idle-time redraws (steffen)
@@ -6102,32 +6361,69 @@ installed tkMacOSXInt.h header (steffen)
 2007-07-09 (bug fix) Aqua: window click activation & titlebar click handling
 in presence of grabs or modal windows (steffen)
 
-2007-07-25 (bug fix)[1743786] Aqua: tk_getOpenFile result (steffen)
+2007-07-25 (bug fix)[1743786] Aqua: [tk_getOpenFile] result (steffen)
+
+2007-08-01 (bug fix)[1692927] [tk_messageBox -detail] buffer (davies,thoyts)
 
 2007-08-27 (bug fix)[1782105] Aqua: tk_chooseColor result (steffen)
 
-2007-09-11 (platform support) Windows AMD64 support (thoyts)
-
-2007-09-11 (bug fix)[777203] add TK_INCLUDE_SPEC to tkConfig.sh (steffen)
+2007-09-06 (platform support) Aqua: drop support for Xcode 1.5 project, add
+project for Xcode 3.0 (steffen)
 
 2007-09-11 (bug fix) Animated GIF buffer overrun (max)
 
 2007-09-15 (platform support) SunOS-5.1x link with cc, not ld (steffen)
 
---- Released 8.4.16, September 21, 2007 --- See ChangeLog for details ---
+2007-09-17 (enhancement)[1780286] Aqua: combobox appearance (english)
+
+2007-09-17 (platform support)[1748251] Fix NetBSD link failures (english)
+
+2007-09-20 (bug fix)[1791052] [text] DLine layout crash (khomoutov,fellows)
+
+--- Released 8.5b1, September 26, 2007 --- See ChangeLog for details ---
+
+2007-09-26 (enhancement)[1800742] msg catalog for Hungarian. (reszo)
 
 2007-10-11 (bug fix)[1810818] Aqua: [wm resizeable] (steffen)
 
-2007-10-11 (enhancement)[1800742] msg catalog for Hungarian. (reszo)
+2007-10-12 (platform support) Aqua: replace RgnHandles by HIShapeRefs (steffen)
+	*** POTENTIAL INCOMPATIBILITY for C code acessing MacDrawable Rgns ***
+
+2007-10-15 (platform support) Mac OS X: 64-bit X11 support (steffen)
+
+2007-10-15 (new feature)[TIP 125][998125] dockable frame support (hobbs)
+
+2007-10-22 (bug fix)[1814778,1780286,1609168,1349586] combobox overhaul(english)
+
+2007-10-22 (platform support) Aqua: TIP 145 and Aqua Theme fonts (steffen)
+
+2007-10-23 (bug fix)[1818441] combobox & reparentable frames (hobbs)
+
+2007-10-24 (bug fix)[1723362] Win: transparent bitmaps (mcdonald,thoyts)
 
 2007-10-25 (bug fix)[1818491] crash in [place] manager (mcdonald)
 
-2007-10-26 (platform support) Mac OS X: 64-bit X11 support (steffen)
+2007-10-25 (new feature)[TIP 242][1156388] file dialog filter (hobbs)
 
-2007-11-09 (platform support) Aqua: replace RgnHandles by HIShapeRefs (steffen)
-	*** POTENTIAL INCOMPATIBILITY for C code acessing MacDrawable Rgns ***
+2007-10-25 (bug fix)[1817596] ttk::notebook (english)
 
-2007-11-09 (enhancement) Aqua: "Run Widget Demo" menu item (steffen)
+2007-10-26 (bug fix)[1816252] Aqua: [wm transient] (steffen)
+
+Improvements to demo suite to make more use of Tk 8.5 features (fellows,steffen)
+
+--- Released 8.5b2, October 26, 2007 --- See ChangeLog for details ---
+
+2007-10-29 (appearance change) Default look and fonts on X11 (hobbs)
+	*** POTENTIAL INCOMPATIBILITY; [::tk::classic::restore] to undo ***
+
+2007-10-30 (bug fix)[1803723] Win: Arabic and Hebrew rendering (fellows)
+
+2007-10-30 (bug fix)[1550528] [tk_chooseDirectory -mustexist true] disables
+the "OK" until valid selection (hobbs)
+
+2007-11-03 (new feature) adjustable [console] fonts (thoyts)
+
+2007-11-04 (enhancement) Aqua: "Run Widget Demo" menu item (steffen)
 
 2007-11-09 (bug fix) Aqua: activate event after window expansion (steffen)
 
@@ -6139,7 +6435,26 @@ look&feel; menubutton size with -image/-bitmap (steffen)
 2007-11-09 (bug fix) Aqua: [tk_getOpenFile] (et al.) and help menu crashes on
 Mac OS X Leopard (steffen)
 
+2007-11-11 (bug fix)[1824638] Aqua: small max-width text measuring (riefenstahl)
+
+2007-11-14 (bug fix)[1831803] sv.msg catalog for "sv" locale (fellows)
+
+Many significant improvements to the documentation and demos (fellows, hobbs,
+steffen, kupries)
+
+--- Released 8.5b3, Novemeber 19, 2007 --- See ChangeLog for details ---
+
+2007-11-25 (bug fix)[1343984] ttk::notebook bugs (english,boudaillier) 
+
 2007-11-26 (bug fix)[1822391] [photo put] segfault w/ PPM data (kenny)
+
+2007-11-26 (bug fix)[1822076] [tk_saveFile] and path w/spaces (bauer,kenny)
+
+2007-12-04 (new feature)[1844143] Danish message catalog (berg)
+
+2007-12-11 (bug fix)[1602537] crash in [$text replace] (goth,porter,fellows)
+
+2007-12-12 (bug fix)[1845899] Aqua: [wm transient] (steffen)
 
 2007-12-12 (bug fix)[1809538,1799782,1737288] fixes for the <<Modified>>
 virtual event on [text] widgets (hobbs)
@@ -6147,18 +6462,116 @@ virtual event on [text] widgets (hobbs)
 2007-12-13 (bug fix) correctly trace menubutton -textvariable for -compound
 use (hobbs)
 
-2007-12-18 (bug fix)[1845899] Aqua: [wm transient] (steffen)
+Several documentation and release notes improvements
 
---- Released 8.4.17, January 4, 2008 --- See ChangeLog for details ---
+--- Released 8.5.0, December 18, 2007 --- See ChangeLog for details ---
+
+2007-12-30 (bug fix)[1860802] fixed Dutch message catalog (markus,fellows)
+
+2008-01-06 (bug fix)[1442006,1821939,18862692] MouseWheel for treeview (english)
+
+2008-01-08 (bug fix)[1865898,1679067] button size & state (english)
+
+2008-01-08 (bug fix)[1867122] [labelframe -style] crash (english,rib)
+
+2008-01-27 (bug fix)[1835848] size value returned by [font actual] (english)
+
+2008-01-27 (bug fix)[1878298] [notebook] redraws on tab visibility (english)
+
+2008-01-31 (bug fix)[1881892] messagebox default title (hobbs)
 
 2008-02-01 (bug fix)[CVE-2008-0553] buffer overflow in GIF format (max)
 
---- Released 8.4.18, February 8, 2008 --- See ChangeLog for details ---
+--- Released 8.5.1, February 5, 2008 --- See ChangeLog for details ---
 
 2008-02-27 (bug fix)[1863346] Aqua: memleak in QD drawing (steffen)
 
+2008-02-29 (enhancement) Knight's tour demo (thoyts)
+
+2008-03-12 (bug fix)[1090382] crash when GetFont() fails (jenglish)
+
+2008-03-13 (enhancement) support space in INSTALL_ROOT or $builddir (steffen)
+
+2008-03-21 (bug fix)[1863007,1920030] Export Ttk stubs table (english)
+
+2008-03-26 (bug fix)[1922466] crash  in [. configure -cursor] (gavilán)
+
 2008-03-27 (platform support)[1921166] Solaris 64bit build fixes (steffen)
 
-2008-04-07 (bug fix)[1937135] Fix double-free with argv error (hobbs)
+2008-03-27 (bug fix) restored [::safe::loadTk] (hobbs)
 
---- Released 8.4.19, April 18, 2008 --- See ChangeLog for details ---
+--- Released 8.5.2, March 28, 2008 --- See ChangeLog for details ---
+
+2008-04-07 (bug fix)[1937135] Tk_ParseArgv() double free crash (hobbs)
+
+2008-04-07 (bug fix)[1936238] wish -h mem explosion (bachmann,kenny)
+
+2008-04-14 (bug fix)[1941740] [tk_chooseColor -title] (thoyts)
+
+2008-04-17 (bug fix)[1327482] canvas item <Enter> events (wangnick)
+
+2008-05-23 (bug fix)[1967576] ttk::label height or width 0 panic (lawlor)
+
+2008-06-10 (enhancement)[1986818] Use Xutf8LookupString when possible (english)
+
+2008-06-12 (bug fix)[1991932] global grab segfault (steffen)
+
+2008-06-12 (platform support) Solaris/amd64 gcc 64bit support (steffen)
+
+2008-06-18 (bug fix) Aqua: missing focus on first map (steffen)
+
+--- Released 8.5.3, June 30, 2008 --- See ChangeLog for details ---
+
+2008-07-04 (bug fix)[2009213] crash in [ttk::scale] (polo,english)
+
+2008-07-26 (bug fix)[2026405] portability of [winfo id] (uchida,thoyts)
+
+2008-07-31 (bug fix) export Tk_PkgInitStubsCheck; fixes Tk embed on Windows
+
+2008-08-01 (bug fix)[2009788,2028703] unmapped toplevel crashes (thoyts)
+
+2008-08-05 (bug fix)[2010422] Tk header files revised to accommodate
+incompatible changes in recent X.org releases of X11 headers. (jenglish)
+
+--- Released 8.5.4, August 15, 2008 --- See ChangeLog for details ---
+
+2008-08-19 (behavior change) arguments passed to -[xy]scrollcommand
+callbacks, and values returned by [xy]view methods are explicitly
+formatted as doubles.  (english)
+	*** POTENTIAL INCOMPATIBILITY ***
+
+2008-08-25 (bug fix)[1936220] fix [tk_getOpenFile -multiple 1] on unix (helfter)
+
+2008-08-25 (bug fix)[1023955] default menu cursor: no more Motif (helfter)
+
+2008-08-28 (bug fix) correct TK_LIBS value to include Xft (porter)
+
+2008-10-05 (bug fix)[2112563] format double values explicitly in double
+format, avoiding sensitivity to locale setting. (fellows)
+	*** POTENTIAL INCOMPATIBILITY ***
+
+2008-10-10 (bug fix)[1894038] [package require] any Tk 8.5.* in any Tcl 8.5.*
+(porter)
+
+--- Released 8.5.5, October 15, 2008 --- See ChangeLog for details ---
+
+2008-10-17 (enhancement) keyboard bindings for ttk::scale (thoyts)
+
+2008-11-12 (bug fix)[1777362] permit [text] names containing "-" (thoyts)
+
+2008-11-15 (bug fix)[2239034] limit [wm manage] to Frames (thoyts)
+
+2008-11-19 (bug fix)[2312027] Tk_Create*ImageType() thread safety (nijtmans)
+
+2008-11-22 (bug fix)[1939129,1991930] combobox behind other windows (thoyts)
+
+2008-12-22 (bug fix)[1813597,2218964] eliminate unnecessary units conversion
+in screen distances, reducing precision loss (ferrieux)
+
+2008-12-22 (bug fix)[2107938] no negative font size in PS (fellows)
+
+2008-12-22 (bug fix)[2264732] crash using nondefault visual (english)
+
+2008-12-22 (bug fix)[2207435] [ttk::entry .t -textvar ::noexist::x] (english)
+
+--- Released 8.5.6, December 23, 2008 --- See ChangeLog for details ---
