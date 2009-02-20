@@ -512,7 +512,6 @@ CreateFrame(clientData, interp, objc, objv, type, appName)
     className = colormapName = screenName = visualName = useOption = NULL;
     colormap = None;
     for (i = 2; i < objc; i += 2) {
-        char *arg;
         length = 0;
 	arg = Tcl_GetStringFromObj(objv[i], &length);
 	if (length < 2) {
@@ -784,9 +783,9 @@ FrameWidgetObjCmd(clientData, interp, objc, objv)
 	     */
 
 	    for (i = 2; i < objc; i++) {
-                char *arg;
+                CONST char *arg;
                 length = 0;
-		char *arg = Tcl_GetStringFromObj(objv[i], &length);
+		arg = Tcl_GetStringFromObj(objv[i], &length);
 		if (length < 2) {
 		    continue;
 		}
