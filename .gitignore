@@ -18,3 +18,7 @@ starconf.status
 tkConfig.sh
 tktest
 wish
+configure-output.log
+configure-output.log.err
+make.log
+make.log.err
