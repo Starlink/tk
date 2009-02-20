@@ -9,7 +9,7 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 # 
-# RCS: @(#) $Id: tkInt.decls,v 1.33.2.3 2004/10/27 00:35:53 davygrvy Exp $
+# RCS: @(#) $Id: tkInt.decls,v 1.33.2.6 2005/11/27 02:44:25 das Exp $
 
 library tk
 
@@ -678,6 +678,22 @@ declare 149 generic {
 					   Tk_OptionTable optionTable)
 }
 
+# TIP#168 - 8.5+
+#declare 150 generic {
+#    int TkMakeRawCurve (Tk_Canvas canvas,
+#	    double *pointPtr, int numPoints, int numSteps,
+#	    XPoint xPoints[], double dblPoints[])
+#}
+#declare 151 generic {
+#    void TkMakeRawCurvePostscript (Tcl_Interp *interp,
+#	    Tk_Canvas canvas, double *pointPtr, int numPoints)
+#}
+
+declare 152 generic {
+    void TkpDrawFrame(Tk_Window tkwin, Tk_3DBorder border,
+		      int highlightWidth, int borderWidth, int relief)
+}
+
 ##############################################################################
 
 # Define the platform specific internal Tcl interface. These functions are
@@ -1213,7 +1229,7 @@ declare 17 aqua {
 }
 
 declare 18 aqua {
-    void   TkMacOSXHandleMenuSelect (long mResult, int optionKeyPressed)
+    void TkMacOSXHandleMenuSelect(MenuID theMenu, MenuItemIndex theItem, int optionKeyPressed)
 }
 
 # removed duplicates from tkPlat table (tk.decls)
@@ -1306,7 +1322,7 @@ declare 40 aqua {
 }
 
 declare 41 aqua {
-    int  TkMacOSXZoomToplevel (WindowPtr whichWindow, Point where, short zoomPart)
+    int  TkMacOSXZoomToplevel (WindowPtr whichWindow, short zoomPart)
 }
 
 declare 42 aqua {
@@ -2256,4 +2272,7 @@ declare 89 {mac aqua} {
 declare 90 {mac aqua} {
     Status XQueryTree (Display* d, Window w1, Window* w2, Window* w3, \
 	    Window** w4, unsigned int* ui)
+}
+declare 91 {aqua} {
+    int XSync(Display *display, Bool flag)
 }

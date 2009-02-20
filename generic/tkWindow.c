@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWindow.c,v 1.56.2.5 2005/01/07 11:16:29 dkf Exp $
+ * RCS: @(#) $Id: tkWindow.c,v 1.56.2.15 2008/04/07 23:12:10 hobbs Exp $
  */
 
 #include "tkPort.h"
@@ -21,6 +21,8 @@
 #if !( defined(__WIN32__) || defined(MAC_TCL) || defined(MAC_OSX_TK))
 #include "tkUnixInt.h"
 #endif
+
+#include "tclInt.h" /* for Tcl_CreateNamespace() */
 
 /* 
  * Type used to keep track of Window objects that were
@@ -177,7 +179,7 @@ static TkCmd commands[] = {
 
 #if defined(MAC_TCL) || defined(MAC_OSX_TK)
     {"::tk::unsupported::MacWindowStyle",
-	    		TkUnsupported1Cmd,	NULL,			1, 1},
+	    		NULL,	TkUnsupported1ObjCmd,			1, 1},
 #endif
     {(char *) NULL,	(int (*) _ANSI_ARGS_((ClientData, Tcl_Interp *, int, CONST char **))) NULL, NULL, 0}
 };
@@ -344,23 +346,26 @@ CreateTopLevelWindow(interp, parent, name, screenName, flags)
 	/*
 	 * Create built-in image types.
 	 */
-    
+
 	Tk_CreateImageType(&tkBitmapImageType);
 	Tk_CreateImageType(&tkPhotoImageType);
-    
+
 	/*
 	 * Create built-in photo image formats.
 	 */
-    
+
 	Tk_CreatePhotoImageFormat(&tkImgFmtGIF);
 	Tk_CreatePhotoImageFormat(&tkImgFmtPPM);
 
 	/*
 	 * Create exit handler to delete all windows when the application
-	 * exits.
+	 * exits.  This must be a thread exit handler, but there may be
+	 * ordering issues with other exit handlers
+	 * (i.e. OptionThreadExitProc).
 	 */
 
-	TkCreateExitHandler(DeleteWindowsExitProc, (ClientData) tsdPtr);
+	Tcl_CreateThreadExitHandler(DeleteWindowsExitProc,
+		(ClientData) tsdPtr);
     }
 
     if ((parent != NULL) && (screenName != NULL) && (screenName[0] == '\0')) {
@@ -899,8 +904,17 @@ TkCreateMainWindow(interp, screenName, baseName)
     mainPtr->optionRootPtr = NULL;
     Tcl_InitHashTable(&mainPtr->imageTable, TCL_STRING_KEYS);
     mainPtr->strictMotif = 0;
+    mainPtr->alwaysShowSelection = 0;
     if (Tcl_LinkVar(interp, "tk_strictMotif", (char *) &mainPtr->strictMotif,
 	    TCL_LINK_BOOLEAN) != TCL_OK) {
+	Tcl_ResetResult(interp);
+    }
+    if (Tcl_CreateNamespace(interp, "::tk", NULL, NULL) == NULL) {
+	Tcl_ResetResult(interp);
+    }
+    if (Tcl_LinkVar(interp, "::tk::AlwaysShowSelection",
+		(char *) &mainPtr->alwaysShowSelection,
+		TCL_LINK_BOOLEAN) != TCL_OK) {
 	Tcl_ResetResult(interp);
     }
     mainPtr->nextPtr = tsdPtr->mainWindowList;
@@ -958,7 +972,7 @@ TkCreateMainWindow(interp, screenName, baseName)
      */
 
     Tcl_SetVar(interp, "tk_patchLevel", TK_PATCH_LEVEL, TCL_GLOBAL_ONLY);
-    Tcl_SetVar(interp, "tk_version", TK_VERSION, TCL_GLOBAL_ONLY);
+    Tcl_SetVar(interp, "tk_version",    TK_VERSION,     TCL_GLOBAL_ONLY);
 
     tsdPtr->numMainWindows++;
     return tkwin;
@@ -1526,6 +1540,7 @@ Tk_DestroyWindow(tkwin)
                         TkDeadAppCmd, (ClientData) NULL, 
                         (void (*) _ANSI_ARGS_((ClientData))) NULL);
                 Tcl_UnlinkVar(winPtr->mainPtr->interp, "tk_strictMotif");
+                Tcl_UnlinkVar(winPtr->mainPtr->interp, "::tk::AlwaysShowSelection");
             }
                 
 	    Tcl_DeleteHashTable(&winPtr->mainPtr->nameTable);
@@ -2687,6 +2702,34 @@ Tk_GetNumMainWindows()
 /*
  *----------------------------------------------------------------------
  *
+ * TkpAlwaysShowSelection --
+ *
+ *	Indicates whether text/entry widgets should always display
+ *	their selection, regardless of window focus.
+ *
+ * Results:
+ *	The return value is 1 if always showing the selection has been
+ *	requested for tkwin's application by setting the
+ *	::tk::AlwaysShowSelection variable in its interpreter to a true value.
+ *	0 is returned if it has a false value.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+TkpAlwaysShowSelection(tkwin)
+    Tk_Window tkwin;			/* Window whose application is
+					 * to be checked. */
+{
+    return ((TkWindow *) tkwin)->mainPtr->alwaysShowSelection;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * DeleteWindowsExitProc --
  *
  *	This procedure is invoked as an exit handler.  It deletes all
@@ -2929,6 +2972,7 @@ Initialize(interp)
     use = NULL;
     visual = NULL;
     rest = 0;
+    argv = NULL;
 
     /*
      * We start by resetting the result because it might not be clean
@@ -2941,7 +2985,7 @@ Initialize(interp)
 	 * from the master.
 	 */
 	Tcl_DString ds;
-	
+
 	/*
 	 * Step 1 : find the master and construct the interp name
 	 * (could be a function if new APIs were ok).
@@ -2954,8 +2998,8 @@ Initialize(interp)
 	    master = Tcl_GetMaster(master);
 	    if (master == NULL) {
 		Tcl_AppendResult(interp, "NULL master", (char *) NULL);
-		Tcl_MutexUnlock(&windowMutex);
-		return TCL_ERROR;
+		code = TCL_ERROR;
+		goto done;
 	    }
 	    if (!Tcl_IsSafe(master)) {
 		/* Found the trusted master. */
@@ -2965,11 +3009,10 @@ Initialize(interp)
 	/*
 	 * Construct the name (rewalk...)
 	 */
-	if (Tcl_GetInterpPath(master, interp) != TCL_OK) {
+	if ((code = Tcl_GetInterpPath(master, interp)) != TCL_OK) {
 	    Tcl_AppendResult(interp, "error in Tcl_GetInterpPath",
 		    (char *) NULL);
-	    Tcl_MutexUnlock(&windowMutex);
-	    return TCL_ERROR;
+	    goto done;
 	}
 	/*
 	 * Build the string to eval.
@@ -2977,13 +3020,13 @@ Initialize(interp)
 	Tcl_DStringInit(&ds);
 	Tcl_DStringAppendElement(&ds, "::safe::TkInit");
 	Tcl_DStringAppendElement(&ds, Tcl_GetStringResult(master));
-	
+
 	/*
 	 * Step 2 : Eval in the master. The argument is the *reversed*
 	 * interp path of the slave.
 	 */
-	
-	if (Tcl_Eval(master, Tcl_DStringValue(&ds)) != TCL_OK) {
+
+	if ((code = Tcl_Eval(master, Tcl_DStringValue(&ds))) != TCL_OK) {
 	    /*
 	     * We might want to transfer the error message or not.
 	     * We don't. (no API to do it and maybe security reasons).
@@ -2992,8 +3035,7 @@ Initialize(interp)
 	    Tcl_AppendResult(interp, 
 		    "not allowed to start Tk by master's safe::TkInit",
 		    (char *) NULL);
-	    Tcl_MutexUnlock(&windowMutex);
-	    return TCL_ERROR;
+	    goto done;
 	}
 	Tcl_DStringFree(&ds);
 	/* 
@@ -3012,7 +3054,6 @@ Initialize(interp)
 
 	argString = Tcl_GetVar2(interp, "argv", (char *) NULL, TCL_GLOBAL_ONLY);
     }
-    argv = NULL;
     if (argString != NULL) {
 	char buffer[TCL_INTEGER_SPACE];
 
@@ -3020,13 +3061,12 @@ Initialize(interp)
 	    argError:
 	    Tcl_AddErrorInfo(interp,
 		    "\n    (processing arguments in argv variable)");
-	    Tcl_MutexUnlock(&windowMutex);
-	    return TCL_ERROR;
+	    code = TCL_ERROR;
+	    goto done;
 	}
 	if (Tk_ParseArgv(interp, (Tk_Window) NULL, &argc, argv,
 		argTable, TK_ARGV_DONT_SKIP_FIRST_ARG|TK_ARGV_NO_DEFAULTS)
 		!= TCL_OK) {
-	    ckfree((char *) argv);
 	    goto argError;
 	}
 	p = Tcl_Merge(argc, argv);
@@ -3125,7 +3165,6 @@ Initialize(interp)
 	}
         geometry = NULL;
     }
-    Tcl_MutexUnlock(&windowMutex);
 
     if (Tcl_PkgRequire(interp, "Tcl", TCL_VERSION, 1) == NULL) {
 	code = TCL_ERROR;
@@ -3159,11 +3198,18 @@ Initialize(interp)
 
     /*
      * Invoke platform-specific initialization.
+     * Unlock mutex before entering TkpInit, as that may run through the
+     * Tk_Init routine again for the console window interpreter.
      */
 
-    code = TkpInit(interp);
+    Tcl_MutexUnlock(&windowMutex);
+    if (argv != NULL) {
+	ckfree((char *) argv);
+    }
+    return TkpInit(interp);
 
     done:
+    Tcl_MutexUnlock(&windowMutex);
     if (argv != NULL) {
 	ckfree((char *) argv);
     }

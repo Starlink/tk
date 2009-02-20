@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkTextBTree.c,v 1.6 2002/08/05 04:30:40 dgp Exp $
+ * RCS: @(#) $Id: tkTextBTree.c,v 1.6.2.3 2006/09/10 17:07:35 das Exp $
  */
 
 #include "tkInt.h"
@@ -2466,7 +2466,7 @@ TkTextIsElided(textPtr, indexPtr)
     register Node *nodePtr;
     register TkTextLine *siblingLinePtr;
     register TkTextSegment *segPtr;
-    register TkTextTag *tagPtr;
+    register TkTextTag *tagPtr = NULL; /* silence gcc 4 warning */
     register int i, index;
 
 	/* almost always avoid malloc, so stay out of system calls */
@@ -2550,13 +2550,18 @@ TkTextIsElided(textPtr, indexPtr)
 
     for (i = numTags-1; i >=0; i--) {
 	if (tagCnts[i] & 1) {
-#ifndef ALWAYS_SHOW_SELECTION
 	    /* who would make the selection elided? */
-	    if ((tagPtr == textPtr->selTagPtr)
+	    if (
+#ifndef MAC_OSX_TK
+		    !TkpAlwaysShowSelection(textPtr->tkwin)
+#else
+		    /* Don't show inactive selection in disabled widgets. */
+		    textPtr->state == TK_STATE_DISABLED
+#endif
+		    && (tagPtr == textPtr->selTagPtr)
 		    && !(textPtr->flags & GOT_FOCUS)) {
 		continue;
 	    }
-#endif
 	    elide = tagPtrs[i]->elide;
 	    break;
 	}

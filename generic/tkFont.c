@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkFont.c,v 1.21 2002/09/02 19:13:47 hobbs Exp $
+ * RCS: @(#) $Id: tkFont.c,v 1.21.2.2 2007/05/31 13:39:26 das Exp $
  */
 
 #include "tkPort.h"
@@ -432,8 +432,10 @@ TkFontPkgFree(mainPtr)
 	    searchPtr != NULL;
 	    searchPtr = Tcl_NextHashEntry(&search)) {
 	fontsLeft++;
+#ifdef DEBUG_FONTS
 	fprintf(stderr, "Font %s still in cache.\n", 
 		Tcl_GetHashKey(&fiPtr->fontCache, searchPtr));
+#endif
     }
 #ifdef PURIFY
     if (fontsLeft) {
@@ -956,7 +958,8 @@ CreateNamedFont(interp, tkwin, name, faPtr)
 
 Tk_Font
 Tk_GetFont(interp, tkwin, string)
-    Tcl_Interp *interp;		/* Interp for database and error return. */
+    Tcl_Interp *interp;		/* Interp for database and error return, or
+				 * NULL for no error messages. */
     Tk_Window tkwin;		/* For display on which font will be used. */
     CONST char *string;		/* String describing font, as: named font,
 				 * native format, or parseable string. */
@@ -982,7 +985,7 @@ Tk_GetFont(interp, tkwin, string)
  * Results:
  *	The return value is token for the font, or NULL if an error
  *	prevented the font from being created.  If NULL is returned, an
- *	error message will be left in interp's result object.
+ *	error message will be left in interp's result object (if non-NULL).
  *
  * Side effects:
  * 	The font is added to an internal database with a reference
@@ -2864,7 +2867,7 @@ Tk_TextLayoutToPostscript(interp, layout)
  *
  * Results:
  *	A standard Tcl return value.  If TCL_ERROR is returned, an
- *	error message will be left in interp's result object.
+ *	error message will be left in interp's result object (if non-NULL).
  *
  * Side effects:
  *	The fields of the font attributes structure get filled in with
@@ -2878,7 +2881,7 @@ Tk_TextLayoutToPostscript(interp, layout)
 
 static int
 ConfigAttributesObj(interp, tkwin, objc, objv, faPtr)
-    Tcl_Interp *interp;		/* Interp for error return. */
+    Tcl_Interp *interp;		/* Interp for error return, or NULL. */
     Tk_Window tkwin;		/* For display on which font will be used. */
     int objc;			/* Number of elements in argv. */
     Tcl_Obj *CONST objv[];	/* Command line options. */
@@ -2906,9 +2909,11 @@ ConfigAttributesObj(interp, tkwin, objc, objv, faPtr)
 	     * for "-xyz" is missing.
 	     */
 
-	    Tcl_AppendResult(interp, "value for \"",
-		    Tcl_GetString(optionPtr), "\" option missing",
-		    (char *) NULL);
+	    if (interp != NULL) {
+		Tcl_AppendResult(interp, "value for \"",
+			Tcl_GetString(optionPtr), "\" option missing",
+			(char *) NULL);
+	    }
 	    return TCL_ERROR;
 	}
 
@@ -3077,8 +3082,8 @@ GetAttributeInfoObj(interp, faPtr, objPtr)
 
 static int
 ParseFontNameObj(interp, tkwin, objPtr, faPtr)
-    Tcl_Interp *interp;		/* Interp for error return.  Must not be
-				 * NULL. */
+    Tcl_Interp *interp;		/* Interp for error return, or NULL if no
+				 * error messages are to be generated. */
     Tk_Window tkwin;		/* For display on which font is used. */
     Tcl_Obj *objPtr;		/* Parseable font description object. */
     TkFontAttributes *faPtr;	/* Filled with attributes parsed from font
@@ -3126,7 +3131,7 @@ ParseFontNameObj(interp, tkwin, objPtr, faPtr)
 	 * have encountered an XLFD on Windows or Mac.
 	 */
 
-	xlfd:
+    xlfd:
 	result = TkFontParseXLFD(string, faPtr, NULL);
 	if (result == TCL_OK) {
 	    return TCL_OK;
@@ -3140,8 +3145,10 @@ ParseFontNameObj(interp, tkwin, objPtr, faPtr)
 
     if ((Tcl_ListObjGetElements(NULL, objPtr, &objc, &objv) != TCL_OK)
 	    || (objc < 1)) {
-	Tcl_AppendResult(interp, "font \"", string, "\" doesn't exist",
-		(char *) NULL);
+	if (interp != NULL) {
+	    Tcl_AppendResult(interp, "font \"", string, "\" doesn't exist",
+		    (char *) NULL);
+	}
 	return TCL_ERROR;
     }
 
@@ -3186,8 +3193,10 @@ ParseFontNameObj(interp, tkwin, objPtr, faPtr)
 	 * Unknown style.
 	 */
 
-	Tcl_AppendResult(interp, "unknown font style \"",
-		Tcl_GetString(objv[i]), "\"", (char *) NULL);
+	if (interp != NULL) {
+	    Tcl_AppendResult(interp, "unknown font style \"",
+		    Tcl_GetString(objv[i]), "\"", (char *) NULL);
+	}
 	return TCL_ERROR;
     }
     return TCL_OK;

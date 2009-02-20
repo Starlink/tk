@@ -17,7 +17,7 @@
  *	   Department of Computer Science,
  *	   Australian National University.
  *
- * RCS: @(#) $Id: tkImgPhoto.c,v 1.36.2.13 2004/12/09 10:05:38 dkf Exp $
+ * RCS: @(#) $Id: tkImgPhoto.c,v 1.36.2.18 2007/06/23 00:26:42 das Exp $
  */
 
 #include "tkInt.h"
@@ -186,6 +186,13 @@ typedef struct PhotoMaster {
 #define COLOR_IMAGE		1
 #define IMAGE_CHANGED		2
 #define COMPLEX_ALPHA		4
+
+/*
+ * Flag to OR with the compositing rule to indicate that the source, despite
+ * having an alpha channel, has simple alpha.
+ */
+
+#define SOURCE_IS_SIMPLE_ALPHA_PHOTO 0x10000000
 
 /*
  * The following data structure represents all of the instances of
@@ -674,10 +681,9 @@ ImgPhotoCmd(clientData, interp, objc, objv)
     XColor color;
     Tk_PhotoImageFormat *imageFormat;
     int imageWidth, imageHeight;
-    int matched;
+    int length, matched;
     Tcl_Channel chan;
     Tk_PhotoHandle srcHandle;
-    size_t length;
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
             Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
@@ -717,12 +723,12 @@ ImgPhotoCmd(clientData, interp, objc, objv)
 	    Tcl_WrongNumArgs(interp, 2, objv, "option");
 	    return TCL_ERROR;
 	}
-	arg = Tcl_GetStringFromObj(objv[2], (int *) &length);
-	if (strncmp(arg,"-data", length) == 0) {
+	arg = Tcl_GetStringFromObj(objv[2], &length);
+	if (strncmp(arg,"-data", (unsigned) length) == 0) {
 	    if (masterPtr->dataString) {
 		Tcl_SetObjResult(interp, masterPtr->dataString);
 	    }
-	} else if (strncmp(arg,"-format", length) == 0) {
+	} else if (strncmp(arg,"-format", (unsigned) length) == 0) {
 	    if (masterPtr->format) {
 		Tcl_SetObjResult(interp, masterPtr->format);
 	    }
@@ -765,8 +771,9 @@ ImgPhotoCmd(clientData, interp, objc, objv)
 	    return TCL_OK;
 	}
 	if (objc == 3) {
-	    char *arg = Tcl_GetStringFromObj(objv[2], (int *) &length);
-	    if (!strncmp(arg, "-data", length)) {
+	    char *arg = Tcl_GetStringFromObj(objv[2], &length);
+
+	    if (!strncmp(arg, "-data", (unsigned) length)) {
 		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 			"-data {} {} {}", (char *) NULL);
 		if (masterPtr->dataString) {
@@ -777,7 +784,7 @@ ImgPhotoCmd(clientData, interp, objc, objv)
 			    " {}", (char *) NULL);
 		}
 		return TCL_OK;
-	    } else if (!strncmp(arg, "-format", length)) {
+	    } else if (!strncmp(arg, "-format", (unsigned) length)) {
 		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 			"-format {} {} {}", (char *) NULL);
 		if (masterPtr->format) {
@@ -837,6 +844,15 @@ ImgPhotoCmd(clientData, interp, objc, objv)
 	    Tcl_AppendResult(interp, "coordinates for -from option extend ",
 		    "outside source image", (char *) NULL);
 	    return TCL_ERROR;
+	}
+
+	/*
+	 * Hack to pass through the message that the place we're coming from
+	 * has a simple alpha channel.
+	 */
+
+	if (!(((PhotoMaster *) srcHandle)->flags & COMPLEX_ALPHA)) {
+	    options.compositingRule |= SOURCE_IS_SIMPLE_ALPHA_PHOTO;
 	}
 
 	/*
@@ -2237,7 +2253,7 @@ ImgPhotoConfigureInstance(instancePtr)
 	if ((instancePtr->imagePtr == NULL)
 		|| (instancePtr->imagePtr->bits_per_pixel != bitsPerPixel)) {
 	    if (instancePtr->imagePtr != NULL) {
-		XFree((char *) instancePtr->imagePtr);
+		XDestroyImage(instancePtr->imagePtr);
 	    }
 	    imagePtr = XCreateImage(instancePtr->display,
 		    instancePtr->visualInfo.visual, (unsigned) bitsPerPixel,
@@ -2246,26 +2262,18 @@ ImgPhotoConfigureInstance(instancePtr)
 	    instancePtr->imagePtr = imagePtr;
 
 	    /*
-	     * Determine the endianness of this machine.
-	     * We create images using the local host's endianness, rather
-	     * than the endianness of the server; otherwise we would have
-	     * to byte-swap any 16 or 32 bit values that we store in the
-	     * image in those situations where the server's endianness
-	     * is different from ours.
-	     *
-	     * FIXME: use autoconf to figure this out.
+	     * We create images using the local host's endianness, rather than
+	     * the endianness of the server; otherwise we would have to
+	     * byte-swap any 16 or 32 bit values that we store in the image
+	     * if the server's endianness is different from ours.
 	     */
 
 	    if (imagePtr != NULL) {
-		union {
-		    int i;
-		    char c[sizeof(int)];
-		} kludge;
-
-		imagePtr->bitmap_unit = sizeof(pixel) * NBBY;
-		kludge.i = 0;
-		kludge.c[0] = 1;
-		imagePtr->byte_order = (kludge.i == 1) ? LSBFirst : MSBFirst;
+#ifdef WORDS_BIGENDIAN
+		imagePtr->byte_order = MSBFirst;
+#else
+		imagePtr->byte_order = LSBFirst;
+#endif
 		_XInitImageFuncPtrs(imagePtr);
 	    }
 	}
@@ -3992,7 +4000,7 @@ DisposeInstance(clientData)
 	Tk_FreeGC(instancePtr->display, instancePtr->gc);
     }
     if (instancePtr->imagePtr != NULL) {
-	XFree((char *) instancePtr->imagePtr);
+	XDestroyImage(instancePtr->imagePtr);
     }
     if (instancePtr->error != NULL) {
 	ckfree((char *) instancePtr->error);
@@ -4337,9 +4345,11 @@ Tk_PhotoPutBlock(handle, blockPtr, x, y, width, height, compRule)
     unsigned char *srcPtr, *srcLinePtr;
     unsigned char *destPtr, *destLinePtr;
     int pitch;
+    int sourceIsSimplePhoto = compRule & SOURCE_IS_SIMPLE_ALPHA_PHOTO;
     XRectangle rect;
 
     masterPtr = (PhotoMaster *) handle;
+    compRule &= ~SOURCE_IS_SIMPLE_ALPHA_PHOTO;
 
     if ((masterPtr->userWidth != 0) && ((x + width) > masterPtr->userWidth)) {
 	width = masterPtr->userWidth - x;
@@ -4386,6 +4396,7 @@ Tk_PhotoPutBlock(handle, blockPtr, x, y, width, height, compRule)
     alphaOffset = blockPtr->offset[3];
     if ((alphaOffset >= blockPtr->pixelSize) || (alphaOffset < 0)) {
 	alphaOffset = 0;
+	sourceIsSimplePhoto = 1;
     } else {
 	alphaOffset -= blockPtr->offset[0];
     }
@@ -4586,7 +4597,29 @@ Tk_PhotoPutBlock(handle, blockPtr, x, y, width, height, compRule)
      * Check if display code needs alpha blending...
      */
 
-    if (alphaOffset != 0 || masterPtr->flags & COMPLEX_ALPHA) {
+    if (!sourceIsSimplePhoto && (width == 1) && (height == 1)) {
+	/*
+	 * Optimize the single pixel case if we can. This speeds up code that
+	 * builds up large simple-alpha images by single pixels.  We don't
+	 * negate COMPLEX_ALPHA in this case. [Bug 1409140]
+	 */
+	if (!(masterPtr->flags & COMPLEX_ALPHA)) {
+	    unsigned char newAlpha;
+
+	    destLinePtr = masterPtr->pix32 + (y * masterPtr->width + x) * 4;
+	    newAlpha = destLinePtr[3];
+
+	    if (newAlpha && newAlpha != 255) {
+		masterPtr->flags |= COMPLEX_ALPHA;
+	    }
+	}
+    } else if ((alphaOffset != 0) || (masterPtr->flags & COMPLEX_ALPHA)) {
+	/*
+	 * Check for partial transparency if alpha pixels are specified, or
+	 * rescan if we already knew such pixels existed.  To restrict this
+	 * Toggle to only checking the changed pixels requires knowing where
+	 * the alpha pixels are.
+	 */
 	ToggleComplexAlphaIfNeeded(masterPtr);
     }
 
@@ -4649,7 +4682,7 @@ Tk_PhotoPutZoomedBlock(handle, blockPtr, x, y, width, height, zoomX, zoomY,
     unsigned char *destPtr, *destLinePtr;
     int pitch;
     int xRepeat, yRepeat;
-    int blockXSkip, blockYSkip;
+    int blockXSkip, blockYSkip, sourceIsSimplePhoto;
     XRectangle rect;
 
     if (zoomX==1 && zoomY==1 && subsampleX==1 && subsampleY==1) {
@@ -4657,6 +4690,8 @@ Tk_PhotoPutZoomedBlock(handle, blockPtr, x, y, width, height, zoomX, zoomY,
 	return;
     }
 
+    sourceIsSimplePhoto = compRule & SOURCE_IS_SIMPLE_ALPHA_PHOTO;
+    compRule &= ~SOURCE_IS_SIMPLE_ALPHA_PHOTO;
     masterPtr = (PhotoMaster *) handle;
 
     if (zoomX <= 0 || zoomY <= 0) {
@@ -4707,6 +4742,7 @@ Tk_PhotoPutZoomedBlock(handle, blockPtr, x, y, width, height, zoomX, zoomY,
     alphaOffset = blockPtr->offset[3];
     if ((alphaOffset >= blockPtr->pixelSize) || (alphaOffset < 0)) {
 	alphaOffset = 0;
+	sourceIsSimplePhoto = 1;
     } else {
 	alphaOffset -= blockPtr->offset[0];
     }
@@ -4880,7 +4916,29 @@ Tk_PhotoPutZoomedBlock(handle, blockPtr, x, y, width, height, zoomX, zoomY,
      * Check if display code needs alpha blending...
      */
 
-    if (alphaOffset != 0 || masterPtr->flags & COMPLEX_ALPHA) {
+    if (!sourceIsSimplePhoto && (width == 1) && (height == 1)) {
+	/*
+	 * Optimize the single pixel case if we can. This speeds up code that
+	 * builds up large simple-alpha images by single pixels.  We don't
+	 * negate COMPLEX_ALPHA in this case. [Bug 1409140]
+	 */
+	if (!(masterPtr->flags & COMPLEX_ALPHA)) {
+	    unsigned char newAlpha;
+
+	    destLinePtr = masterPtr->pix32 + (y * masterPtr->width + x) * 4;
+	    newAlpha = destLinePtr[3];
+
+	    if (newAlpha && newAlpha != 255) {
+		masterPtr->flags |= COMPLEX_ALPHA;
+	    }
+	}
+    } else if ((alphaOffset != 0) || (masterPtr->flags & COMPLEX_ALPHA)) {
+	/*
+	 * Check for partial transparency if alpha pixels are specified, or
+	 * rescan if we already knew such pixels existed.  To restrict this
+	 * Toggle to only checking the changed pixels requires knowing where
+	 * the alpha pixels are.
+	 */
 	ToggleComplexAlphaIfNeeded(masterPtr);
     }
 
@@ -5830,15 +5888,16 @@ PhotoOptionFind(interp, obj)
     Tcl_Interp *interp;		/* Interpreter that is being deleted. */
     Tcl_Obj *obj;			/* Name of option to be found. */
 {
-    size_t length;
-    char *name = Tcl_GetStringFromObj(obj, (int *) &length);
+    int length;
+    char *name = Tcl_GetStringFromObj(obj, &length);
     OptionAssocData *list;
     char *prevname = NULL;
     Tcl_ObjCmdProc *proc = (Tcl_ObjCmdProc *) NULL;
+
     list = (OptionAssocData *) Tcl_GetAssocData(interp, "photoOption",
 	    (Tcl_InterpDeleteProc **) NULL);
     while (list != (OptionAssocData *) NULL) {
-	if (strncmp(name, list->name, length) == 0) {
+	if (strncmp(name, list->name, (unsigned) length) == 0) {
 	    if (proc != (Tcl_ObjCmdProc *) NULL) {
 		Tcl_ResetResult(interp);
 		Tcl_AppendResult(interp, "ambiguous option \"", name,

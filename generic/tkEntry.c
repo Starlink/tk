@@ -14,7 +14,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkEntry.c,v 1.35.2.1 2005/03/25 04:34:16 wolfsuit Exp $
+ * RCS: @(#) $Id: tkEntry.c,v 1.35.2.4 2007/04/29 02:24:02 das Exp $
  */
 
 #include "tkInt.h"
@@ -144,7 +144,7 @@ static Tk_OptionSpec entryOptSpec[] = {
         0, (ClientData) DEF_ENTRY_SELECT_BD_MONO, 0},
     {TK_OPTION_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_ENTRY_SELECT_FG_COLOR, -1, Tk_Offset(Entry, selFgColorPtr),
-	0, (ClientData) DEF_ENTRY_SELECT_FG_MONO, 0},
+	TK_CONFIG_NULL_OK, (ClientData) DEF_ENTRY_SELECT_FG_MONO, 0},
     {TK_OPTION_STRING, "-show", "show", "Show",
         DEF_ENTRY_SHOW, -1, Tk_Offset(Entry, showChar), 
         TK_OPTION_NULL_OK, 0, 0},
@@ -302,7 +302,7 @@ static Tk_OptionSpec sbOptSpec[] = {
         0, (ClientData) DEF_ENTRY_SELECT_BD_MONO, 0},
     {TK_OPTION_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_ENTRY_SELECT_FG_COLOR, -1, Tk_Offset(Entry, selFgColorPtr),
-	0, (ClientData) DEF_ENTRY_SELECT_FG_MONO, 0},
+	TK_CONFIG_NULL_OK, (ClientData) DEF_ENTRY_SELECT_FG_MONO, 0},
     {TK_OPTION_STRING_TABLE, "-state", "state", "State",
 	DEF_ENTRY_STATE, -1, Tk_Offset(Entry, state), 
         0, (ClientData) stateStrings, 0},
@@ -1497,7 +1497,9 @@ EntryWorldChanged(instanceData)
     }
     entryPtr->textGC = gc;
 
-    gcValues.foreground = entryPtr->selFgColorPtr->pixel;
+    if (entryPtr->selFgColorPtr != NULL) {
+	gcValues.foreground = entryPtr->selFgColorPtr->pixel;
+    }
     gcValues.font = Tk_FontId(entryPtr->tkfont);
     mask = GCForeground | GCFont;
     gc = Tk_GetGC(entryPtr->tkwin, mask, &gcValues);
@@ -1635,6 +1637,7 @@ DisplayEntry(clientData)
 	Tcl_Release((ClientData) entryPtr);
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * In order to avoid screen flashes, this procedure redraws the
      * textual area of the entry into off-screen memory, then copies
@@ -1644,6 +1647,9 @@ DisplayEntry(clientData)
 
     pixmap = Tk_GetPixmap(entryPtr->display, Tk_WindowId(tkwin),
 	    Tk_Width(tkwin), Tk_Height(tkwin), Tk_Depth(tkwin));
+#else
+    pixmap = Tk_WindowId(tkwin);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     /*
      * Compute x-coordinate of the pixel just after last visible
@@ -1658,11 +1664,11 @@ DisplayEntry(clientData)
      * don't have the focus.
      */
 
-#ifdef ALWAYS_SHOW_SELECTION
-    showSelection = 1;
-#else
-    showSelection = (entryPtr->flags & GOT_FOCUS);
-#endif
+    if (TkpAlwaysShowSelection(entryPtr->tkwin)) {
+	showSelection = 1;
+    } else {
+	showSelection = (entryPtr->flags & GOT_FOCUS);
+    }
 
     /*
      * Draw the background in three layers.  From bottom to top the
@@ -1700,7 +1706,13 @@ DisplayEntry(clientData)
 		    baseY - fm.ascent - entryPtr->selBorderWidth,
 		    (selEndX - selStartX) + 2*entryPtr->selBorderWidth,
 		    (fm.ascent + fm.descent) + 2*entryPtr->selBorderWidth,
-		    entryPtr->selBorderWidth, TK_RELIEF_RAISED);
+		    entryPtr->selBorderWidth, 
+#ifndef MAC_OSX_TK
+		    TK_RELIEF_RAISED
+#else
+		    MAC_OSX_ENTRY_SELECT_RELIEF
+#endif
+		    );
 	} 
     }
 
@@ -1869,6 +1881,7 @@ DisplayEntry(clientData)
         }
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Everything's been redisplayed;  now copy the pixmap onto the screen
      * and free up the pixmap.
@@ -1878,6 +1891,7 @@ DisplayEntry(clientData)
 	    0, 0, (unsigned) Tk_Width(tkwin), (unsigned) Tk_Height(tkwin),
 	    0, 0);
     Tk_FreePixmap(entryPtr->display, pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     entryPtr->flags &= ~BORDER_NEEDED;
 }
 
@@ -2838,16 +2852,16 @@ EntryLostSelection(clientData)
     /*
      * On Windows and Mac systems, we want to remember the selection
      * for the next time the focus enters the window.  On Unix, we need
-     * to clear the selection since it is always visible.
+     * to clear the selection since it is always visible.  This is
+     * controlled by ::tk::AlwaysShowSelection.
      */
 
-#ifdef ALWAYS_SHOW_SELECTION
-    if ((entryPtr->selectFirst >= 0) && entryPtr->exportSelection) {
+    if (TkpAlwaysShowSelection(entryPtr->tkwin)
+	    && (entryPtr->selectFirst >= 0) && entryPtr->exportSelection) {
 	entryPtr->selectFirst = -1;
 	entryPtr->selectLast = -1;
 	EventuallyRedraw(entryPtr);
     }
-#endif
 }
 
 /*

@@ -4,9 +4,10 @@
 # "autoconf" program (constructs like "@foo@" will get replaced in the
 # actual Makefile.
 #
-# RCS: @(#) $Id: Makefile.in,v 1.59 2003/01/13 07:30:58 mdejong Exp $
+# RCS: @(#) $Id: Makefile.in,v 1.59.2.7 2007/01/30 23:21:24 hobbs Exp $
 
 TCLVERSION		= @TCL_VERSION@
+TCLPATCHL		= @TCL_PATCH_LEVEL@
 VERSION			= @TK_VERSION@
 
 #----------------------------------------------------------------
@@ -56,6 +57,9 @@ SCRIPT_INSTALL_DIR	= $(INSTALL_ROOT)$(TK_LIBRARY)
 # Directory in which to install the include file tk.h:
 INCLUDE_INSTALL_DIR	= $(INSTALL_ROOT)$(includedir)
 
+# Directory in which to (optionally) install the private tk headers:
+PRIVATE_INCLUDE_INSTALL_DIR = $(INSTALL_ROOT)$(includedir)
+
 # Top-level directory for manual entries:
 MAN_INSTALL_DIR		= $(INSTALL_ROOT)$(mandir)
 
@@ -89,8 +93,8 @@ TCL_BIN_DIR		= @TCL_BIN_DIR@
 # The directory containing the Tcl sources and headers appropriate
 # for this version of Tk ("srcdir" will be replaced or has already
 # been replaced by the configure script):
-TCL_GENERIC_DIR	= @TCL_SRC_DIR@/generic
-TCL_TOOL_DIR = @TCL_SRC_DIR@/tools
+TCL_GENERIC_DIR		= @TCL_SRC_DIR@/generic
+TCL_TOOL_DIR		= @TCL_SRC_DIR@/tools
 
 # Converts a POSIX path to a Windows native path.
 CYGPATH			= @CYGPATH@
@@ -108,14 +112,14 @@ BITMAP_DIR		= $(ROOT_DIR)/bitmaps
 XLIB_DIR		= $(ROOT_DIR)/xlib
 RC_DIR			= $(WIN_DIR)/rc
 
-ROOT_DIR_NATIVE	   	= $(shell $(CYGPATH) '$(ROOT_DIR)')
-WIN_DIR_NATIVE	   	= $(shell $(CYGPATH) '$(WIN_DIR)')
-GENERIC_DIR_NATIVE 	= $(shell $(CYGPATH) '$(GENERIC_DIR)')
-BITMAP_DIR_NATIVE	= $(shell $(CYGPATH) '$(ROOT_DIR)/bitmaps')
-XLIB_DIR_NATIVE		= $(shell $(CYGPATH) '$(ROOT_DIR)/xlib')
-TCL_GENERIC_NATIVE	= $(shell $(CYGPATH) '$(TCL_GENERIC_DIR)')
-TCL_SRC_DIR_NATIVE      = $(shell $(CYGPATH) '$(TCL_SRC_DIR)')
-RC_DIR_NATIVE      	= $(shell $(CYGPATH) '$(RC_DIR)')
+ROOT_DIR_NATIVE	   	= $(shell $(CYGPATH) '$(ROOT_DIR)' | sed 's!\\!/!g')
+WIN_DIR_NATIVE	   	= $(shell $(CYGPATH) '$(WIN_DIR)' | sed 's!\\!/!g')
+GENERIC_DIR_NATIVE 	= $(shell $(CYGPATH) '$(GENERIC_DIR)' | sed 's!\\!/!g')
+BITMAP_DIR_NATIVE	= $(ROOT_DIR_NATIVE)/bitmaps
+XLIB_DIR_NATIVE		= $(ROOT_DIR_NATIVE)/xlib
+RC_DIR_NATIVE      	= $(WIN_DIR_NATIVE)/rc
+TCL_GENERIC_NATIVE	= $(shell $(CYGPATH) '$(TCL_GENERIC_DIR)' | sed 's!\\!/!g')
+TCL_SRC_DIR_NATIVE      = $(shell $(CYGPATH) '$(TCL_SRC_DIR)' | sed 's!\\!/!g')
 
 DLLSUFFIX		= @DLLSUFFIX@
 LIBSUFFIX		= @LIBSUFFIX@
@@ -189,14 +193,14 @@ SHELL		= @SHELL@
 RM		= rm -f
 COPY		= cp
 
-TCLSH_PROG	= @TCLSH_PROG@
+BUILD_TCLSH	= @BUILD_TCLSH@
 
 # TCL_EXE is the name of a tclsh executable that is available *BEFORE*
 # running make for the first time. Certain build targets (make genstubs)
 # need it to be available on the PATH. This executable should *NOT* be
 # required just to do a normal build although it can be required to run
 # make dist.
-TCL_EXE			= tclsh
+TCL_EXE			= @TCLSH_PROG@
 
 CC_SWITCHES = ${CFLAGS} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} \
 -I"${GENERIC_DIR_NATIVE}" -I"${WIN_DIR_NATIVE}" \
@@ -362,10 +366,7 @@ $(ROOT_DIR)/doc/man.macros:
 doc: $(ROOT_DIR)/doc/man.macros
 
 winhelp: $(TCL_SRC_DIR_NATIVE)/tools/man2help.tcl $(MAN2TCL)
-	TCL_LIBRARY="$(TCL_SRC_DIR_NATIVE)/library"; export TCL_LIBRARY; \
-	TK_LIBRARY="$(ROOT_DIR_NATIVE)/library"; export TK_LIBRARY; \
-	PATH="$(PATH):$(TCL_BIN_DIR)"; export PATH; \
-	$(TCLSH_PROG) "$(TCL_SRC_DIR_NATIVE)/tools/man2help.tcl" tcl "$(VER)" $(CORE_DOCS)
+	$(TCL_EXE) "$(TCL_SRC_DIR_NATIVE)/tools/man2help.tcl" tcl "$(VER)" $(CORE_DOCS)
 	$(COPY) "$(TCL_BIN_DIR)"/tcl.hpj ./
 	hcw /c /e tcl.hpj
 	$(COPY) ./tcl$(VER).cnt ./TCL$(VER).HLP "$(TCL_SRC_DIR_NATIVE)"/tools/
@@ -380,14 +381,14 @@ $(MAN2TCL): $(TCL_SRC_DIR_NATIVE)/tools/man2tcl.c
 test: binaries $(TKTEST)
 	@TCL_LIBRARY="$(TCL_SRC_DIR_NATIVE)/library"; export TCL_LIBRARY; \
 	TK_LIBRARY="$(ROOT_DIR_NATIVE)/library"; export TK_LIBRARY; \
-	PATH="$(PATH):$(TCL_BIN_DIR)"; export PATH; \
+	PATH="$(TCL_BIN_DIR):$(PATH)"; export PATH; \
 	./$(TKTEST) "$(ROOT_DIR_NATIVE)/tests/all.tcl" $(TESTFLAGS) \
 	| ./$(CAT32)
 
 runtest: binaries $(TKTEST)
 	@TCL_LIBRARY="$(TCL_SRC_DIR_NATIVE)/library"; export TCL_LIBRARY; \
 	TK_LIBRARY="$(ROOT_DIR_NATIVE)/library"; export TK_LIBRARY; \
-	PATH="$(PATH):$(TCL_BIN_DIR)"; export PATH; \
+	PATH="$(TCL_BIN_DIR):$(PATH)"; export PATH; \
 	./$(TKTEST) $(TESTFLAGS) $(SCRIPT)
 
 # This target can be used to run wish from the build directory
@@ -395,14 +396,14 @@ runtest: binaries $(TKTEST)
 shell: binaries
 	@TCL_LIBRARY="$(TCL_SRC_DIR_NATIVE)/library"; export TCL_LIBRARY; \
 	TK_LIBRARY="$(ROOT_DIR_NATIVE)/library"; export TK_LIBRARY; \
-	PATH="$(PATH):$(TCL_BIN_DIR)"; export PATH; \
+	PATH="$(TCL_BIN_DIR):$(PATH)"; export PATH; \
 	./$(WISH) $(SCRIPT)
 
 # This target can be used to run wish inside either gdb or insight
 gdb: binaries
 	@echo "set env TCL_LIBRARY=$(TCL_SRC_DIR_NATIVE)/library" > gdb.run
 	@echo "set env TK_LIBRARY=$(ROOT_DIR_NATIVE)/library" >> gdb.run
-	PATH="$(PATH):$(TCL_BIN_DIR)"; export PATH; \
+	PATH="$(TCL_BIN_DIR):$(PATH)"; export PATH; \
 	gdb ./$(WISH) --command=gdb.run
 	@$(RM) gdb.run
 
@@ -519,6 +520,25 @@ install-demos:
 
 install-doc: doc
 
+# Optional target to install private headers
+install-private-headers: libraries
+	@for i in $(PRIVATE_INCLUDE_INSTALL_DIR); \
+	    do \
+	    if [ ! -d $$i ] ; then \
+		echo "Making directory $$i"; \
+		$(MKDIR) $$i; \
+		chmod 755 $$i; \
+		else true; \
+		fi; \
+	    done;
+	@echo "Installing private header files to $(PRIVATE_INCLUDE_INSTALL_DIR)/";
+	@for i in $(GENERIC_DIR)/tkInt.h $(GENERIC_DIR)/tkIntDecls.h \
+		$(GENERIC_DIR)/tkIntPlatDecls.h $(GENERIC_DIR)/tkPort.h \
+		$(WIN_DIR)/tkWinPort.h $(WIN_DIR)/tkWinInt.h \
+		$(WIN_DIR)/tkWin.h; \
+	    do \
+	    $(INSTALL_DATA) $$i $(PRIVATE_INCLUDE_INSTALL_DIR); \
+	    done;
 
 $(WISH): $(TK_LIB_FILE) $(TK_STUB_LIB_FILE) $(WISH_OBJS) wish.$(RES)
 	$(CC) $(CFLAGS) $(WISH_OBJS) $(TCL_LIB_FILE) $(TK_LIB_FILE) $(LIBS) \
@@ -538,7 +558,7 @@ cat32.${OBJEXT}: $(TCL_SRC_DIR)/win/cat.c
 	$(CC) -c $(CC_SWITCHES) @DEPARG@ $(CC_OBJNAME)
 
 $(CAT32): cat32.${OBJEXT}
-	$(CC) $(CFLAGS) cat32.$(OBJEXT) $(CC_EXENAME) $(LDFLAGS_CONSOLE)
+	$(CC) $(CFLAGS) cat32.$(OBJEXT) $(CC_EXENAME) $(LIBS) $(LDFLAGS_CONSOLE)
 
 # The following targets are configured by autoconf to generate either
 # a shared library or static library
@@ -600,7 +620,8 @@ clean: cleanhelp
 	$(RM) *.pch *.ilk *.pdb
 
 distclean: clean
-	$(RM) Makefile config.status config.cache config.log tkConfig.sh
+	$(RM) Makefile config.status config.cache config.log tkConfig.sh \
+		wish.exe.manifest
 
 Makefile: $(SRC_DIR)/Makefile.in
 	./config.status

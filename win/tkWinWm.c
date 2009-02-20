@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinWm.c,v 1.54.2.20 2005/06/01 00:07:30 mdejong Exp $
+ * RCS: @(#) $Id: tkWinWm.c,v 1.54.2.28 2007/12/05 19:18:09 hobbs Exp $
  */
 
 #include "tkWinInt.h"
@@ -23,6 +23,9 @@
  */
 #ifndef WS_EX_LAYERED
 #define WS_EX_LAYERED	0x00080000
+#endif
+#ifndef LWA_COLORKEY
+#define LWA_COLORKEY	0x00000001
 #endif
 #ifndef LWA_ALPHA
 #define LWA_ALPHA	0x00000002
@@ -238,6 +241,8 @@ typedef struct TkWmInfo {
     DWORD style, exStyle;	/* Style flags for the wrapper window. */
     LONG styleConfig;		/* Extra user requested style bits */
     LONG exStyleConfig;		/* Extra user requested extended style bits */
+    Tcl_Obj *crefObj;		/* COLORREF object for transparent handling */
+    COLORREF colorref;		/* COLORREF for transparent handling */
     double alpha;		/* Alpha transparency level
 				 * 0.0 (fully transparent) .. 1.0 (opaque) */
 
@@ -866,20 +871,7 @@ InitWindowClass(WinIconPtr titlebaricon)
 	     */
 	    ZeroMemory(&class, sizeof(WNDCLASS));
 
-	    /*
-	     * When threads are enabled, we cannot use CLASSDC because
-	     * threads will then write into the same device context.
-	     *
-	     * This is a hack; we should add a subsystem that manages
-	     * device context on a per-thread basis.  See also tkWinX.c,
-	     * which also initializes a WNDCLASS structure.
-	     */
-
-#ifdef TCL_THREADS
 	    class.style = CS_HREDRAW | CS_VREDRAW;
-#else
-	    class.style = CS_HREDRAW | CS_VREDRAW | CS_CLASSDC;
-#endif
 	    class.hInstance = Tk_GetHINSTANCE();
 	    Tcl_WinUtfToTChar(TK_WIN_TOPLEVEL_CLASS_NAME, -1, &classString);
 	    class.lpszClassName = (LPCTSTR) Tcl_DStringValue(&classString);
@@ -903,22 +895,6 @@ InitWindowClass(WinIconPtr titlebaricon)
 		Tcl_Panic("Unable to register TkTopLevel class");
 	    }
 
-#ifndef TCL_THREADS
-	    /*
-	     * Use of WS_EX_LAYERED disallows CS_CLASSDC, as does
-	     * TCL_THREADS usage, so only create this if necessary.
-	     */
-	    if (setLayeredWindowAttributesProc != NULL) {
-		class.style = CS_HREDRAW | CS_VREDRAW;
-		Tcl_DStringFree(&classString);
-		Tcl_WinUtfToTChar(TK_WIN_TOPLEVEL_NOCDC_CLASS_NAME,
-			-1, &classString);
-		class.lpszClassName = (LPCTSTR) Tcl_DStringValue(&classString);
-		if (!(*tkWinProcs->registerClass)(&class)) {
-		    Tcl_Panic("Unable to register TkTopLevelNoCDC class");
-		}
-	    }
-#endif
 	    Tcl_DStringFree(&classString);
 	}
 	Tcl_MutexUnlock(&winWmMutex);
@@ -1840,15 +1816,6 @@ TkWinWmCleanup(hInstance)
     tsdPtr->initialized = 0;
 
     UnregisterClass(TK_WIN_TOPLEVEL_CLASS_NAME, hInstance);
-#ifndef TCL_THREADS
-    /*
-     * Clean up specialized class created for layered windows.
-     */
-    if (setLayeredWindowAttributesProc != NULL) {
-	UnregisterClass(TK_WIN_TOPLEVEL_NOCDC_CLASS_NAME, hInstance);
-	setLayeredWindowAttributesProc = NULL;
-    }
-#endif
 }
 
 /*
@@ -1910,6 +1877,8 @@ TkWmNewWindow(winPtr)
     wmPtr->height = -1;
     wmPtr->x = winPtr->changes.x;
     wmPtr->y = winPtr->changes.y;
+    wmPtr->crefObj = NULL;
+    wmPtr->colorref = (COLORREF) NULL;
     wmPtr->alpha = 1.0;
 
     wmPtr->configWidth = -1;
@@ -2046,6 +2015,10 @@ UpdateWrapper(winPtr)
 	 * Compute the geometry of the parent and child windows.
 	 */
 
+	if ((wmPtr->flags & WM_UPDATE_PENDING)) {
+	    Tcl_CancelIdleCall(UpdateGeometryInfo, (ClientData) winPtr);
+	}
+
 	wmPtr->flags |= WM_CREATE_PENDING|WM_MOVE_PENDING;
 	UpdateGeometryInfo((ClientData)winPtr);
 	wmPtr->flags &= ~(WM_CREATE_PENDING|WM_MOVE_PENDING);
@@ -2076,17 +2049,7 @@ UpdateWrapper(winPtr)
 	tsdPtr->createWindow = winPtr;
 	Tcl_WinUtfToTChar(((wmPtr->title != NULL) ?
                            wmPtr->title : winPtr->nameUid), -1, &titleString);
-#ifndef TCL_THREADS
-	/*
-	 * Transparent windows require a non-CS_CLASSDC window class.
-	 */
-	if ((wmPtr->exStyleConfig & WS_EX_LAYERED)
-		&& setLayeredWindowAttributesProc != NULL) {
-	    Tcl_WinUtfToTChar(TK_WIN_TOPLEVEL_NOCDC_CLASS_NAME,
-		    -1, &classString);
-	} else
-#endif
-	    Tcl_WinUtfToTChar(TK_WIN_TOPLEVEL_CLASS_NAME, -1, &classString);
+	Tcl_WinUtfToTChar(TK_WIN_TOPLEVEL_CLASS_NAME, -1, &classString);
 	wmPtr->wrapper = (*tkWinProcs->createWindowEx)(wmPtr->exStyle,
 		(LPCTSTR) Tcl_DStringValue(&classString),
 		(LPCTSTR) Tcl_DStringValue(&titleString),
@@ -2109,13 +2072,17 @@ UpdateWrapper(winPtr)
 	     * Add the 0.5 to round the value.
 	     */
 	    setLayeredWindowAttributesProc((HWND) wmPtr->wrapper,
-		    (COLORREF) NULL, (BYTE) (wmPtr->alpha * 255 + 0.5),
-		    LWA_ALPHA);
+		    wmPtr->colorref, (BYTE) (wmPtr->alpha * 255 + 0.5),
+		    LWA_ALPHA | (wmPtr->crefObj ? LWA_COLORKEY : 0));
 	} else {
 	    /*
 	     * Layering not used or supported.
 	     */
 	    wmPtr->alpha = 1.0;
+	    if (wmPtr->crefObj) {
+		Tcl_DecrRefCount(wmPtr->crefObj);
+		wmPtr->crefObj = NULL;
+	    }
 	}
 
 	place.length = sizeof(WINDOWPLACEMENT);
@@ -2123,7 +2090,9 @@ UpdateWrapper(winPtr)
 	wmPtr->x = place.rcNormalPosition.left;
 	wmPtr->y = place.rcNormalPosition.top;
 
-	TkInstallFrameMenu((Tk_Window) winPtr);
+	if (!(winPtr->flags & TK_ALREADY_DEAD)) {
+	    TkInstallFrameMenu((Tk_Window) winPtr);
+	}
 
 	if (oldWrapper && (oldWrapper != wmPtr->wrapper)
 		&& !(wmPtr->exStyle & WS_EX_TOPMOST)) {
@@ -2550,6 +2519,10 @@ TkWmDeadWindow(winPtr)
 		WmWaitVisibilityOrMapProc, (ClientData) winPtr);
 	wmPtr->masterPtr = NULL;
     }
+    if (wmPtr->crefObj != NULL) {
+	Tcl_DecrRefCount(wmPtr->crefObj);
+	wmPtr->crefObj = NULL;
+    }
 
     /*
      * Destroy the decorative frame window.
@@ -2868,13 +2841,14 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     LONG style, exStyle, styleBit, *stylePtr;
     char *string;
-    int i, boolean, length;
+    int i, boolean, length, updatewrapper = 0;
 
     if ((objc < 3) || ((objc > 5) && ((objc%2) == 0))) {
         configArgs:
 	Tcl_WrongNumArgs(interp, 2, objv,
 		"window"
 		" ?-alpha ?double??"
+		" ?-transparentcolor ?color??"
 		" ?-disabled ?bool??"
 		" ?-toolwindow ?bool??"
 		" ?-topmost ?bool??");
@@ -2887,6 +2861,10 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
 	Tcl_ListObjAppendElement(NULL, objPtr,
 		Tcl_NewStringObj("-alpha", -1));
 	Tcl_ListObjAppendElement(NULL, objPtr, Tcl_NewDoubleObj(wmPtr->alpha));
+	Tcl_ListObjAppendElement(NULL, objPtr,
+		Tcl_NewStringObj("-transparentcolor", -1));
+	Tcl_ListObjAppendElement(NULL, objPtr,
+		wmPtr->crefObj ? wmPtr->crefObj : Tcl_NewObj());
 	Tcl_ListObjAppendElement(NULL, objPtr,
 		Tcl_NewStringObj("-disabled", -1));
 	Tcl_ListObjAppendElement(NULL, objPtr,
@@ -2910,13 +2888,21 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
 	if (strncmp(string, "-disabled", length) == 0) {
 	    stylePtr = &style;
 	    styleBit = WS_DISABLED;
-	} else if (strncmp(string, "-alpha", length) == 0) {
+	} else if ((strncmp(string, "-alpha", length) == 0)
+		|| ((length > 2) && (strncmp(string, "-transparentcolor",
+					     length) == 0))) {
 	    stylePtr = &exStyle;
 	    styleBit = WS_EX_LAYERED;
 	} else if ((length > 3)
 		   && (strncmp(string, "-toolwindow", length) == 0)) {
 	    stylePtr = &exStyle;
 	    styleBit = WS_EX_TOOLWINDOW;
+	    if (objc != 4) {
+		/*
+		 * Changes to toolwindow style require an update
+		 */
+		updatewrapper = 1;
+	    }
 	} else if ((length > 3)
 		   && (strncmp(string, "-topmost", length) == 0)) {
 	    stylePtr = &exStyle;
@@ -2931,42 +2917,85 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
 	    goto configArgs;
 	}
 	if (styleBit == WS_EX_LAYERED) {
-	    double dval;
-
 	    if (objc == 4) {
-		Tcl_SetDoubleObj(Tcl_GetObjResult(interp), wmPtr->alpha);
+		if (string[1] == 'a') {		/* -alpha */
+		    Tcl_SetObjResult(interp, Tcl_NewDoubleObj(wmPtr->alpha));
+		} else {			/* -transparentcolor */
+		    Tcl_SetObjResult(interp,
+			    wmPtr->crefObj ? wmPtr->crefObj : Tcl_NewObj());
+		}
 	    } else {
-		if ((i < objc-1) &&
-			(Tcl_GetDoubleFromObj(interp, objv[i+1], &dval)
-				!= TCL_OK)) {
-		    return TCL_ERROR;
+		if (string[1] == 'a') {		/* -alpha */
+		    double dval;
+
+		    if (Tcl_GetDoubleFromObj(interp, objv[i+1], &dval)
+			    != TCL_OK) {
+			return TCL_ERROR;
+		    }
+
+		    /*
+		     * The user should give (transparent) 0 .. 1.0 (opaque),
+		     * but we ignore the setting of this (it will always be 1)
+		     * in the case that the API is not available.
+		     */
+		    if (dval < 0.0) {
+			dval = 0;
+		    } else if (dval > 1.0) {
+			dval = 1;
+		    }
+		    wmPtr->alpha = dval;
+		} else {			/* -transparentcolor */
+		    char *crefstr = Tcl_GetStringFromObj(objv[i+1], &length);
+
+		    if (length == 0) {
+			/* reset to no transparent color */
+			if (wmPtr->crefObj) {
+			    Tcl_DecrRefCount(wmPtr->crefObj);
+			    wmPtr->crefObj = NULL;
+			}
+		    } else {
+			XColor *cPtr =
+			    Tk_GetColor(interp, tkwin, Tk_GetUid(crefstr));
+			if (cPtr == NULL) {
+			    return TCL_ERROR;
+			}
+
+			if (wmPtr->crefObj) {
+			    Tcl_DecrRefCount(wmPtr->crefObj);
+			}
+			wmPtr->crefObj = objv[i+1];
+			Tcl_IncrRefCount(wmPtr->crefObj);
+			wmPtr->colorref = RGB((BYTE) (cPtr->red >> 8),
+				(BYTE) (cPtr->green >> 8),
+				(BYTE) (cPtr->blue >> 8));
+			Tk_FreeColor(cPtr);
+		    }
 		}
+
 		/*
-		 * The user should give (transparent) 0 .. 1.0 (opaque),
-		 * but we ignore the setting of this (it will always be 1)
-		 * in the case that the API is not available.
+		 * Only ever add the WS_EX_LAYERED bit, as it can cause
+		 * flashing to change this window style.  This allows things
+		 * like fading tooltips to avoid flash ugliness without
+		 * forcing all window to be layered.
 		 */
-		if (dval < 0.0) {
-		    dval = 0;
-		} else if (dval > 1.0) {
-		    dval = 1;
-		}
-		wmPtr->alpha = dval;
-		if (dval < 1.0) {
+		if ((wmPtr->alpha < 1.0) || (wmPtr->crefObj != NULL)) {
 		    *stylePtr |= styleBit;
-		} else {
-		    *stylePtr &= ~styleBit;
 		}
-		if (setLayeredWindowAttributesProc != NULL) {
+		if ((setLayeredWindowAttributesProc != NULL)
+			&& (wmPtr->wrapper != NULL)) {
 		    /*
 		     * Set the window directly regardless of UpdateWrapper.
 		     * The user supplies a double from [0..1], but Windows
 		     * wants an int (transparent) 0..255 (opaque), so do the
 		     * translation.  Add the 0.5 to round the value.
 		     */
+		    if (!(wmPtr->exStyleConfig & WS_EX_LAYERED)) {
+			SetWindowLongPtr(wmPtr->wrapper, GWL_EXSTYLE,
+				*stylePtr);
+		    }
 		    setLayeredWindowAttributesProc((HWND) wmPtr->wrapper,
-			    (COLORREF) NULL, (BYTE) (wmPtr->alpha * 255 + 0.5),
-			    LWA_ALPHA);
+			    wmPtr->colorref, (BYTE) (wmPtr->alpha * 255 + 0.5),
+			    LWA_ALPHA | (wmPtr->crefObj ? LWA_COLORKEY : 0));
 		}
 	    }
 	} else {
@@ -2984,6 +3013,17 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
 		*stylePtr &= ~styleBit;
 	    }
 	}
+	if ((styleBit == WS_EX_TOPMOST) && (wmPtr->wrapper != NULL)) {
+	    /*
+	     * Force the topmost position aspect to ensure that switching
+	     * between (no)topmost reflects properly when rewrapped.
+	     */
+	    SetWindowPos(wmPtr->wrapper,
+		    ((exStyle & WS_EX_TOPMOST) ?
+			    HWND_TOPMOST : HWND_NOTOPMOST), 0, 0, 0, 0,
+		    SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOSENDCHANGING
+		    |SWP_NOOWNERZORDER);
+	}
     }
     if (wmPtr->styleConfig != style) {
 	/*
@@ -2997,13 +3037,15 @@ WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
 	}
     }
     if (wmPtr->exStyleConfig != exStyle) {
-	/*
-	 * UpdateWrapper ensure that all effects are properly handled,
-	 * such as TOOLWINDOW disappearing from the taskbar.
-	 */
 	wmPtr->exStyleConfig = exStyle;
-	if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
-	    UpdateWrapper(winPtr);
+	if (updatewrapper) {
+	    /*
+	     * UpdateWrapper ensure that all effects are properly handled,
+	     * such as TOOLWINDOW disappearing from the taskbar.
+	     */
+	    if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
+		UpdateWrapper(winPtr);
+	    }
 	}
     }
     return TCL_OK;
@@ -3565,11 +3607,11 @@ WmGridCmd(tkwin, winPtr, interp, objc, objv)
 	    return TCL_ERROR;
 	}
 	if (widthInc <= 0) {
-	    Tcl_SetResult(interp, "widthInc can't be < 0", TCL_STATIC);
+	    Tcl_SetResult(interp, "widthInc can't be <= 0", TCL_STATIC);
 	    return TCL_ERROR;
 	}
 	if (heightInc <= 0) {
-	    Tcl_SetResult(interp, "heightInc can't be < 0", TCL_STATIC);
+	    Tcl_SetResult(interp, "heightInc can't be <= 0", TCL_STATIC);
 	    return TCL_ERROR;
 	}
 	Tk_SetGrid((Tk_Window) winPtr, reqWidth, reqHeight, widthInc,
@@ -3960,7 +4002,8 @@ WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
     TkWindow *useWinPtr = winPtr; /* window to apply to (NULL if -default) */
     Tk_PhotoHandle photo;
     Tk_PhotoImageBlock block;
-    int i, size, width, height, startObj = 3;
+    int i, size, width, height, idx, bufferSize, startObj = 3;
+    unsigned char *bgraPixelPtr;
     BlockOfIconImagesPtr lpIR;
     WinIconPtr titlebaricon = NULL;
     HICON hIcon;
@@ -4007,10 +4050,20 @@ WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
 	Tk_PhotoGetImage(photo, &block);
 
 	/*
-	 * Encode the image data into an HICON.
+	 * Convert the image data into BGRA format (RGBQUAD) and then
+	 * encode the image data into an HICON.
 	 */
+	bufferSize = height * width * block.pixelSize;
+	bgraPixelPtr = ckalloc(bufferSize);
+	for (idx = 0 ; idx < bufferSize ; idx += 4) {
+	    bgraPixelPtr[idx] = block.pixelPtr[idx+2];
+	    bgraPixelPtr[idx+1] = block.pixelPtr[idx+1];
+	    bgraPixelPtr[idx+2] = block.pixelPtr[idx+0];
+	    bgraPixelPtr[idx+3] = block.pixelPtr[idx+3];
+	}
 	hIcon = CreateIcon(Tk_GetHINSTANCE(), width, height, 1, 32,
-		NULL, (BYTE *) block.pixelPtr);
+		NULL, (BYTE *) bgraPixelPtr);
+	ckfree(bgraPixelPtr);
 	if (hIcon == NULL) {
 	    /* XXX should free up created icons */
 	    Tcl_Free((char *) lpIR);
@@ -5568,10 +5621,13 @@ UpdateGeometryInfo(clientData)
      */
 
     if (winPtr->flags & TK_BOTH_HALVES) {
+	TkWindow *childPtr = TkpGetOtherWindow(winPtr);
+
 	wmPtr->x = wmPtr->y = 0;
 	wmPtr->flags &= ~(WM_NEGATIVE_X|WM_NEGATIVE_Y);
-	Tk_GeometryRequest((Tk_Window) TkpGetOtherWindow(winPtr),
-		width, height);
+	if (childPtr != NULL) {
+	    Tk_GeometryRequest((Tk_Window) childPtr, width, height);
+	}
 	return;
     }
 
@@ -7437,6 +7493,18 @@ WmProc(hwnd, message, wParam, lParam)
 	    }
 	    result = MA_NOACTIVATE;
 	    goto done;
+	}
+
+	case WM_QUERYENDSESSION: {
+	    XEvent event;
+
+	    winPtr = GetTopLevel(hwnd);
+	    event.xclient.message_type =
+		Tk_InternAtom((Tk_Window) winPtr, "WM_PROTOCOLS");
+	    event.xclient.data.l[0] =
+		Tk_InternAtom((Tk_Window) winPtr, "WM_SAVE_YOURSELF");
+	    TkWmProtocolEventProc(winPtr, &event);
+	    break;
 	}
 
 	default:

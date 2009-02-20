@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkPanedWindow.c,v 1.13.2.8 2005/05/31 05:22:06 hobbs Exp $
+ * RCS: @(#) $Id: tkPanedWindow.c,v 1.13.2.11 2007/04/29 02:24:02 das Exp $
  */
 
 #include "tkPort.h"
@@ -164,7 +164,7 @@ static void	PanedWindowEventProc _ANSI_ARGS_((ClientData clientData,
 static void	ProxyWindowEventProc _ANSI_ARGS_((ClientData clientData,
 			XEvent *eventPtr));
 static void	DisplayProxyWindow _ANSI_ARGS_((ClientData clientData));
-void		PanedWindowWorldChanged _ANSI_ARGS_((ClientData instanceData));
+static void	PanedWindowWorldChanged _ANSI_ARGS_((ClientData instanceData));
 static int	PanedWindowWidgetObjCmd _ANSI_ARGS_((ClientData clientData,
 			Tcl_Interp *, int objc, Tcl_Obj * CONST objv[]));
 static void	PanedWindowLostSlaveProc _ANSI_ARGS_((ClientData clientData,
@@ -349,7 +349,7 @@ Tk_PanedWindowObjCmd(clientData, interp, objc, objv)
     }
 
     tkwin = Tk_CreateWindowFromPath(interp, Tk_MainWindow(interp), 
-	    Tcl_GetStringFromObj(objv[1], NULL), (char *) NULL);
+	    Tcl_GetStringFromObj(objv[1], NULL), NULL);
     if (tkwin == NULL) {
 	return TCL_ERROR;
     }
@@ -1225,7 +1225,7 @@ ConfigurePanedWindow(interp, pwPtr, objc, objv)
  *----------------------------------------------------------------------
  */
 
-void
+static void
 PanedWindowWorldChanged(instanceData)
     ClientData instanceData;	/* Information about the paned window. */
 {
@@ -1381,12 +1381,16 @@ DisplayPanedWindow(clientData)
 	ArrangePanes(clientData);
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Create a pixmap for double-buffering, if necessary.
      */
 
     pixmap = Tk_GetPixmap(Tk_Display(tkwin), Tk_WindowId(tkwin),
 	    Tk_Width(tkwin), Tk_Height(tkwin), Tk_Depth(tkwin));
+#else
+    pixmap = Tk_WindowId(tkwin);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     /*
      * Redraw the widget's background and border.
@@ -1426,6 +1430,7 @@ DisplayPanedWindow(clientData)
 	}
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Copy the information from the off-screen pixmap onto the screen,
      * then delete the pixmap.
@@ -1435,6 +1440,7 @@ DisplayPanedWindow(clientData)
 	    0, 0, (unsigned) Tk_Width(tkwin), (unsigned) Tk_Height(tkwin),
 	    0, 0);
     Tk_FreePixmap(Tk_Display(tkwin), pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 }
 
 /*
@@ -2606,12 +2612,16 @@ DisplayProxyWindow(clientData)
 	return;
     }
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Create a pixmap for double-buffering, if necessary.
      */
 
     pixmap = Tk_GetPixmap(Tk_Display(tkwin), Tk_WindowId(tkwin),
 	    Tk_Width(tkwin), Tk_Height(tkwin), Tk_Depth(tkwin));
+#else
+    pixmap = Tk_WindowId(tkwin);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
     /*
      * Redraw the widget's background and border.
@@ -2619,6 +2629,7 @@ DisplayProxyWindow(clientData)
     Tk_Fill3DRectangle(tkwin, pixmap, pwPtr->background, 0, 0,
 	    Tk_Width(tkwin), Tk_Height(tkwin), 2, pwPtr->sashRelief);
 
+#ifndef TK_NO_DOUBLE_BUFFERING
     /*
      * Copy the pixmap to the display.
      */
@@ -2626,6 +2637,7 @@ DisplayProxyWindow(clientData)
 	    0, 0, (unsigned) Tk_Width(tkwin), (unsigned) Tk_Height(tkwin),
 	    0, 0);
     Tk_FreePixmap(Tk_Display(tkwin), pixmap);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 }
 
 /*

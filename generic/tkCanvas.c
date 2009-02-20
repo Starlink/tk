@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkCanvas.c,v 1.21.2.2 2005/06/21 17:29:16 dgp Exp $
+ * RCS: @(#) $Id: tkCanvas.c,v 1.21.2.5 2008/04/17 14:48:23 dgp Exp $
  */
 
 /* #define USE_OLD_TAG_SEARCH 1 */
@@ -21,6 +21,11 @@
 #include "tkInt.h"
 #include "tkPort.h"
 #include "tkCanvas.h"
+#ifdef TK_NO_DOUBLE_BUFFERING
+#ifdef MAC_OSX_TK
+#include "tkMacOSXInt.h"
+#endif
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
 /*
  * See tkCanvas.h for key data structures used to implement canvases.
@@ -174,10 +179,10 @@ static Tk_ConfigSpec configSpecs[] = {
 	TK_CONFIG_MONO_ONLY},
     {TK_CONFIG_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_CANVAS_SELECT_FG_COLOR, Tk_Offset(TkCanvas, textInfo.selFgColorPtr),
-	TK_CONFIG_COLOR_ONLY},
+	TK_CONFIG_COLOR_ONLY|TK_CONFIG_NULL_OK},
     {TK_CONFIG_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_CANVAS_SELECT_FG_MONO, Tk_Offset(TkCanvas, textInfo.selFgColorPtr),
-	TK_CONFIG_MONO_ONLY},
+	TK_CONFIG_MONO_ONLY|TK_CONFIG_NULL_OK},
     {TK_CONFIG_CUSTOM, "-state", "state", "State",
 	"normal", Tk_Offset(TkCanvas, canvas_state), TK_CONFIG_DONT_SET_DEFAULT,
 	&stateOption},
@@ -521,8 +526,7 @@ CanvasWidgetCmd(clientData, interp, objc, objv)
     Tcl_Obj *CONST objv[];		/* Argument objects. */
 {
     TkCanvas *canvasPtr = (TkCanvas *) clientData;
-    unsigned int length;
-    int c, result;
+    int c, length, result;
     Tk_Item *itemPtr = NULL;		/* Initialization needed only to
 					 * prevent compiler warning. */
 #ifdef USE_OLD_TAG_SEARCH
@@ -933,12 +937,12 @@ CanvasWidgetCmd(clientData, interp, objc, objv)
 	    result = TCL_ERROR;
 	    goto done;
 	}
-	arg = Tcl_GetStringFromObj(objv[2], (int *) &length);
+	arg = Tcl_GetStringFromObj(objv[2], &length);
 	c = arg[0];
 	Tcl_MutexLock(&typeListMutex);
 	for (typePtr = typeList; typePtr != NULL; typePtr = typePtr->nextPtr) {
 	    if ((c == typePtr->name[0])
-		    && (strncmp(arg, typePtr->name, length) == 0)) {
+		    && (strncmp(arg, typePtr->name, (unsigned) length) == 0)) {
 		if (matchPtr != NULL) {
 		    Tcl_MutexUnlock(&typeListMutex);
 		  badType:
@@ -2281,6 +2285,10 @@ DisplayCanvas(clientData)
 	    goto borders;
 	}
     
+	width = screenX2 - screenX1;
+	height = screenY2 - screenY1;
+
+#ifndef TK_NO_DOUBLE_BUFFERING
 	/*
 	 * Redrawing is done in a temporary pixmap that is allocated
 	 * here and freed at the end of the procedure.  All drawing
@@ -2319,13 +2327,18 @@ DisplayCanvas(clientData)
 	    (screenX2 + 30 - canvasPtr->drawableXOrigin),
 	    (screenY2 + 30 - canvasPtr->drawableYOrigin),
 	    Tk_Depth(tkwin));
+#else
+	canvasPtr->drawableXOrigin = canvasPtr->xOrigin;
+	canvasPtr->drawableYOrigin = canvasPtr->yOrigin;
+	pixmap = Tk_WindowId(tkwin);
+	TkpClipDrawableToRect(Tk_Display(tkwin), pixmap,
+		screenX1 - canvasPtr->xOrigin, screenY1 - canvasPtr->yOrigin,
+		width, height);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     
 	/*
 	 * Clear the area to be redrawn.
 	 */
-    
-	width = screenX2 - screenX1;
-	height = screenY2 - screenY1;
     
 	XFillRectangle(Tk_Display(tkwin), pixmap, canvasPtr->pixmapGC,
 		screenX1 - canvasPtr->drawableXOrigin,
@@ -2364,6 +2377,7 @@ DisplayCanvas(clientData)
 		    height);
 	}
     
+#ifndef TK_NO_DOUBLE_BUFFERING
 	/*
 	 * Copy from the temporary pixmap to the screen, then free up
 	 * the temporary pixmap.
@@ -2373,10 +2387,12 @@ DisplayCanvas(clientData)
 		canvasPtr->pixmapGC,
 		screenX1 - canvasPtr->drawableXOrigin,
 		screenY1 - canvasPtr->drawableYOrigin,
-		(unsigned) (screenX2 - screenX1),
-		(unsigned) (screenY2 - screenY1),
+		(unsigned int) width, (unsigned int) height,
 		screenX1 - canvasPtr->xOrigin, screenY1 - canvasPtr->yOrigin);
 	Tk_FreePixmap(Tk_Display(tkwin), pixmap);
+#else
+	TkpClipDrawableToRect(Tk_Display(tkwin), pixmap, 0, 0, -1, -1);
+#endif /* TK_NO_DOUBLE_BUFFERING */
     }
 
     /*
@@ -4647,9 +4663,6 @@ PickCurrentItem(canvasPtr, eventPtr)
 
     buttonDown = canvasPtr->state
 	    & (Button1Mask|Button2Mask|Button3Mask|Button4Mask|Button5Mask);
-    if (!buttonDown) {
-	canvasPtr->flags &= ~LEFT_GRABBED_ITEM;
-    }
 
     /*
      * Save information about this event in the canvas.  The event in
@@ -4723,6 +4736,10 @@ PickCurrentItem(canvasPtr, eventPtr)
 	return;
     }
 
+    if (!buttonDown) {
+	canvasPtr->flags &= ~LEFT_GRABBED_ITEM;
+    }
+    
     /*
      * Simulate a LeaveNotify event on the previous current item and
      * an EnterNotify event on the new current item.  Remove the "current"
@@ -5571,7 +5588,7 @@ GetStringsFromObjs(argc, objv)
     }
     argv = (CONST char **) ckalloc((argc+1) * sizeof(char *));
     for (i = 0; i < argc; i++) {
-	argv[i]=Tcl_GetStringFromObj(objv[i], (int *) NULL);
+	argv[i] = Tcl_GetStringFromObj(objv[i], NULL);
     }
     argv[argc] = 0;
     return argv;

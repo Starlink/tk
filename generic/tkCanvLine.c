@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkCanvLine.c,v 1.13 2003/02/09 07:48:22 hobbs Exp $
+ * RCS: @(#) $Id: tkCanvLine.c,v 1.13.2.2 2006/10/16 15:35:50 das Exp $
  */
 
 #include <stdio.h>
@@ -535,7 +535,15 @@ ConfigureLine(interp, canvas, itemPtr, objc, objv, flags)
 	gcValues.join_style = linePtr->joinStyle;
 	mask |= GCJoinStyle;
 	newGC = Tk_GetGC(tkwin, mask, &gcValues);
+#ifdef MAC_OSX_TK
+	/*
+	 * Mac OS X CG drawing needs access to linewidth even for 
+	 * arrow fills (as linewidth controls antialiasing).
+	 */
+	mask |= GCLineWidth;
+#else
 	gcValues.line_width = 0;
+#endif
 	arrowGC = Tk_GetGC(tkwin, mask, &gcValues);
     } else {
 	newGC = arrowGC = None;
@@ -1729,11 +1737,11 @@ GetLineIndex(interp, canvas, itemPtr, obj, indexPtr)
     int *indexPtr;		/* Where to store converted index. */
 {
     LineItem *linePtr = (LineItem *) itemPtr;
-    size_t length;
-    char *string = Tcl_GetStringFromObj(obj, (int *) &length);
+    int length;
+    char *string = Tcl_GetStringFromObj(obj, &length);
 
     if (string[0] == 'e') {
-	if (strncmp(string, "end", length) == 0) {
+	if (strncmp(string, "end", (unsigned) length) == 0) {
 	    *indexPtr = 2*linePtr->numPoints;
 	} else {
 	    badIndex:

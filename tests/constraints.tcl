@@ -127,6 +127,8 @@ namespace eval tk {
 namespace import -force tk::test::*
 
 namespace import -force tcltest::testConstraint
+testConstraint notAqua [expr {[tk windowingsystem] ne "aqua"}]
+testConstraint aqua [expr {[tk windowingsystem] eq "aqua"}]
 testConstraint userInteraction 0
 testConstraint nonUnixUserInteraction [expr {[testConstraint userInteraction]
                                                 || [testConstraint unix]}]

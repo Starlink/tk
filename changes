@@ -2,7 +2,7 @@ This file summarizes all changes made to Tk since version 1.0 was
 released on March 13, 1991.  Changes that aren't backward compatible
 are marked specially.
 
-RCS: @(#) $Id: changes,v 1.64.2.25 2005/06/24 13:51:39 dgp Exp $
+RCS: @(#) $Id: changes,v 1.64.2.55 2008/04/11 16:55:47 dgp Exp $
 
 3/16/91 (bug fix) Modified tkWindow.c to remove Tk's Tcl commands from
 the interpreter when the main window is deleted (otherwise there will
@@ -5831,3 +5831,334 @@ Documentation improvements [1087842,1081527,1115907,etc.]
 2005-06-23 (bug fix)[756840] Fix Tk console cleanup on exit/reinit (mistachkin)
 
 --- Released 8.4.11, June 28, 2005 --- See ChangeLog for details ---
+
+2005-07-24 (enhancement)[1244153] use SC_PROG_TCLSH, SC_BUILD_TCLSH (dejong)
+
+2005-08-09 (Aqua enhancement) Carbon events (steffen)
+
+2005-08-11 (bug fix)[1252702] portable Tcl_GetStringFromObj() calls (fellows)
+
+2005-08-16 (bug fix)[749908] per-thread Tk_ConfigSpec tables (fellows)
+
+2005-08-23 (bug fix)[1235544] adopt Tcl's SEH implementation (kenny,dejong)
+
+2005-08-23 (Aqua bug fix) dialogs ignore -initial* options (hobbs)
+
+2005-10-04 (bug fix)[1216775] [tk_dialog] failing [grab] (fontana,hobbs)
+
+2005-10-04 (bug fix)[1309218] [tk_chooseDirectory -mustexist] (lemburg,hobbs)
+
+2005-10-10 (bug fix)[1319720] Tk_DeleteOptionTable() mem leak (melbardis)
+
+2005-10-18 (bug fix)[1328926] $argv encoding and list formatting (porter)
+
+2005-11-06 (platform support) OpenBSD missing LIBS (thoyts)
+
+2005-11-22 (bug fix)[1353414] [selection get] compat w/OpenOffice.org (fellows)
+
+2005-11-22 (bug fix)[1335485] dialog and space in widget name (taylor,fellows)
+
+2005-11-29 (enhancement)[1369597] Win 64: --enable-64bit=amd64|ia64 (hobbs)
+
+2005-11-29 (bug fix)[1252259] clear initial % from console (lawlor,hobbs)
+
+2005-11-30 (bug fix)[1289565] ClientMessage handling (staplin,hobbs)
+
+2005-11-30 (bug fix)[1086049] [wm attributes -topmost] fix (courtney,hobbs)
+
+2005-12-01 (bug fix)[1353416] [tk_popup] wrong post location (fvogelnew1,hobbs)
+
+2005-12-01 (workaround)[905830] Disable SCIM usage by Tk until properly
+handled (max)
+
+--- Released 8.4.12, December 5, 2005 --- See ChangeLog for details ---
+
+2005-12-12 (bug fix)[1377619] configure syntax error exposed in bash-3.1 (hobbs)
+
+2005-12-13 (Aqua) MouseWheel bindings; kEventMouseScroll events (steffen) 
+
+2006-01-20 (bug fix)[905830] all events to XFilterEvent (SCIM compat) (english)
+
+2006-01-25 (feature enhance)[1237759] update script lib to 8.4 (fradin,porter)
+
+2006-02-27 (bug fix)[480862] [$img configure -data] no display change (fellows)
+
+2006-02-27 (bug fix)[470322] BitmapInit() thread safety (griffin,fellows)
+
+2006-03-02 (Aqua bug fix) image endian issue on OS X/x86 (hobbs)
+
+2006-03-15 (bug fix)[1409140] speed up photo image updates (fellows)
+
+2006-03-16 (enhancement)[1405069] added Portuguese l10n. (ricardoj,silasj)
+
+2006-03-17 (bug fix)[1451587] no abbreviations in script library (thoyts)
+
+2006-03-20 (bug fix)[1380427] crash in undo stack (lz_ufo,callewaert,fellows)
+
+2006-03-27 (bug fix)[1458234] crash in animated GIFs (bron,fellows)
+
+2006-03-29 (platform support)[917433] tolerate X servers that do not
+accept the color names "Black" and "White" (porter)
+
+2006-04-05 (bug fix) several finalization issues corrected (hobbs)
+
+2006-04-05 (bug fix)[1442102] crash on full -elide [text] (hobbs)
+
+2006-04-05 (bug fix)[1374119] default keyboard charset init (hobbs)
+
+2006-04-05 (bug fix)[1414171] stop $text dump if change detected (hobbs)
+
+2006-04-05 (bug fix)[1422430] [grid] empty index list crash (hobbs)
+
+2006-04-06 (bug fix)[1455241] Aqua: [wm attributes -titlepath] fix (steffen)
+
+2006-04-07 (bug fix)[934524]  Aqua: background window dragging/growing (steffen)
+
+2006-04-09 (bug fix)[1467004] Aqua: [wm resizable] fix (steffen)
+
+2006-04-09 (bug fix)[1450800] Aqua: allow empty toplevel names (steffen)
+
+2006-04-11 (bug fix)[1073456] Aqua: implement toplevel zoom (steffen)
+
+2006-04-11 (bug fix)[700316]  Aqua: enable 'Preferences' app menu item (steffen)
+
+2006-04-11 (bug fix)[1193614] Aqua: tk_messageBox escape key binding (steffen)
+
+2006-04-11 (enhancement)[1105284] Aqua: call ::tk::mac::* procs for all
+registered applevents (steffen)
+
+2006-04-11 (bug fix)[1212056] fix panic on safe window exit on Windows (hobbs)
+
+2006-04-12 (bug fix)[1432666] grid row/col out of bounds crash (spjuth)
+
+--- Released 8.4.13, April 19, 2006 --- See ChangeLog for details ---
+
+2006-04-25 (bug fix)[1475865] crash on invalid font name from XServer (fellows)
+
+2006-04-28 (bug fix)[1243318] Aqua: incorrect cursor pos in bindings (steffen)
+
+2006-04-28 (bug fix)[1476443] Aqua: incorrect toplevel pos on 1st map (steffen)
+
+2006-05-12 (performance)[1409140] restore perf lost in 2006-03-15 change (hobbs)
+
+2006-05-13 (bug fix)[1481503] Aqua: key shortcut for 'Preferences' (steffen)
+
+2006-05-13 (bug fix)[1155596] Aqua: images with alpha on native btns (steffen)
+
+2006-05-13 (bug fix)[1480105] Aqua: Map/Unmap propagation to children (steffen)
+
+2006-05-13 (bug fix)[940117] Unmap canvas window items on canvas Unmap (steffen)
+
+2006-05-16 (bug fix)[1472624] Aqua: balloon help don't steal focus (steffen)
+
+2006-05-29 (bug fix)[706446] Aqua: active [button] highlight (hobbs)
+
+2006-05-29 (bug fix)[1424513] [listbox] crash with namespace var (hobbs)
+
+2006-06-01 (bug fix)[912571] [console] std chan refcount (mistachkin,hobbs)
+
+2006-06-05 (bug fix)[1188340] [console] thread safety (porter)
+
+2006-06-14 (bug fix)[950121] Aqua: crash in draw of very wide images (steffen)
+
+2006-06-14 (bug fix)[1501922] Aqua: invalid clip regions on redraw (steffen)
+
+2006-06-14 (bug fix)[891141] excess variable writes by [scale] (porter)
+
+2006-06-15 (platform support)[1424909] MS VS2005 support (thoyts)
+
+2006-07-20 (platform support) Mac OS X weak linking (steffen)
+
+2006-07-21 (bug fix)[700311, 1525905] Aqua: pure modifier keysyms (steffen)
+
+2006-07-24 (bug fix)[1358663] Aqua: [wm geometry -x-y] (steffen)
+
+2006-07-25 (bug fix)[1516950] Aqua: cmd-Q app menu key shortcut (steffen)
+
+2006-08-18 (bug fix)[1542205] Aqua: toplevel toolbar button crash (steffen)
+
+2006-08-21 (bug fix) Aqua: recursively called event loop (steffen)
+
+2006-08-24 (bug fix) Aqua: window grow icon obscuring scrollbar (steffen)
+
+2006-08-30 (new feature)[1518677] WM_UNICHAR window message (hobbs,petasis)
+
+2006-09-06 (bug fix)[1456342] speedier [text] delete (hobbs)
+
+2006-09-10 (bug fix) Aqua: active/inactive text selection color&relief (steffen)
+
+2006-09-10 (bug fix)[1472624] Aqua: mouse events in overrideredir wins (steffen)
+
+2006-09-11 (bug fix) Aqua: app menu shortcuts with custom .apple menu (steffen)
+
+2006-09-22 (bug fix)[1562528] NULL terminates variadic calls (fellows,ryazanov)
+
+2006-09-26 (platform support) MSVC8 AMD64 support (thoyts)
+
+2006-10-05 (bug fix)[1122671] alignment fixes in ucs-2be encoding routines
+(hobbs,staplin)
+
+2006-10-16 (bug fix)[1558051] Aqua: CG drawing matches X11 (steffen)
+
+--- Released 8.4.14, October 19, 2006 --- See ChangeLog for details ---
+
+2006-10-31 (platform support)[1582769] Fix build with VC2003 (thoyts)
+
+2006-11-02 (enhancement) Improve OS X Carbon Update event handling (steffen).
+
+2006-11-23 (bug fix)[1599877] Win: multibyte menu item underlines (hobbs)
+
+2006-11-24 (bug fix)[1487701] Better handling of tcl_interactive on OS X to
+control display of console (hobbs, steffen)
+
+2006-11-26 (platform support)[1230558] --enable-64bit on more systems (steffen)
+
+2006-11-30 (bug fix) Fix handling of Escape binding on OS X dialogs (steffen)
+
+2006-12-01 (new feature) Win: [wm attributes -transparentcolor] (hobbs)
+
+2006-12-04 (performance)[1608046] [$listbox itemconfigure] (rezic,hobbs)
+
+2006-12-22 (bug fix)[1522467] use fd_mask for 64bit support (fellow,vriezen)
+
+2007-01-25 (configure change) ensure CPPFLAGS env var used when set (steffen)
+
+2007-01-30 (enhancement) new target: `install-private-headers` (hobbs, steffen)
+
+2007-02-19 (bug fix)[1662959] [tk_getOpenFile] in empty dir (hobbs)
+
+2007-04-23 (enhancement) Allow empty value for -selectforeground opt (steffen)
+
+2007-04-23 (platform support) Aqua: remove Tk-internal double buffering that is
+wasteful on Aqua; allows direct-to-window CoreGraphics drawing (e.g. adding 
+support for colors with alpha) (steffen)
+
+2007-04-23 (platform support) Aqua: add all OS theme colors/brushes (patterns)
+as system colors (steffen)
+
+2007-04-23 (platform support) Aqua: tk_dialog & bgerror use OS theme (steffen)
+
+2007-04-23 (platform support) Aqua: add 'none' & missing theme cursors (steffen)
+
+2007-04-23 (platform support) Aqua: [tk_getOpenFile -parent] et al use sheet
+dialog (steffen)
+
+2007-04-23 (bug fix) Aqua: fix custom MDEF and tearoff menu display (steffen)
+
+2007-04-23 (bug fix)[1620826] Aqua: fix <<MenuSelect>> support (steffen)
+
+2007-04-23 (platform support) Aqua: add support for live window resizing and
+asynchronous window dragging; prevent window from becoming inacessible
+offscreen or under Dock after dragging; use transparent grow box (steffen)
+
+2007-04-23 (platform support) Aqua: improve event processing during nested
+event loops (e.g. modal dialogs, menu tracking, window resizing etc) (steffen)
+
+2007-04-23 (bug fix) Aqua: add support for all possible aqua scrollbar arrow
+positions, scrollbar variants and for "jump to here" scrollbar behaviour;
+correct scroll view size computation; enforce minimal scrollbar height (steffen)
+
+2007-04-23 (platform support) Aqua: add [wm attributes] -topmost, -fullscreen
+and -transparent (fully transparent win via -bg "systemTransparent") (steffen)
+
+2007-04-23 (platform support) Aqua: determine win min/max sizes dynamically;
+correct size handling of gridded windows; improve computation of initial
+window bounds; correct window size handling on multi-headed systems (steffen)
+
+2007-04-23 (platform support) Aqua: correct composite attribute handling in
+[tk::unsupported::MacWindowStyle] and add new attributes; allow changing
+window class of already existing windows (steffen)
+
+2007-04-23 (platform support) Aqua: add tcl document extensions and mime type
+to Wish.app's Info.plist (steffen)
+
+2007-05-15 (bug fix)[1677608] list shimmer crash [grid *configure] (porter)
+
+--- Released 8.4.15, May 25, 2007 --- See ChangeLog for details ---
+
+2007-05-31 (platform support) Aqua: improve interaction of Expose events and
+idle-time redraws (steffen)
+
+2007-05-31 (bug fix) Aqua: gridded window max-size calculation (steffen)
+
+2007-06-02 (bug fix)[1731734] Aqua: menu cascades outside menubar (steffen)
+
+2007-06-06 (platform support) Aqua: enable MouseWheel events in background
+windows (steffen)
+
+2007-06-09 (bug fix)[1724223] Unicode menu entry crash (hobbs)
+
+2007-06-09 (bug fix)[1467997] Blue/red reversal in icons (hobbs,janssen)
+
+2007-06-23 (bug fix) Aqua: nav dialog sheet crash (steffen)
+
+2007-06-29 (platform support) Aqua: remove private internal declarations from
+installed tkMacOSXInt.h header (steffen)
+
+2007-06-29 (bug fix) Aqua: scrollbar thumb size calculation (steffen)
+
+2007-07-09 (bug fix) Aqua: app-is-frontmost detection (steffen)
+
+2007-07-09 (bug fix) Aqua: window click activation & titlebar click handling
+in presence of grabs or modal windows (steffen)
+
+2007-07-25 (bug fix)[1743786] Aqua: tk_getOpenFile result (steffen)
+
+2007-08-27 (bug fix)[1782105] Aqua: tk_chooseColor result (steffen)
+
+2007-09-11 (platform support) Windows AMD64 support (thoyts)
+
+2007-09-11 (bug fix)[777203] add TK_INCLUDE_SPEC to tkConfig.sh (steffen)
+
+2007-09-11 (bug fix) Animated GIF buffer overrun (max)
+
+2007-09-15 (platform support) SunOS-5.1x link with cc, not ld (steffen)
+
+--- Released 8.4.16, September 21, 2007 --- See ChangeLog for details ---
+
+2007-10-11 (bug fix)[1810818] Aqua: [wm resizeable] (steffen)
+
+2007-10-11 (enhancement)[1800742] msg catalog for Hungarian. (reszo)
+
+2007-10-25 (bug fix)[1818491] crash in [place] manager (mcdonald)
+
+2007-10-26 (platform support) Mac OS X: 64-bit X11 support (steffen)
+
+2007-11-09 (platform support) Aqua: replace RgnHandles by HIShapeRefs (steffen)
+	*** POTENTIAL INCOMPATIBILITY for C code acessing MacDrawable Rgns ***
+
+2007-11-09 (enhancement) Aqua: "Run Widget Demo" menu item (steffen)
+
+2007-11-09 (bug fix) Aqua: activate event after window expansion (steffen)
+
+2007-11-09 (bug fix)[1824521] Aqua: menubutton crash with -bitmap (steffen)
+
+2007-11-09 (platform support) Aqua: (menu)button pressed/inactive/disabled
+look&feel; menubutton size with -image/-bitmap (steffen)
+
+2007-11-09 (bug fix) Aqua: [tk_getOpenFile] (et al.) and help menu crashes on
+Mac OS X Leopard (steffen)
+
+2007-11-26 (bug fix)[1822391] [photo put] segfault w/ PPM data (kenny)
+
+2007-12-12 (bug fix)[1809538,1799782,1737288] fixes for the <<Modified>>
+virtual event on [text] widgets (hobbs)
+
+2007-12-13 (bug fix) correctly trace menubutton -textvariable for -compound
+use (hobbs)
+
+2007-12-18 (bug fix)[1845899] Aqua: [wm transient] (steffen)
+
+--- Released 8.4.17, January 4, 2008 --- See ChangeLog for details ---
+
+2008-02-01 (bug fix)[CVE-2008-0553] buffer overflow in GIF format (max)
+
+--- Released 8.4.18, February 8, 2008 --- See ChangeLog for details ---
+
+2008-02-27 (bug fix)[1863346] Aqua: memleak in QD drawing (steffen)
+
+2008-03-27 (platform support)[1921166] Solaris 64bit build fixes (steffen)
+
+2008-04-07 (bug fix)[1937135] Fix double-free with argv error (hobbs)
+
+--- Released 8.4.19, April 18, 2008 --- See ChangeLog for details ---

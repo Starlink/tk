@@ -7,10 +7,10 @@
 #	Donal K. Fellows.
 #
 # Copyright (c) 1998-2000 by Ajuba Solutions.
-# All rights reserved.
+# Copyright (c) 2007 Daniel A. Steffen <das@users.sourceforge.net>
 # 
-# RCS: @(#) $Id: bgerror.tcl,v 1.23.2.2 2004/04/17 03:54:10 hobbs Exp $
-# $Id: bgerror.tcl,v 1.23.2.2 2004/04/17 03:54:10 hobbs Exp $
+# RCS: @(#) $Id: bgerror.tcl,v 1.23.2.9 2007/11/09 06:26:54 das Exp $
+# $Id: bgerror.tcl,v 1.23.2.9 2007/11/09 06:26:54 das Exp $
 
 namespace eval ::tk::dialog::error {
     namespace import -force ::tk::msgcat::*
@@ -18,6 +18,13 @@ namespace eval ::tk::dialog::error {
     option add *ErrorDialog.function.text [mc "Save To Log"] \
 	widgetDefault
     option add *ErrorDialog.function.command [namespace code SaveToLog]
+    if {[tk windowingsystem] eq "aqua"} {
+	option add *ErrorDialog*background systemAlertBackgroundActive \
+		widgetDefault
+	option add *ErrorDialog*info.text.background white widgetDefault
+	option add *ErrorDialog*Button.highlightBackground \
+		systemAlertBackgroundActive widgetDefault
+    }
 }
 
 proc ::tk::dialog::error::Return {} {
@@ -88,8 +95,10 @@ proc ::tk::dialog::error::bgerror err {
 
     # Ok the application's tkerror either failed or was not found
     # we use the default dialog then :
+    set windowingsystem [tk windowingsystem]
+
     if {($tcl_platform(platform) eq "macintosh")
-             || ([tk windowingsystem] eq "aqua")} {
+             || ($windowingsystem eq "aqua")} {
 	set ok		[mc Ok]
 	set messageFont	system
 	set textRelief	flat
@@ -123,14 +132,14 @@ proc ::tk::dialog::error::bgerror err {
 
     set w .bgerrorDialog
     set title [mc "Application Error"]
-    set text [mc {Error: %1$s} $err]
+    set text [mc {Error: %1$s} $displayedErr]
     set buttons [list ok $ok dismiss [mc "Skip Messages"] \
 	    function [mc "Details >>"]]
 
     # 1. Create the top-level window and divide it into top
     # and bottom parts.
 
-    catch {destroy .bgerrorDialog}
+    destroy .bgerrorDialog
     toplevel .bgerrorDialog -class ErrorDialog
     wm withdraw .bgerrorDialog
     wm title .bgerrorDialog $title
@@ -138,13 +147,13 @@ proc ::tk::dialog::error::bgerror err {
     wm protocol .bgerrorDialog WM_DELETE_WINDOW { }
 
     if {($tcl_platform(platform) eq "macintosh")
-            || ([tk windowingsystem] eq "aqua")} {
-	::tk::unsupported::MacWindowStyle style .bgerrorDialog dBoxProc
+            || ($windowingsystem eq "aqua")} {
+	::tk::unsupported::MacWindowStyle style .bgerrorDialog moveableAlert {}
     }
 
     frame .bgerrorDialog.bot
     frame .bgerrorDialog.top
-    if {[tk windowingsystem] eq "x11"} {
+    if {$windowingsystem eq "x11"} {
 	.bgerrorDialog.bot configure -relief raised -bd 1
 	.bgerrorDialog.top configure -relief raised -bd 1
     }
@@ -153,7 +162,6 @@ proc ::tk::dialog::error::bgerror err {
 
     set W [frame $w.top.info]
     text $W.text				\
-	    -bd 2				\
 	    -yscrollcommand [list $W.scroll set]\
 	    -setgrid true			\
 	    -width 40				\
@@ -162,8 +170,11 @@ proc ::tk::dialog::error::bgerror err {
 	    -relief $textRelief			\
 	    -highlightthickness $textHilight	\
 	    -wrap char
+    if {$windowingsystem eq "aqua"} {
+	$W.text configure -width 80 -background white
+    }
 
-    scrollbar $W.scroll -relief sunken -command [list $W.text yview]
+    scrollbar $W.scroll -command [list $W.text yview]
     pack $W.scroll -side right -fill y
     pack $W.text -side left -expand yes -fill both
     $W.text insert 0.0 "$err\n$info"
@@ -181,7 +192,7 @@ proc ::tk::dialog::error::bgerror err {
     label .bgerrorDialog.msg -justify left -text $text -font $messageFont \
 	    -wraplength $wrapwidth
     if {($tcl_platform(platform) eq "macintosh")
-            || ([tk windowingsystem] eq "aqua")} {
+            || ($windowingsystem eq "aqua")} {
 	# On the Macintosh, use the stop bitmap
 	label .bgerrorDialog.bitmap -bitmap stop
     } else {
@@ -217,10 +228,11 @@ proc ::tk::dialog::error::bgerror err {
 	grid columnconfigure .bgerrorDialog.bot $i -weight 1
 	# We boost the size of some Mac buttons for l&f
 	if {($tcl_platform(platform) eq "macintosh")
-	    || ([tk windowingsystem] eq "aqua")} {
+	    || ($windowingsystem eq "aqua")} {
 	    if {($name eq "ok") || ($name eq "dismiss")} {
-		grid columnconfigure .bgerrorDialog.bot $i -minsize 79
+		grid columnconfigure .bgerrorDialog.bot $i -minsize 90
 	    }
+	    grid configure .bgerrorDialog.$name -pady 7
 	}
 	incr i
     }

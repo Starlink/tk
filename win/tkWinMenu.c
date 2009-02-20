@@ -9,7 +9,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinMenu.c,v 1.21.2.4 2004/10/27 00:37:38 davygrvy Exp $
+ * RCS: @(#) $Id: tkWinMenu.c,v 1.21.2.9 2007/06/09 23:52:40 hobbs Exp $
  */
 
 #define OEMRESOURCE
@@ -33,6 +33,10 @@
 #define ALIGN_BITMAP_TOP    0x00000004
 #define ALIGN_BITMAP_BOTTOM 0x00000008
 
+#ifndef TPM_NOANIMATION
+#define TPM_NOANIMATION 0x4000L
+#endif
+
 /*
  * Platform-specific menu flags:
  *
@@ -54,8 +58,6 @@ static int indicatorDimensions[2];
 				 * time to save time. */
 
 typedef struct ThreadSpecificData {
-    Tcl_HashTable commandTable;
-				/* A map of command ids to menu entries */
     int inPostMenu;		/* We cannot be re-entrant like X Windows. */
     WORD lastCommandID;	        /* The last command ID we allocated. */
     HWND menuHWND;		/* A window to service popup-menu messages
@@ -69,8 +71,8 @@ typedef struct ThreadSpecificData {
 				 * active items when menus go away since
 				 * Windows does not see fit to give this
 				 * to us when it sends its WM_MENUSELECT. */
-    Tcl_HashTable winMenuTable;
-				/* Need this to map HMENUs back to menuPtrs */
+    Tcl_HashTable commandTable;	/* A map of command ids to menu entries */
+    Tcl_HashTable winMenuTable;	/* Need this to map HMENUs back to menuPtrs */
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
 
@@ -251,11 +253,16 @@ FreeID(commandID)
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
             Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
-    Tcl_HashEntry *entryPtr = Tcl_FindHashEntry(&tsdPtr->commandTable,
-	    (char *) commandID);
-    
-    if (entryPtr != NULL) {
-    	 Tcl_DeleteHashEntry(entryPtr);
+    /*
+     * If the menuHWND is NULL, this table has been finalized already.
+     */
+
+    if (tsdPtr->menuHWND != NULL) {
+	Tcl_HashEntry *entryPtr = Tcl_FindHashEntry(&tsdPtr->commandTable,
+		(char *) commandID);
+	if (entryPtr != NULL) {
+	    Tcl_DeleteHashEntry(entryPtr);
+	}
     }
 }
 
@@ -289,7 +296,7 @@ TkpNewMenu(menuPtr)
             Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     winMenuHdl = CreatePopupMenu();
-    
+
     if (winMenuHdl == NULL) {
     	Tcl_AppendResult(menuPtr->interp, "No more menus can be allocated.",
     		(char *) NULL);
@@ -301,8 +308,8 @@ TkpNewMenu(menuPtr)
      * back when dispatch messages.
      */
 
-    hashEntryPtr = Tcl_CreateHashEntry(&tsdPtr->winMenuTable, (char *) winMenuHdl,
-	    &newEntry);
+    hashEntryPtr = Tcl_CreateHashEntry(&tsdPtr->winMenuTable,
+	    (char *) winMenuHdl, &newEntry);
     Tcl_SetHashValue(hashEntryPtr, (char *) menuPtr);
 
     menuPtr->platformData = (TkMenuPlatformData) winMenuHdl;
@@ -370,16 +377,17 @@ TkpDestroyMenu(menuPtr)
 	    }
 	}
     } else {
-	Tcl_HashEntry *hashEntryPtr;
- 
 	/*
 	 * Remove the menu from the menu hash table, then destroy the handle.
+	 * If the menuHWND is NULL, this table has been finalized already.
 	 */
 
-	hashEntryPtr = Tcl_FindHashEntry(&tsdPtr->winMenuTable, 
-                (char *) winMenuHdl);
-	if (hashEntryPtr != NULL) {
-	    Tcl_DeleteHashEntry(hashEntryPtr);
+	if (tsdPtr->menuHWND != NULL) {
+	    Tcl_HashEntry *hashEntryPtr =
+		Tcl_FindHashEntry(&tsdPtr->winMenuTable, (char *) winMenuHdl);
+	    if (hashEntryPtr != NULL) {
+		Tcl_DeleteHashEntry(hashEntryPtr);
+	    }
 	}
  	DestroyMenu(winMenuHdl);
     }
@@ -497,7 +505,7 @@ GetEntryText(mePtr)
 		next = Tcl_UtfNext(p);
 		Tcl_DStringAppend(&itemString, p, (int) (next - p));
 	    }
-	} 	    
+	}
 
 	itemText = ckalloc(Tcl_DStringLength(&itemString) + 1);
 	strcpy(itemText, Tcl_DStringValue(&itemString));
@@ -731,11 +739,12 @@ TkpPostMenu(interp, menuPtr, x, y)
     int y;
 {
     HMENU winMenuHdl = (HMENU) menuPtr->platformData;
-    int result, flags;
+    int i, result, flags;
     RECT noGoawayRect;
     POINT point;
     Tk_Window parentWindow = Tk_Parent(menuPtr->tkwin);
     int oldServiceMode = Tcl_GetServiceMode();
+    TkMenuEntry *mePtr;
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
             Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
@@ -756,7 +765,7 @@ TkpPostMenu(interp, menuPtr, x, y)
      * The post commands could have deleted the menu, which means
      * we are dead and should go away.
      */
-    
+
     if (menuPtr->tkwin == NULL) {
 	tsdPtr->inPostMenu--;
     	return TCL_OK;
@@ -777,7 +786,7 @@ TkpPostMenu(interp, menuPtr, x, y)
     }
 
     Tcl_SetServiceMode(TCL_SERVICE_NONE);
-    
+
     /*
      * Make an assumption here. If the right button is down,
      * then we want to track it. Otherwise, track the left mouse button.
@@ -795,6 +804,18 @@ TkpPostMenu(interp, menuPtr, x, y)
 	    flags |= TPM_RIGHTBUTTON;
 	} else {
 	    flags |= TPM_LEFTBUTTON;
+	}
+    }
+
+    /*
+     * Disable menu animation if an image is present, as clipping isn't
+     * handled correctly with temp DCs.  [Bug 1329198]
+     */
+    for (i = 0; i < menuPtr->numEntries; i++) {
+	mePtr = menuPtr->entries[i];
+	if (mePtr->image != NULL) {
+	    flags |= TPM_NOANIMATION;
+	    break;
 	}
     }
 
@@ -1021,31 +1042,35 @@ TkWinHandleMenuEvent(phwnd, pMessage, pwParam, plParam, plResult)
 
 
 	case WM_MENUCHAR: {
-	    unsigned char menuChar = (unsigned char) LOWORD(*pwParam);
-	    hashEntryPtr = Tcl_FindHashEntry(&tsdPtr->winMenuTable, 
-                    (char *) *plParam);
+	    hashEntryPtr = Tcl_FindHashEntry(&tsdPtr->winMenuTable,
+		    (char *) *plParam);
 	    if (hashEntryPtr != NULL) {
-		int i;
+		int i, len, underline;
+		Tcl_Obj *labelPtr;
+		Tcl_UniChar *wlabel, menuChar;
 
 		*plResult = 0;
 		menuPtr = (TkMenu *) Tcl_GetHashValue(hashEntryPtr);
-		for (i = 0; i < menuPtr->numEntries; i++) {
-		    int underline;
-		    char *label;
+		/*
+		 * Assume we have something directly convertable to
+		 * Tcl_UniChar.  True at least for wide systems.
+		 */
+		menuChar = Tcl_UniCharToUpper((Tcl_UniChar) LOWORD(*pwParam));
 
+		for (i = 0; i < menuPtr->numEntries; i++) {
 		    underline = menuPtr->entries[i]->underline;
-		    if (menuPtr->entries[i]->labelPtr != NULL) {
-			label = Tcl_GetStringFromObj(
-				menuPtr->entries[i]->labelPtr, NULL);
-		    }
-		    if ((-1 != underline) 
-			    && (NULL != menuPtr->entries[i]->labelPtr)
-			    && (CharUpper((LPTSTR) menuChar) 
-			    == CharUpper((LPTSTR) (unsigned char) 
-			    label[underline]))) {
-			*plResult = (2 << 16) | i;
-			returnResult = 1;
-			break;
+		    labelPtr = menuPtr->entries[i]->labelPtr;
+		    if ((underline >= 0) && (labelPtr != NULL)) {
+			/*
+			 * Ensure we don't exceed the label length, then check
+			 */
+			wlabel = Tcl_GetUnicodeFromObj(labelPtr, &len);
+			if ((underline < len) && (menuChar ==
+				    Tcl_UniCharToUpper(wlabel[underline]))) {
+			    *plResult = (2 << 16) | i;
+			    returnResult = 1;
+			    break;
+			}
 		    }
 		}
 	    }
@@ -1054,7 +1079,7 @@ TkWinHandleMenuEvent(phwnd, pMessage, pwParam, plParam, plResult)
 
 	case WM_MEASUREITEM: {
 	    LPMEASUREITEMSTRUCT itemPtr = (LPMEASUREITEMSTRUCT) *plParam;
-    
+
 	    if (itemPtr != NULL) {
 		mePtr = (TkMenuEntry *) itemPtr->itemData;
 		menuPtr = mePtr->menuPtr;
@@ -1066,7 +1091,7 @@ TkWinHandleMenuEvent(phwnd, pMessage, pwParam, plParam, plResult)
 		    itemPtr->itemWidth += 2 - indicatorDimensions[1];
 		} else {
 		    int activeBorderWidth;
-		    
+
 		    Tk_GetPixelsFromObj(menuPtr->interp, menuPtr->tkwin,
 			    menuPtr->activeBorderWidthPtr, 
 			    &activeBorderWidth);
@@ -1077,7 +1102,7 @@ TkWinHandleMenuEvent(phwnd, pMessage, pwParam, plParam, plResult)
 	    }
 	    break;
 	}
-	
+
 	case WM_DRAWITEM: {
 	    TkWinDrawable *twdPtr;
 	    LPDRAWITEMSTRUCT itemPtr = (LPDRAWITEMSTRUCT) *plParam;
@@ -1161,11 +1186,11 @@ TkWinHandleMenuEvent(phwnd, pMessage, pwParam, plParam, plResult)
 			    mePtr = menuPtr->entries[LOWORD(*pwParam)];
 			} else {
 			    hashEntryPtr = Tcl_FindHashEntry(
-                                    &tsdPtr->commandTable,
-				    (char *) LOWORD(*pwParam));
+				&tsdPtr->commandTable,
+				(char *) LOWORD(*pwParam));
 			    if (hashEntryPtr != NULL) {
 				mePtr = (TkMenuEntry *) 
-					Tcl_GetHashValue(hashEntryPtr);
+				    Tcl_GetHashValue(hashEntryPtr);
 			    }
 			}
 		    }	 
@@ -1252,7 +1277,7 @@ TkpSetWindowMenuBar(tkwin, menuPtr)
 {
     HMENU winMenuHdl;
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+	Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (menuPtr != NULL) {
 	Tcl_HashEntry *hashEntryPtr;
@@ -1711,10 +1736,10 @@ DrawMenuEntryArrow(menuPtr, mePtr, d, gc,
     /* Set bitmap bg to highlight color if the menu is highlighted */
     if (mePtr->entryFlags & ENTRY_PLATFORM_FLAG1) {
         XColor *activeBgColor = Tk_3DBorderColor(Tk_Get3DBorderFromObj(
-                mePtr->menuPtr->tkwin,
-                (mePtr->activeBorderPtr == NULL) ?
-                mePtr->menuPtr->activeBorderPtr :
-                mePtr->activeBorderPtr));
+						     mePtr->menuPtr->tkwin,
+						     (mePtr->activeBorderPtr == NULL) ?
+						     mePtr->menuPtr->activeBorderPtr :
+						     mePtr->activeBorderPtr));
         gc->background = activeBgColor->pixel;
     }
 
@@ -1779,8 +1804,7 @@ DrawMenuSeparator(menuPtr, mePtr, d, gc, tkfont, fmPtr, x, y, width, height)
  *
  * DrawMenuUnderline --
  *
- *	On appropriate platforms, draw the underline character for the
- *	menu.
+ *	On appropriate platforms, draw the underline character for the menu.
  *
  * Results:
  *	None.
@@ -1804,16 +1828,23 @@ DrawMenuUnderline(
     int width,				/* Width of entry */
     int height)				/* Height of entry */
 {
-    if (mePtr->underline >= 0) {
-	char *label = Tcl_GetStringFromObj(mePtr->labelPtr, NULL);
-	CONST char *start = Tcl_UtfAtIndex(label, mePtr->underline);
-	CONST char *end = Tcl_UtfNext(start);
+    if ((mePtr->underline >= 0) && (mePtr->labelPtr != NULL)) {
+	int len;
 
-    	Tk_UnderlineChars(menuPtr->display, d,
-    		gc, tkfont, label, x + mePtr->indicatorSpace,
-    		y + (height + fmPtr->ascent - fmPtr->descent) / 2, 
-		(int) (start - label), (int) (end - label));
-    }		
+	/* do the unicode call just to prevent overruns */
+	Tcl_GetUnicodeFromObj(mePtr->labelPtr, &len);
+	if (mePtr->underline < len) {
+	    CONST char *label, *start, *end;
+
+	    label = Tcl_GetStringFromObj(mePtr->labelPtr, NULL);
+	    start = Tcl_UtfAtIndex(label, mePtr->underline);
+	    end = Tcl_UtfNext(start);
+	    Tk_UnderlineChars(menuPtr->display, d,
+		    gc, tkfont, label, x + mePtr->indicatorSpace,
+		    y + (height + fmPtr->ascent - fmPtr->descent) / 2,
+		    (int) (start - label), (int) (end - label));
+	}
+    }
 }
 
 /*
@@ -2806,8 +2837,7 @@ TkpMenuNotifyToplevelCreate(
  *
  * MenuExitHandler --
  *
- *	Throws away the utility window needed for menus and unregisters
- *	the class.
+ *	Unregisters the class of utility windows.
  *
  * Results:
  *	None.
@@ -2822,11 +2852,38 @@ static void
 MenuExitHandler(
     ClientData clientData)	    /* Not used */
 {
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    UnregisterClass(MENU_CLASS_NAME, Tk_GetHINSTANCE());
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * MenuExitHandler --
+ *
+ *	Throws away the utility window needed for menus and delete hash
+ *	tables.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Menus have to be reinitialized next time.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+MenuThreadExitHandler(
+    ClientData clientData)	    /* Not used */
+{
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     DestroyWindow(tsdPtr->menuHWND);
-    UnregisterClass(MENU_CLASS_NAME, Tk_GetHINSTANCE());
+    tsdPtr->menuHWND = NULL;
+
+    Tcl_DeleteHashTable(&tsdPtr->winMenuTable);
+    Tcl_DeleteHashTable(&tsdPtr->commandTable);
 }
 
 /*
@@ -2996,8 +3053,6 @@ void
 TkpMenuInit()
 {
     WNDCLASS wndClass;
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     wndClass.style = CS_OWNDC;
     wndClass.lpfnWndProc = TkWinMenuProc;
@@ -3010,9 +3065,6 @@ TkpMenuInit()
     wndClass.lpszMenuName = NULL;
     wndClass.lpszClassName = MENU_CLASS_NAME;
     RegisterClass(&wndClass);
-
-    tsdPtr->menuHWND = CreateWindow(MENU_CLASS_NAME, "MenuWindow", WS_POPUP,
-	0, 0, 10, 10, NULL, NULL, Tk_GetHINSTANCE(), NULL);
 
     TkCreateExitHandler(MenuExitHandler, (ClientData) NULL);
     SetDefaults(1);
@@ -3040,6 +3092,11 @@ TkpMenuThreadInit()
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
             Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
+    tsdPtr->menuHWND = CreateWindow(MENU_CLASS_NAME, "MenuWindow", WS_POPUP,
+	0, 0, 10, 10, NULL, NULL, Tk_GetHINSTANCE(), NULL);
+
     Tcl_InitHashTable(&tsdPtr->winMenuTable, TCL_ONE_WORD_KEYS);
     Tcl_InitHashTable(&tsdPtr->commandTable, TCL_ONE_WORD_KEYS);
+
+    Tcl_CreateThreadExitHandler(MenuThreadExitHandler, (ClientData) NULL);
 }

@@ -1,28 +1,47 @@
-/* 
+/*
  * tkMacOSXWm.c --
  *
  *	This module takes care of the interactions between a Tk-based
- *	application and the window manager.  Among other things, it
+ *	application and the window manager. Among other things, it
  *	implements the "wm" command and passes geometry information
  *	to the window manager.
  *
  * Copyright (c) 1994-1997 Sun Microsystems, Inc.
  * Copyright 2001, Apple Computer, Inc.
+ * Copyright (c) 2006-2007 Daniel A. Steffen <das@users.sourceforge.net>
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXWm.c,v 1.7.2.9 2005/06/01 00:07:28 mdejong Exp $
+ * RCS: @(#) $Id: tkMacOSXWm.c,v 1.7.2.46 2007/12/18 18:21:31 das Exp $
  */
-#include <Carbon/Carbon.h>
 
-#include "tkPort.h"
-#include "tkInt.h"
-#include "tkMacOSXInt.h"
-#include <errno.h>
+#include "tkMacOSXPrivate.h"
 #include "tkScrollbar.h"
 #include "tkMacOSXWm.h"
 #include "tkMacOSXEvent.h"
+#include "tkMacOSXDebug.h"
+
+/*
+#ifdef TK_MAC_DEBUG
+#define TK_MAC_DEBUG_WINDOWS
+#endif
+*/
+
+/*
+ * Data for [wm attributes] command:
+ */
+typedef enum {
+    WMATT_ALPHA, WMATT_FULLSCREEN, WMATT_MODIFIED,/* WMATT_NOTIFY,*/
+    WMATT_TITLEPATH, WMATT_TOPMOST, WMATT_TRANSPARENT,
+    _WMATT_LAST_ATTRIBUTE
+} WmAttribute;
+
+static const char *WmAttributeNames[] = {
+    "-alpha", "-fullscreen", "-modified",/* "-notify",*/
+    "-titlepath", "-topmost", "-transparent",
+    NULL
+};
 
 /*
  * This is a list of all of the toplevels that have been mapped so far. It is
@@ -34,7 +53,7 @@ TkMacOSXWindowList *tkMacOSXWindowListPtr = NULL;
 
 /*
  * The variable below is used to enable or disable tracing in this
- * module.  If tracing is enabled, then information is printed on
+ * module. If tracing is enabled, then information is printed on
  * standard output about interesting interactions with the window
  * manager.
  */
@@ -46,14 +65,21 @@ static int wmTracing = 0;
  * management of top-level windows.
  */
 
-static void		TopLevelReqProc _ANSI_ARGS_((ClientData dummy,
-	Tk_Window tkwin));
+static void TopLevelReqProc(ClientData dummy, Tk_Window tkwin);
 
-static Tk_GeomMgr wmMgrType = {
+static /* const */ Tk_GeomMgr wmMgrType = {
     "wm",				/* name */
     TopLevelReqProc,			/* requestProc */
     (Tk_GeomLostSlaveProc *) NULL,	/* lostSlaveProc */
 };
+
+/*
+ * The following keeps state for Aqua dock icon bounce notification.
+ */
+
+#if 0
+static int tkMacOSXWmAttrNotifyVal = 0;
+#endif
 
 /*
  * Hash table for Mac Window -> TkWindow mapping.
@@ -66,127 +92,105 @@ static int windowHashInit = false;
  * Forward declarations for procedures defined in this file:
  */
 
-static void		InitialWindowBounds _ANSI_ARGS_((TkWindow *winPtr, 
-			    Rect *geometry));
-static int		ParseGeometry _ANSI_ARGS_((Tcl_Interp *interp,
-			    char *string, TkWindow *winPtr));
-static void		TopLevelEventProc _ANSI_ARGS_((ClientData clientData,
-			    XEvent *eventPtr));
-static void             TkWmStackorderToplevelWrapperMap _ANSI_ARGS_((
-                            TkWindow *winPtr,
-                            Display *display,
-                            Tcl_HashTable *table));
-static void		TopLevelReqProc _ANSI_ARGS_((ClientData dummy,
-			    Tk_Window tkwin));
-static void		UpdateGeometryInfo _ANSI_ARGS_((
-			    ClientData clientData));
-static void		UpdateSizeHints _ANSI_ARGS_((TkWindow *winPtr));
-static void		UpdateVRootGeometry _ANSI_ARGS_((WmInfo *wmPtr));
-static int 		WmAspectCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                      TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                      Tcl_Obj *CONST objv[]));
-static int 		WmAttributesCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                          TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                          Tcl_Obj *CONST objv[]));
-static void		WmAttrGetModifiedStatus(WindowRef macWindow, Tcl_Obj
-				    *result);
-static void		WmAttrGetTitlePath(WindowRef macWindow, Tcl_Obj
-				    *result);
-static void		WmAttrGetAlpha(WindowRef macWindow, Tcl_Obj *result);
-static int 		WmClientCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                      TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                      Tcl_Obj *CONST objv[]));
-static int 		WmColormapwindowsCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                               TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                               Tcl_Obj *CONST objv[]));
-static int 		WmCommandCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                       TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                       Tcl_Obj *CONST objv[]));
-static int 		WmDeiconifyCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                         TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                         Tcl_Obj *CONST objv[]));
-static int 		WmFocusmodelCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                          TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                          Tcl_Obj *CONST objv[]));
-static int 		WmFrameCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                     TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                     Tcl_Obj *CONST objv[]));
-static int 		WmGeometryCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static int 		WmGridCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                    TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                    Tcl_Obj *CONST objv[]));
-static int 		WmGroupCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                     TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                     Tcl_Obj *CONST objv[]));
-static int 		WmIconbitmapCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                          TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                          Tcl_Obj *CONST objv[]));
-static int 		WmIconifyCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                       TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                       Tcl_Obj *CONST objv[]));
-static int 		WmIconmaskCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static int 		WmIconnameCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static int 		WmIconphotoCmd _ANSI_ARGS_((Tk_Window tkwin,
-			    TkWindow *winPtr, Tcl_Interp *interp, int objc,
-			    Tcl_Obj *CONST objv[]));
-static int 		WmIconpositionCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                            TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                            Tcl_Obj *CONST objv[]));
-static int 		WmIconwindowCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                          TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                          Tcl_Obj *CONST objv[]));
-static int 		WmMaxsizeCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                       TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                       Tcl_Obj *CONST objv[]));
-static int 		WmMinsizeCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                       TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                       Tcl_Obj *CONST objv[]));
-static int 		WmOverrideredirectCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                                TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                                Tcl_Obj *CONST objv[]));
-static int 		WmPositionfromCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                            TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                            Tcl_Obj *CONST objv[]));
-static int 		WmProtocolCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static int 		WmResizableCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                         TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                         Tcl_Obj *CONST objv[]));
-static int 		WmSizefromCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static int 		WmStackorderCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                          TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                          Tcl_Obj *CONST objv[]));
-static int 		WmStateCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                     TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                     Tcl_Obj *CONST objv[]));
-static int 		WmTitleCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                     TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                     Tcl_Obj *CONST objv[]));
-static int 		WmTransientCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                         TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                         Tcl_Obj *CONST objv[]));
-static int 		WmWithdrawCmd _ANSI_ARGS_((Tk_Window tkwin,
-                                        TkWindow *winPtr, Tcl_Interp *interp, int objc,
-                                        Tcl_Obj *CONST objv[]));
-static void		WmUpdateGeom _ANSI_ARGS_((WmInfo *wmPtr,
-                                       TkWindow *winPtr));
+static void InitialWindowBounds(TkWindow *winPtr, WindowRef macWindow,
+	Rect *geometry);
+static int ParseGeometry(Tcl_Interp *interp, char *string, TkWindow *winPtr);
+static void TopLevelEventProc(ClientData clientData, XEvent *eventPtr);
+static void WmStackorderToplevelWrapperMap(TkWindow *winPtr, Display *display,
+	Tcl_HashTable *table);
+static void UpdateGeometryInfo(ClientData clientData);
+static void UpdateSizeHints(TkWindow *winPtr);
+static void UpdateVRootGeometry(WmInfo *wmPtr);
+static int WmAspectCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmAttributesCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmClientCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmColormapwindowsCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmCommandCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmDeiconifyCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmFocusmodelCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+#if 0
+static int WmForgetCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+#endif
+static int WmFrameCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmGeometryCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmGridCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmGroupCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmIconbitmapCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmIconifyCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmIconmaskCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmIconnameCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmIconphotoCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmIconpositionCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmIconwindowCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+#if 0
+static int WmManageCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+#endif
+static int WmMaxsizeCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmMinsizeCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmOverrideredirectCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmPositionfromCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmProtocolCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmResizableCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmSizefromCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmStackorderCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmStateCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmTitleCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int WmTransientCmd(Tk_Window tkwin, TkWindow *winPtr,
+	Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
+static int WmWithdrawCmd(Tk_Window tkwin, TkWindow *winPtr, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static void WmUpdateGeom(WmInfo *wmPtr, TkWindow *winPtr);
+static int WmWinStyle(Tcl_Interp *interp, TkWindow *winPtr, int objc,
+	Tcl_Obj * const objv[]);
+static void ApplyWindowClassAttributeChanges(TkWindow *winPtr,
+	WindowRef macWindow, WindowClass oldClass,
+	WindowAttributes oldAttributes, int create);
+static void ApplyMasterOverrideChanges(TkWindow *winPtr, WindowRef macWindow);
+static WindowGroupRef WmGetWindowGroup(TkWindow *winPtr);
+static void GetMinSize(TkWindow *winPtr, int *minWidthPtr, int *minHeightPtr);
+static void GetMaxSize(TkWindow *winPtr, int *maxWidthPtr, int *maxHeightPtr);
+#if 0
+static void RemapWindows(TkWindow *winPtr, MacDrawable *parentWin);
+#endif
 
+
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * TkWmNewWindow --
  *
  *	This procedure is invoked whenever a new top-level
- *	window is created.  Its job is to initialize the WmInfo
+ *	window is created. Its job is to initialize the WmInfo
  *	structure for the window.
  *
  * Results:
@@ -195,7 +199,7 @@ static void		WmUpdateGeom _ANSI_ARGS_((WmInfo *wmPtr,
  * Side effects:
  *	A WmInfo structure gets allocated and initialized.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 void
@@ -203,7 +207,7 @@ TkWmNewWindow(
     TkWindow *winPtr)		/* Newly-created top-level window. */
 {
     WmInfo *wmPtr;
-	
+
     wmPtr = (WmInfo *) ckalloc(sizeof(WmInfo));
     wmPtr->winPtr = winPtr;
     wmPtr->reparent = None;
@@ -224,14 +228,8 @@ TkWmNewWindow(
     wmPtr->iconFor = NULL;
     wmPtr->sizeHintsFlags = 0;
     wmPtr->minWidth = wmPtr->minHeight = 1;
-
-    /*
-     * Default the maximum dimensions to the size of the display, minus
-     * a guess about how space is needed for window manager decorations.
-     */
-
-    wmPtr->maxWidth = DisplayWidth(winPtr->display, winPtr->screenNum) - 15;
-    wmPtr->maxHeight = DisplayHeight(winPtr->display, winPtr->screenNum) - 30;
+    wmPtr->maxWidth = 0;
+    wmPtr->maxHeight = 0;
     wmPtr->gridWin = NULL;
     wmPtr->widthInc = wmPtr->heightInc = 1;
     wmPtr->minAspect.x = wmPtr->minAspect.y = 1;
@@ -250,6 +248,8 @@ TkWmNewWindow(
     wmPtr->yInParent = 0;
     wmPtr->cmapList = NULL;
     wmPtr->cmapCount = 0;
+    wmPtr->configX = 0;
+    wmPtr->configY = 0;
     wmPtr->configWidth = -1;
     wmPtr->configHeight = -1;
     wmPtr->vRoot = None;
@@ -259,7 +259,8 @@ TkWmNewWindow(
     wmPtr->flags = WM_NEVER_MAPPED;
     wmPtr->style = -1;
     wmPtr->macClass = kDocumentWindowClass;
-    wmPtr->attributes = kWindowStandardDocumentAttributes;
+    wmPtr->attributes = kWindowStandardDocumentAttributes
+	    | kWindowLiveResizeAttribute;
     wmPtr->scrollWinPtr = NULL;
     winPtr->wmInfoPtr = wmPtr;
 
@@ -282,14 +283,14 @@ TkWmNewWindow(
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * TkWmMapWindow --
  *
- *	This procedure is invoked to map a top-level window.  This
+ *	This procedure is invoked to map a top-level window. This
  *	module gets a chance to update all window-manager-related
  *	information in properties before the window manager sees
- *	the map event and checks the properties.  It also gets to
+ *	the map event and checks the properties. It also gets to
  *	decide whether or not to even map the window after all.
  *
  * Results:
@@ -297,11 +298,11 @@ TkWmNewWindow(
  *
  * Side effects:
  *	Properties of winPtr may get updated to provide up-to-date
- *	information to the window manager.  The window may also get
+ *	information to the window manager. The window may also get
  *	mapped, but it may not be if this procedure decides that
  *	isn't appropriate (e.g. because the window is withdrawn).
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 void
@@ -310,34 +311,23 @@ TkWmMapWindow(
 				 * be mapped. */
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
-    Point where = {0, 0};
-    int xOffset, yOffset;	    
-    int firstMap = false;
-    MacDrawable *macWin;
 
     if (wmPtr->flags & WM_NEVER_MAPPED) {
 	wmPtr->flags &= ~WM_NEVER_MAPPED;
-	firstMap = true;
 
 	/*
 	 * Create the underlying Mac window for this Tk window.
 	 */
-	macWin = (MacDrawable *) winPtr->window;
 	if (!TkMacOSXHostToplevelExists(winPtr)) {
 	    TkMacOSXMakeRealWindowExist(winPtr);
 	}
-	
+
 	/*
 	 * Generate configure event when we first map the window.
 	 */
-	LocalToGlobal(&where);
-	TkMacOSXWindowOffset( GetWindowFromPort(TkMacOSXGetDrawablePort((Drawable) macWin)),
-		&xOffset, &yOffset);
-	where.h -= xOffset;
-	where.v -= yOffset;
-	TkGenWMConfigureEvent((Tk_Window) winPtr, 
-		where.h, where.v, -1, -1, TK_LOCATION_CHANGED);
-	
+	TkGenWMConfigureEvent((Tk_Window) winPtr, wmPtr->x, wmPtr->y, -1, -1,
+		TK_LOCATION_CHANGED);
+
 	/*
 	 * This is the first time this window has ever been mapped.
 	 * Store all the window-manager-related information for the
@@ -347,23 +337,23 @@ TkWmMapWindow(
 	if (wmPtr->titleUid == NULL) {
 	    wmPtr->titleUid = winPtr->nameUid;
 	}
-	
+
 	if (!Tk_IsEmbedded(winPtr)) {
 	    TkSetWMName(winPtr, wmPtr->titleUid);
 	}
 
 	TkWmSetClass(winPtr);
-    
+
 	if (wmPtr->iconName != NULL) {
 	    XSetIconName(winPtr->display, winPtr->window, wmPtr->iconName);
 	}
-    
+
 	wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     }
     if (wmPtr->hints.initial_state == WithdrawnState) {
 	return;
     }
-    
+
     /*
      * TODO: we need to display a window if it's iconic on creation.
      */
@@ -371,7 +361,7 @@ TkWmMapWindow(
     if (wmPtr->hints.initial_state == IconicState) {
 	return;
     }
-    
+
     /*
      * Update geometry information.
      */
@@ -387,18 +377,10 @@ TkWmMapWindow(
      */
 
     XMapWindow(winPtr->display, winPtr->window);
-    
-    /*
-     * Now that the window is visable we can determine the offset
-     * from the window's content orgin to the window's decorative
-     * orgin (structure orgin).
-     */
-    TkMacOSXWindowOffset( GetWindowFromPort(TkMacOSXGetDrawablePort(Tk_WindowId(winPtr))), 
-	&wmPtr->xInParent, &wmPtr->yInParent);
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * TkWmUnmapWindow --
  *
@@ -411,7 +393,7 @@ TkWmMapWindow(
  * Side effects:
  *	Unmaps the window.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 void
@@ -423,12 +405,12 @@ TkWmUnmapWindow(
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * TkWmDeadWindow --
  *
  *	This procedure is invoked when a top-level window is
- *	about to be deleted.  It cleans up the wm-related data
+ *	about to be deleted. It cleans up the wm-related data
  *	structures for the window.
  *
  * Results:
@@ -437,12 +419,12 @@ TkWmUnmapWindow(
  * Side effects:
  *	The WmInfo structure for winPtr gets freed up.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 void
-TkWmDeadWindow(winPtr)
-    TkWindow *winPtr;		/* Top-level window that's being deleted. */
+TkWmDeadWindow(
+    TkWindow *winPtr)		/* Top-level window that's being deleted. */
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
     WmInfo *wmPtr2;
@@ -492,14 +474,14 @@ TkWmDeadWindow(winPtr)
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * TkWmSetClass --
  *
  *	This procedure is invoked whenever a top-level window's
- *	class is changed.  If the window has been mapped then this
+ *	class is changed. If the window has been mapped then this
  *	procedure updates the window manager property for the
- *	class.  If the window hasn't been mapped, the update is
+ *	class. If the window hasn't been mapped, the update is
  *	deferred until just before the first mapping.
  *
  * Results:
@@ -508,7 +490,7 @@ TkWmDeadWindow(winPtr)
  * Side effects:
  *	A window property may get updated.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 void
@@ -517,6 +499,7 @@ TkWmSetClass(
 {
     return;
 }
+
 /*
  *----------------------------------------------------------------------
  *
@@ -537,143 +520,154 @@ TkWmSetClass(
 /* ARGSUSED */
 int
 Tk_WmObjCmd(
-            ClientData clientData,	/* Main window associated with
-            * interpreter. */
-            Tcl_Interp *interp,		/* Current interpreter. */
-            int objc,			/* Number of arguments. */
-            Tcl_Obj *CONST objv[])	/* Argument objects. */
-            {
+    ClientData clientData,	/* Main window associated with interpreter. */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
+{
     Tk_Window tkwin = (Tk_Window) clientData;
-    static CONST char *optionStrings[] = {
-        "aspect", "attributes", "client", "colormapwindows",
-        "command", "deiconify", "focusmodel", "frame",
-        "geometry", "grid", "group", "iconbitmap",
-        "iconify", "iconmask", "iconname",
-	"iconphoto", "iconposition",
-        "iconwindow", "maxsize", "minsize", "overrideredirect",
-        "positionfrom", "protocol", "resizable", "sizefrom",
-        "stackorder", "state", "title", "transient",
-        "withdraw", (char *) NULL };
+    static const char *optionStrings[] = {
+	"aspect", "attributes", "client", "colormapwindows",
+	"command", "deiconify", "focusmodel",/* "forget",*/
+	"frame", "geometry", "grid", "group",
+	"iconbitmap", "iconify", "iconmask", "iconname",
+	"iconphoto", "iconposition", "iconwindow",
+	/*"manage", */"maxsize", "minsize", "overrideredirect",
+	"positionfrom", "protocol", "resizable", "sizefrom",
+	"stackorder", "state", "title", "transient",
+	"withdraw", NULL };
     enum options {
-        WMOPT_ASPECT, WMOPT_ATTRIBUTES, WMOPT_CLIENT, WMOPT_COLORMAPWINDOWS,
-        WMOPT_COMMAND, WMOPT_DEICONIFY, WMOPT_FOCUSMODEL, WMOPT_FRAME,
-        WMOPT_GEOMETRY, WMOPT_GRID, WMOPT_GROUP, WMOPT_ICONBITMAP,
-        WMOPT_ICONIFY, WMOPT_ICONMASK, WMOPT_ICONNAME,
-	WMOPT_ICONPHOTO, WMOPT_ICONPOSITION,
-        WMOPT_ICONWINDOW, WMOPT_MAXSIZE, WMOPT_MINSIZE, WMOPT_OVERRIDEREDIRECT,
-        WMOPT_POSITIONFROM, WMOPT_PROTOCOL, WMOPT_RESIZABLE, WMOPT_SIZEFROM,
-        WMOPT_STACKORDER, WMOPT_STATE, WMOPT_TITLE, WMOPT_TRANSIENT,
-        WMOPT_WITHDRAW };
+	WMOPT_ASPECT, WMOPT_ATTRIBUTES, WMOPT_CLIENT, WMOPT_COLORMAPWINDOWS,
+	WMOPT_COMMAND, WMOPT_DEICONIFY, WMOPT_FOCUSMODEL,/* WMOPT_FORGET,*/
+	WMOPT_FRAME, WMOPT_GEOMETRY, WMOPT_GRID, WMOPT_GROUP,
+	WMOPT_ICONBITMAP, WMOPT_ICONIFY, WMOPT_ICONMASK, WMOPT_ICONNAME,
+	WMOPT_ICONPHOTO, WMOPT_ICONPOSITION, WMOPT_ICONWINDOW,
+	/*WMOPT_MANAGE, */WMOPT_MAXSIZE, WMOPT_MINSIZE, WMOPT_OVERRIDEREDIRECT,
+	WMOPT_POSITIONFROM, WMOPT_PROTOCOL, WMOPT_RESIZABLE, WMOPT_SIZEFROM,
+	WMOPT_STACKORDER, WMOPT_STATE, WMOPT_TITLE, WMOPT_TRANSIENT,
+	WMOPT_WITHDRAW };
     int index, length;
     char *argv1;
     TkWindow *winPtr;
 
     if (objc < 2) {
 wrongNumArgs:
-        Tcl_WrongNumArgs(interp, 1, objv, "option window ?arg ...?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 1, objv, "option window ?arg ...?");
+	return TCL_ERROR;
     }
 
     argv1 = Tcl_GetStringFromObj(objv[1], &length);
     if ((argv1[0] == 't') && (strncmp(argv1, "tracing", length) == 0)
-        && (length >= 3)) {
-        if ((objc != 2) && (objc != 3)) {
-            Tcl_WrongNumArgs(interp, 2, objv, "?boolean?");
-            return TCL_ERROR;
-        }
-        if (objc == 2) {
-            Tcl_SetResult(interp, ((wmTracing) ? "on" : "off"), TCL_STATIC);
-            return TCL_OK;
-        }
-        return Tcl_GetBooleanFromObj(interp, objv[2], &wmTracing);
+	&& (length >= 3)) {
+	if ((objc != 2) && (objc != 3)) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "?boolean?");
+	    return TCL_ERROR;
+	}
+	if (objc == 2) {
+	    Tcl_SetResult(interp, ((wmTracing) ? "on" : "off"), TCL_STATIC);
+	    return TCL_OK;
+	}
+	return Tcl_GetBooleanFromObj(interp, objv[2], &wmTracing);
     }
 
     if (Tcl_GetIndexFromObj(interp, objv[1], optionStrings, "option", 0,
-                            &index) != TCL_OK) {
-        return TCL_ERROR;
+			    &index) != TCL_OK) {
+	return TCL_ERROR;
     }
 
     if (objc < 3) {
-        goto wrongNumArgs;
+	goto wrongNumArgs;
     }
 
     if (TkGetWindowFromObj(interp, tkwin, objv[2], (Tk_Window *) &winPtr)
-        != TCL_OK) {
-        return TCL_ERROR;
+	!= TCL_OK) {
+	return TCL_ERROR;
     }
-    if (!Tk_IsTopLevel(winPtr)) {
-        Tcl_AppendResult(interp, "window \"", winPtr->pathName,
-                         "\" isn't a top-level window", (char *) NULL);
-        return TCL_ERROR;
+    if (!Tk_IsTopLevel(winPtr)
+#if 0
+	    && (index != WMOPT_MANAGE) && (index != WMOPT_FORGET)
+#endif
+	    ) {
+	Tcl_AppendResult(interp, "window \"", winPtr->pathName,
+		"\" isn't a top-level window", NULL);
+	return TCL_ERROR;
     }
 
     switch ((enum options) index) {
-        case WMOPT_ASPECT:
-            return WmAspectCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ATTRIBUTES:
-            return WmAttributesCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_CLIENT:
-            return WmClientCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_COLORMAPWINDOWS:
-            return WmColormapwindowsCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_COMMAND:
-            return WmCommandCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_DEICONIFY:
-            return WmDeiconifyCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_FOCUSMODEL:
-            return WmFocusmodelCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_FRAME:
-            return WmFrameCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_GEOMETRY:
-            return WmGeometryCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_GRID:
-            return WmGridCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_GROUP:
-            return WmGroupCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONBITMAP:
-            return WmIconbitmapCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONIFY:
-            return WmIconifyCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONMASK:
-            return WmIconmaskCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONNAME:
-            return WmIconnameCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ASPECT:
+	    return WmAspectCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ATTRIBUTES:
+	    return WmAttributesCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_CLIENT:
+	    return WmClientCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_COLORMAPWINDOWS:
+	    return WmColormapwindowsCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_COMMAND:
+	    return WmCommandCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_DEICONIFY:
+	    return WmDeiconifyCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_FOCUSMODEL:
+	    return WmFocusmodelCmd(tkwin, winPtr, interp, objc, objv);
+#if 0
+	case WMOPT_FORGET:
+	    return WmForgetCmd(tkwin, winPtr, interp, objc, objv);
+#endif
+	case WMOPT_FRAME:
+	    return WmFrameCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_GEOMETRY:
+	    return WmGeometryCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_GRID:
+	    return WmGridCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_GROUP:
+	    return WmGroupCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONBITMAP:
+	    return WmIconbitmapCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONIFY:
+	    return WmIconifyCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONMASK:
+	    return WmIconmaskCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONNAME:
+	    return WmIconnameCmd(tkwin, winPtr, interp, objc, objv);
 	case WMOPT_ICONPHOTO:
 	    return WmIconphotoCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONPOSITION:
-            return WmIconpositionCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_ICONWINDOW:
-            return WmIconwindowCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_MAXSIZE:
-            return WmMaxsizeCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_MINSIZE:
-            return WmMinsizeCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_OVERRIDEREDIRECT:
-            return WmOverrideredirectCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_POSITIONFROM:
-            return WmPositionfromCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_PROTOCOL:
-            return WmProtocolCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_RESIZABLE:
-            return WmResizableCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_SIZEFROM:
-            return WmSizefromCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_STACKORDER:
-            return WmStackorderCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_STATE:
-            return WmStateCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_TITLE:
-            return WmTitleCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_TRANSIENT:
-            return WmTransientCmd(tkwin, winPtr, interp, objc, objv);
-        case WMOPT_WITHDRAW:
-            return WmWithdrawCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONPOSITION:
+	    return WmIconpositionCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_ICONWINDOW:
+	    return WmIconwindowCmd(tkwin, winPtr, interp, objc, objv);
+#if 0
+	case WMOPT_MANAGE:
+	    return WmManageCmd(tkwin, winPtr, interp, objc, objv);
+#endif
+	case WMOPT_MAXSIZE:
+	    return WmMaxsizeCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_MINSIZE:
+	    return WmMinsizeCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_OVERRIDEREDIRECT:
+	    return WmOverrideredirectCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_POSITIONFROM:
+	    return WmPositionfromCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_PROTOCOL:
+	    return WmProtocolCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_RESIZABLE:
+	    return WmResizableCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_SIZEFROM:
+	    return WmSizefromCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_STACKORDER:
+	    return WmStackorderCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_STATE:
+	    return WmStateCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_TITLE:
+	    return WmTitleCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_TRANSIENT:
+	    return WmTransientCmd(tkwin, winPtr, interp, objc, objv);
+	case WMOPT_WITHDRAW:
+	    return WmWithdrawCmd(tkwin, winPtr, interp, objc, objv);
     }
 
     /* This should not happen */
     return TCL_ERROR;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -692,58 +686,312 @@ wrongNumArgs:
  */
 
 static int
-WmAspectCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmAspectCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int numer1, denom1, numer2, denom2;
 
     if ((objc != 3) && (objc != 7)) {
-        Tcl_WrongNumArgs(interp, 2, objv,
-                         "window ?minNumer minDenom maxNumer maxDenom?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv,
+		"window ?minNumer minDenom maxNumer maxDenom?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->sizeHintsFlags & PAspect) {
-            char buf[TCL_INTEGER_SPACE * 4];
+	if (wmPtr->sizeHintsFlags & PAspect) {
+	    char buf[TCL_INTEGER_SPACE * 4];
 
-            sprintf(buf, "%d %d %d %d", wmPtr->minAspect.x,
-                    wmPtr->minAspect.y, wmPtr->maxAspect.x,
-                    wmPtr->maxAspect.y);
-            Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        }
-        return TCL_OK;
+	    sprintf(buf, "%d %d %d %d", wmPtr->minAspect.x,
+		    wmPtr->minAspect.y, wmPtr->maxAspect.x,
+		    wmPtr->maxAspect.y);
+	    Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	}
+	return TCL_OK;
     }
     if (*Tcl_GetString(objv[3]) == '\0') {
-        wmPtr->sizeHintsFlags &= ~PAspect;
+	wmPtr->sizeHintsFlags &= ~PAspect;
     } else {
-        if ((Tcl_GetIntFromObj(interp, objv[3], &numer1) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[4], &denom1) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[5], &numer2) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[6], &denom2) != TCL_OK)) {
-            return TCL_ERROR;
-        }
-        if ((numer1 <= 0) || (denom1 <= 0) || (numer2 <= 0) ||
-            (denom2 <= 0)) {
-            Tcl_SetResult(interp, "aspect number can't be <= 0",
-                          TCL_STATIC);
-            return TCL_ERROR;
-        }
-        wmPtr->minAspect.x = numer1;
-        wmPtr->minAspect.y = denom1;
-        wmPtr->maxAspect.x = numer2;
-        wmPtr->maxAspect.y = denom2;
-        wmPtr->sizeHintsFlags |= PAspect;
+	if ((Tcl_GetIntFromObj(interp, objv[3], &numer1) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[4], &denom1) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[5], &numer2) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[6], &denom2) != TCL_OK)) {
+	    return TCL_ERROR;
+	}
+	if ((numer1 <= 0) || (denom1 <= 0) || (numer2 <= 0) ||
+	    (denom2 <= 0)) {
+	    Tcl_SetResult(interp, "aspect number can't be <= 0",
+		    TCL_STATIC);
+	    return TCL_ERROR;
+	}
+	wmPtr->minAspect.x = numer1;
+	wmPtr->minAspect.y = denom1;
+	wmPtr->maxAspect.x = numer2;
+	wmPtr->maxAspect.y = denom2;
+	wmPtr->sizeHintsFlags |= PAspect;
     }
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmSetAttribute --
+ *
+ *	Helper routine for WmAttributesCmd. Sets the value
+ *	of the specified attribute.
+ *
+ * Returns:
+ *
+ *	TCL_OK if successful, TCL_ERROR otherwise. In case of an
+ *	error, leaves a message in the interpreter's result.
+ *
+ *----------------------------------------------------------------------
+ */
+static int WmSetAttribute(
+    TkWindow *winPtr,		/* Toplevel to work with */
+    WindowRef macWindow,
+    Tcl_Interp *interp,		/* Current interpreter */
+    WmAttribute attribute,	/* Code of attribute to set */
+    Tcl_Obj *value)		/* New value */
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    int boolean;
 
+    switch (attribute) {
+	case WMATT_ALPHA: {
+	    double dval;
+
+	    if (Tcl_GetDoubleFromObj(interp, value, &dval) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    /*
+	     * The user should give (transparent) 0 .. 1.0 (opaque)
+	     */
+	    if (dval < 0.0) {
+		dval = 0.0;
+	    } else if (dval > 1.0) {
+		dval = 1.0;
+	    }
+	    ChkErr(SetWindowAlpha, macWindow, dval);
+	    break;
+	}
+	case WMATT_FULLSCREEN:
+	    if (Tcl_GetBooleanFromObj(interp, value, &boolean) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (boolean != ((wmPtr->flags & WM_FULLSCREEN) != 0)) {
+		if(TkMacOSXMakeFullscreen(winPtr, macWindow, boolean, interp)
+			!= TCL_OK) {
+		    return TCL_ERROR;
+		}
+	    }
+	    break;
+	case WMATT_MODIFIED:
+	    if (Tcl_GetBooleanFromObj(interp, value, &boolean) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (boolean != IsWindowModified(macWindow)) {
+		ChkErr(SetWindowModified, macWindow, boolean);
+	    }
+	    break;
+#if 0
+	case WMATT_NOTIFY:
+	    if (Tcl_GetBooleanFromObj(interp, value, &boolean) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (boolean == !tkMacOSXWmAttrNotifyVal) {
+		static NMRec notifyRec;
+
+		if (boolean) {
+		    bzero(&notifyRec, sizeof(notifyRec));
+		    notifyRec.qType = nmType;
+		    notifyRec.nmMark = 1;
+		    ChkErr(NMInstall, &notifyRec);
+		} else {
+		    ChkErr(NMRemove, &notifyRec);
+		}
+		tkMacOSXWmAttrNotifyVal = boolean;
+	    }
+	    break;
+#endif
+	case WMATT_TITLEPATH: {
+	    const char *path;
+	    OSStatus err;
+
+	    path = Tcl_FSGetNativePath(value);
+	    if (path && *path) {
+		FSRef ref;
+		Boolean d;
+
+		err = ChkErr(FSPathMakeRef, (const unsigned char*) path, &ref,
+			&d);
+		if (err == noErr) {
+		    TK_IF_MAC_OS_X_API (4, HIWindowSetProxyFSRef,
+			err = ChkErr(HIWindowSetProxyFSRef, macWindow, &ref);
+		    ) TK_ELSE_MAC_OS_X (4,
+			AliasHandle alias;
+
+			err = ChkErr(FSNewAlias, NULL, &ref, &alias);
+			if (err == noErr) {
+			    err = ChkErr(SetWindowProxyAlias, macWindow,
+				    alias);
+			    DisposeHandle((Handle) alias);
+			}
+		    ) TK_ENDIF
+		}
+	    } else {
+		int len;
+
+		Tcl_GetStringFromObj(value, &len);
+		if (!len) {
+		    err = ChkErr(RemoveWindowProxy, macWindow);
+		} else {
+		    err = fnfErr;
+		}
+	    }
+	    if (err != noErr) {
+		return TCL_ERROR;
+	    }
+	    break;
+	}
+	case WMATT_TOPMOST: {
+	    if (Tcl_GetBooleanFromObj(interp, value, &boolean) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (boolean != ((wmPtr->flags & WM_TOPMOST) != 0)) {
+		WindowGroupRef group;
+
+		if (boolean) {
+		    wmPtr->flags |= WM_TOPMOST;
+		} else {
+		    wmPtr->flags &= ~WM_TOPMOST;
+		}
+		group = WmGetWindowGroup(winPtr);
+		if (group && group != GetWindowGroup(macWindow)) {
+		    ChkErr(SetWindowGroup, macWindow, group);
+		}
+	    }
+	    break;
+	}
+	case WMATT_TRANSPARENT:
+	    if (Tcl_GetBooleanFromObj(interp, value, &boolean) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (boolean != ((wmPtr->flags & WM_TRANSPARENT) != 0)) {
+		WindowAttributes oldAttributes = wmPtr->attributes;
+
+		if (boolean) {
+		    wmPtr->flags |= WM_TRANSPARENT;
+		    wmPtr->attributes |= kWindowNoShadowAttribute;
+		    TK_IF_MAC_OS_X_API (3, HIWindowChangeFeatures,
+			UInt32 features;
+
+			ChkErr(GetWindowFeatures, macWindow, &features);
+			if (features & kWindowIsOpaque) {
+			    ChkErr(HIWindowChangeFeatures, macWindow, 0,
+				    kWindowIsOpaque);
+			}
+		    ) TK_ENDIF
+		} else {
+		    wmPtr->flags &= ~WM_TRANSPARENT;
+		    wmPtr->attributes &= ~kWindowNoShadowAttribute;
+		}
+		ApplyWindowClassAttributeChanges(winPtr, macWindow,
+			wmPtr->macClass, oldAttributes, 1);
+		ChkErr(ReshapeCustomWindow, macWindow);
+		TkMacOSXInvalidateWindow((MacDrawable *)(winPtr->window),
+			TK_PARENT_WINDOW);
+	    }
+	    break;
+	case _WMATT_LAST_ATTRIBUTE:
+	default:
+	    return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmGetAttribute --
+ *
+ *	Helper routine for WmAttributesCmd. Returns the current value
+ *	of the specified attribute.
+ *
+ *----------------------------------------------------------------------
+ */
+static Tcl_Obj *WmGetAttribute(
+    TkWindow *winPtr,		/* Toplevel to work with */
+    WindowRef macWindow,
+    WmAttribute attribute)	/* Code of attribute to get */
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    Tcl_Obj *result = NULL;
+
+    switch (attribute) {
+	case WMATT_ALPHA: {
+	    float fval = 1.0;
+
+	    ChkErr(GetWindowAlpha, macWindow, &fval);
+	    result = Tcl_NewDoubleObj(fval);
+	    break;
+	}
+	case WMATT_FULLSCREEN:
+	    result = Tcl_NewBooleanObj(wmPtr->flags & WM_FULLSCREEN);
+	    break;
+	case WMATT_MODIFIED:
+	    result = Tcl_NewBooleanObj(IsWindowModified(macWindow));
+	    break;
+#if 0
+	case WMATT_NOTIFY:
+	    result = Tcl_NewBooleanObj(tkMacOSXWmAttrNotifyVal);
+	    break;
+#endif
+	case WMATT_TITLEPATH: {
+	    FSRef ref;
+	    UInt8 path[PATH_MAX+1];
+	    OSStatus err;
+
+	    TK_IF_MAC_OS_X_API (4, HIWindowSetProxyFSRef,
+		err = ChkErr(HIWindowGetProxyFSRef, macWindow, &ref);
+	    ) TK_ELSE_MAC_OS_X (4,
+		Boolean wasChanged;
+		AliasHandle alias;
+
+		err = ChkErr(GetWindowProxyAlias, macWindow, &alias);
+		if (err == noErr) {
+		    err = ChkErr(FSResolveAlias, NULL, alias, &ref,
+			    &wasChanged);
+		}
+	    ) TK_ENDIF
+	    if (err == noErr) {
+		err = ChkErr(FSRefMakePath, &ref, path, PATH_MAX);
+	    }
+	    if (err != noErr) {
+		*path = 0;
+	    }
+	    result = Tcl_NewStringObj((char*) path, -1);
+	    break;
+	}
+	case WMATT_TOPMOST:
+	    result = Tcl_NewBooleanObj(wmPtr->flags & WM_TOPMOST);
+	    break;
+	case WMATT_TRANSPARENT:
+	    result = Tcl_NewBooleanObj(wmPtr->flags & WM_TRANSPARENT);
+	    break;
+	case _WMATT_LAST_ATTRIBUTE:
+	default:
+	    break;
+    }
+    return result;
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -762,220 +1010,58 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmAttributesCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmAttributesCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    int i;
-    int index;
+    int attribute = 0;
     WindowRef macWindow;
-    Tcl_Obj *result = NULL;
-    const char *optionTable[] = {
-	"-modified",
-	"-titlepath",
-	"-alpha",
-	(char *)NULL
-    };
-    enum optionIdx {
-	WmAttrModifiedIdx,
-	WmAttrTitlePathIdx,
-	WmAttrAlphaIdx,
-    };
 
-    /* Must have objc >= 3 at this point. */
-    if (objc < 3) {
-	Tcl_WrongNumArgs(interp, 1, objv,
-	    "attributes window ?-modified ?bool?? ?-titlepath ?path?? ?-alpha ?double??");
-	return TCL_ERROR;
+    if (winPtr->window == None) {
+	Tk_MakeWindowExist((Tk_Window) winPtr);
     }
-
-    macWindow = GetWindowFromPort(TkMacOSXGetDrawablePort(winPtr->window));
-
-    if (objc == 3) {
-	result = Tcl_NewObj();
-	Tcl_AppendToObj(result, "-modified ", -1);
-	WmAttrGetModifiedStatus(macWindow, result);
-	Tcl_AppendToObj(result, " -titlepath ", -1);
-	WmAttrGetTitlePath(macWindow, result);
-	Tcl_AppendToObj(result, " -alpha ", -1);
-	WmAttrGetAlpha(macWindow, result);
-	Tcl_SetObjResult(interp, result);
-        return TCL_OK;
+    if (!TkMacOSXHostToplevelExists(winPtr)) {
+	TkMacOSXMakeRealWindowExist(winPtr);
     }
-    if (objc == 4) {
-	if (Tcl_GetIndexFromObj(interp, objv[3], optionTable, "option", 0,
-	    &index) != TCL_OK) {
-	    return TCL_ERROR;
-	}
-	result = Tcl_NewObj();
-	switch (index) {
-	    case WmAttrModifiedIdx:
-		WmAttrGetModifiedStatus(macWindow, result);
-		break;
-	    case WmAttrTitlePathIdx:
-		WmAttrGetTitlePath(macWindow, result);
-		break;
-	    case WmAttrAlphaIdx:
-		WmAttrGetAlpha(macWindow, result);
-		break;
+    macWindow = TkMacOSXDrawableWindow(winPtr->window);
+
+    if (objc == 3) {		/* wm attributes $win */
+	Tcl_Obj *result = Tcl_NewListObj(0,0);
+
+	for (attribute = 0; attribute < _WMATT_LAST_ATTRIBUTE; ++attribute) {
+	    Tcl_ListObjAppendElement(interp, result,
+		    Tcl_NewStringObj(WmAttributeNames[attribute], -1));
+	    Tcl_ListObjAppendElement(interp, result,
+		    WmGetAttribute(winPtr, macWindow, attribute));
 	}
 	Tcl_SetObjResult(interp, result);
-	return TCL_OK;
-    }
-
-    if ( (objc - 3) % 2 != 0 ) {
-	Tcl_WrongNumArgs(interp, 3, objv,
-	    "?-modified ?bool?? ?-titlepath ?path?? ?-alpha ?double??");
-	return TCL_ERROR;
-    }
-    for (i = 3; i < objc; i += 2) {
-	int boolean;
-	OSErr err;
-	FSRef ref;
-	AliasHandle alias;
-	Boolean isDirectory;
-	double dval;
-
-	if (Tcl_GetIndexFromObj(interp, objv[i], optionTable, "option", 0,
-	    &index) != TCL_OK) {
+    } else if (objc == 4)  {	/* wm attributes $win -attribute */
+	if (Tcl_GetIndexFromObj(interp, objv[3], WmAttributeNames,
+		    "attribute", 0, &attribute) != TCL_OK) {
 	    return TCL_ERROR;
 	}
-	switch (index) {
-	    case WmAttrModifiedIdx:
-		if (Tcl_GetBooleanFromObj(interp, objv[i+1], &boolean) !=
-		    TCL_OK) {
-		    return TCL_ERROR;
-		}
-		result = objv[i+1];
-		SetWindowModified(macWindow, boolean);
-		break;
-	    case WmAttrTitlePathIdx:
-                err = FSPathMakeRef(
-		    (unsigned char*) Tcl_GetStringFromObj(objv[i+1], NULL), 
-		    &ref, &isDirectory);
-                if (err == noErr) {
-		    err = FSNewAlias(NULL, &ref, &alias);
-                }
-		if (err == noErr) {
-		    err = SetWindowProxyAlias(macWindow, alias);
-		}
-		if (err != noErr) {
-		    Tcl_SetObjResult(interp,
-		    Tcl_NewStringObj("couldn't set window proxy title path",
-			-1));
-		    return TCL_ERROR;
-		} else {
-		    result = objv[i+1];
-		}
-		break;
-	    case WmAttrAlphaIdx:
-		if (Tcl_GetDoubleFromObj(interp, objv[i+1], &dval) !=
-		    TCL_OK) {
-		    return TCL_ERROR;
-		}
-		/*
-		 * The user should give (transparent) 0 .. 1.0 (opaque)
-		 */
-		if (dval < 0.0) {
-		    dval = 0.0;
-		} else if (dval > 1.0) {
-		    dval = 1.0;
-		}
-		result = Tcl_NewDoubleObj(dval);
-		SetWindowAlpha(macWindow, dval);
-		break;
-	}
-    }
-    Tcl_SetObjResult(interp, result);
-    return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- * WmAttrGetModifiedStatus --
- *
- *	Helper procedure to retrieve the -modified option for the wm
- *	attributes command.
- *
- * Results:
- *	Nothing.
- * 
- * Side effects:
- *	Appends the modified status of the given window to the Tcl_Obj 
- * 	passed in.
- *
- *----------------------------------------------------------------------
- */
-static void WmAttrGetModifiedStatus(WindowRef macWindow, Tcl_Obj *result)
-{
-    Tcl_AppendObjToObj(result, Tcl_NewBooleanObj(
-	(IsWindowModified(macWindow) == true)));
-}
-
-/*
- *----------------------------------------------------------------------
- * WmAttrGetTitlePath --
- *
- *	Helper procedure to retrieve the -titlepath option for the wm
- *	attributes command.
- *
- * Results:
- *	Nothing.
- * 
- * Side effects:
- *	Appends the proxy file path of the given window to the Tcl_Obj 
- *	passed in.
- *
- *----------------------------------------------------------------------
- */
-static void WmAttrGetTitlePath(WindowRef macWindow, Tcl_Obj *result)
-{
-    FSRef ref;
-    AliasHandle alias;
-    Boolean wasChanged;
-    UInt8 path[2048];
-    OSStatus err;
+	Tcl_SetObjResult(interp, WmGetAttribute(winPtr, macWindow, attribute));
+    } else if ((objc - 3) % 2 == 0) {	/* wm attributes $win -att value... */
+	int i;
 
-    err = GetWindowProxyAlias(macWindow, &alias);
-    if (err == noErr) {
-	err = FSResolveAlias(NULL, alias, &ref, &wasChanged);
-    }
-    if (err == noErr) {
-	err = FSRefMakePath(&ref, path, 2048);
-    }
-    if (err == noErr) {
-	Tcl_AppendToObj(result, (char*) path, -1);
+	for (i = 3; i < objc; i += 2) {
+	    if (Tcl_GetIndexFromObj(interp, objv[i], WmAttributeNames,
+			"attribute", 0, &attribute) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    if (WmSetAttribute(winPtr, macWindow, interp, attribute, objv[i+1])
+		    != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	}
     } else {
-	Tcl_AppendToObj(result, "{}", -1);
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?-attribute ?value ...??");
+	return TCL_ERROR;
     }
-}
-
-/*
- *----------------------------------------------------------------------
- * WmAttrGetAlpha --
- *
- *	Helper procedure to retrieve the -alpha option for the wm
- *	attributes command.
- *
- * Results:
- *	Nothing.
- * 
- * Side effects:
- *	Appends the alpha value of the given window to the Tcl_Obj 
- * 	passed in.
- *
- *----------------------------------------------------------------------
- */
-static void WmAttrGetAlpha(WindowRef macWindow, Tcl_Obj *result)
-{
-    float fval;
-    if (GetWindowAlpha(macWindow, &fval) != noErr) {
-        fval = 1.0;
-    }
-    Tcl_AppendObjToObj(result, Tcl_NewDoubleObj(fval));
+    return TCL_OK;
 }
 
 /*
@@ -996,44 +1082,44 @@ static void WmAttrGetAlpha(WindowRef macWindow, Tcl_Obj *result)
  */
 
 static int
-WmClientCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmClientCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     char *argv3;
     int length;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?name?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?name?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->clientMachine != NULL) {
-            Tcl_SetResult(interp, wmPtr->clientMachine, TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->clientMachine != NULL) {
+	    Tcl_SetResult(interp, wmPtr->clientMachine, TCL_STATIC);
+	}
+	return TCL_OK;
     }
     argv3 = Tcl_GetStringFromObj(objv[3], &length);
     if (argv3[0] == 0) {
-        if (wmPtr->clientMachine != NULL) {
-            ckfree((char *) wmPtr->clientMachine);
-            wmPtr->clientMachine = NULL;
-        }
-        return TCL_OK;
+	if (wmPtr->clientMachine != NULL) {
+	    ckfree((char *) wmPtr->clientMachine);
+	    wmPtr->clientMachine = NULL;
+	}
+	return TCL_OK;
     }
     if (wmPtr->clientMachine != NULL) {
-        ckfree((char *) wmPtr->clientMachine);
+	ckfree((char *) wmPtr->clientMachine);
     }
     wmPtr->clientMachine = (char *)
-        ckalloc((unsigned) (length + 1));
+	ckalloc((unsigned) (length + 1));
     strcpy(wmPtr->clientMachine, argv3);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1053,12 +1139,12 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmColormapwindowsCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmColormapwindowsCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     TkWindow **cmapList;
@@ -1067,64 +1153,64 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     Tcl_Obj **windowObjv;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?windowList?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?windowList?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        Tk_MakeWindowExist((Tk_Window) winPtr);
-        for (i = 0; i < wmPtr->cmapCount; i++) {
-            if ((i == (wmPtr->cmapCount-1))
-                && (wmPtr->flags & WM_ADDED_TOPLEVEL_COLORMAP)) {
-                break;
-            }
-            Tcl_AppendElement(interp, wmPtr->cmapList[i]->pathName);
-        }
-        return TCL_OK;
+	Tk_MakeWindowExist((Tk_Window) winPtr);
+	for (i = 0; i < wmPtr->cmapCount; i++) {
+	    if ((i == (wmPtr->cmapCount-1))
+		&& (wmPtr->flags & WM_ADDED_TOPLEVEL_COLORMAP)) {
+		break;
+	    }
+	    Tcl_AppendElement(interp, wmPtr->cmapList[i]->pathName);
+	}
+	return TCL_OK;
     }
     if (Tcl_ListObjGetElements(interp, objv[3], &windowObjc, &windowObjv)
-        != TCL_OK) {
-        return TCL_ERROR;
+	!= TCL_OK) {
+	return TCL_ERROR;
     }
     cmapList = (TkWindow **) ckalloc((unsigned)
-                                     ((windowObjc+1)*sizeof(TkWindow*)));
+	((windowObjc+1)*sizeof(TkWindow*)));
     for (i = 0; i < windowObjc; i++) {
-        if (TkGetWindowFromObj(interp, tkwin, windowObjv[i],
-                               (Tk_Window *) &winPtr2) != TCL_OK)
-        {
-            ckfree((char *) cmapList);
-            return TCL_ERROR;
-        }
-        if (winPtr2 == winPtr) {
-            gotToplevel = 1;
-        }
-        if (winPtr2->window == None) {
-            Tk_MakeWindowExist((Tk_Window) winPtr2);
-        }
-        cmapList[i] = winPtr2;
+	if (TkGetWindowFromObj(interp, tkwin, windowObjv[i],
+		(Tk_Window *) &winPtr2) != TCL_OK)
+	{
+	    ckfree((char *) cmapList);
+	    return TCL_ERROR;
+	}
+	if (winPtr2 == winPtr) {
+	    gotToplevel = 1;
+	}
+	if (winPtr2->window == None) {
+	    Tk_MakeWindowExist((Tk_Window) winPtr2);
+	}
+	cmapList[i] = winPtr2;
     }
     if (!gotToplevel) {
-        wmPtr->flags |= WM_ADDED_TOPLEVEL_COLORMAP;
-        cmapList[windowObjc] = winPtr;
-        windowObjc++;
+	wmPtr->flags |= WM_ADDED_TOPLEVEL_COLORMAP;
+	cmapList[windowObjc] = winPtr;
+	windowObjc++;
     } else {
-        wmPtr->flags &= ~WM_ADDED_TOPLEVEL_COLORMAP;
+	wmPtr->flags &= ~WM_ADDED_TOPLEVEL_COLORMAP;
     }
     wmPtr->flags |= WM_COLORMAPS_EXPLICIT;
     if (wmPtr->cmapList != NULL) {
-        ckfree((char *)wmPtr->cmapList);
+	ckfree((char *)wmPtr->cmapList);
     }
     wmPtr->cmapList = cmapList;
     wmPtr->cmapCount = windowObjc;
 
     /*
      * On the Macintosh all of this is just an excercise
-     * in compatability as we don't support colormaps.  If
+     * in compatability as we don't support colormaps. If
      * we did they would be installed here.
      */
 
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1143,49 +1229,49 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmCommandCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmCommandCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     char *argv3;
     int cmdArgc;
-    CONST char **cmdArgv;
+    const char **cmdArgv;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?value?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?value?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->cmdArgv != NULL) {
-            Tcl_SetResult(interp,
-                          Tcl_Merge(wmPtr->cmdArgc, wmPtr->cmdArgv),
-                          TCL_DYNAMIC);
-        }
-        return TCL_OK;
+	if (wmPtr->cmdArgv != NULL) {
+	    Tcl_SetResult(interp,
+		    Tcl_Merge(wmPtr->cmdArgc, wmPtr->cmdArgv),
+		    TCL_DYNAMIC);
+	}
+	return TCL_OK;
     }
     argv3 = Tcl_GetString(objv[3]);
     if (argv3[0] == 0) {
-        if (wmPtr->cmdArgv != NULL) {
-            ckfree((char *) wmPtr->cmdArgv);
-            wmPtr->cmdArgv = NULL;
-        }
-        return TCL_OK;
+	if (wmPtr->cmdArgv != NULL) {
+	    ckfree((char *) wmPtr->cmdArgv);
+	    wmPtr->cmdArgv = NULL;
+	}
+	return TCL_OK;
     }
     if (Tcl_SplitList(interp, argv3, &cmdArgc, &cmdArgv) != TCL_OK) {
-        return TCL_ERROR;
+	return TCL_ERROR;
     }
     if (wmPtr->cmdArgv != NULL) {
-        ckfree((char *) wmPtr->cmdArgv);
+	ckfree((char *) wmPtr->cmdArgv);
     }
     wmPtr->cmdArgc = cmdArgc;
     wmPtr->cmdArgv = cmdArgv;
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1204,39 +1290,33 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmDeiconifyCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmDeiconifyCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-
     if (objc != 3) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window");
+	return TCL_ERROR;
     }
     if (wmPtr->iconFor != NULL) {
-        Tcl_AppendResult(interp, "can't deiconify ", Tcl_GetString(objv[2]),
-                         ": it is an icon for ", Tk_PathName(wmPtr->iconFor),
-                         (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't deiconify ", Tcl_GetString(objv[2]),
+		": it is an icon for ", Tk_PathName(wmPtr->iconFor), NULL);
+	return TCL_ERROR;
     }
     if (winPtr->flags & TK_EMBEDDED) {
-        Tcl_AppendResult(interp, "can't deiconify ", winPtr->pathName,
-                         ": it is an embedded window", (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't deiconify ", winPtr->pathName,
+		": it is an embedded window", NULL);
+	return TCL_ERROR;
     }
-
-    /*
-     * TODO: may not want to call this function - look at Map events gened.
-     */
-
-    TkpWmSetState(winPtr, NormalState);
+    TkpWmSetState(winPtr, TkMacOSXIsWindowZoomed(winPtr) ?
+	    ZoomState : NormalState);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1255,42 +1335,105 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmFocusmodelCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmFocusmodelCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    static CONST char *optionStrings[] = {
-        "active", "passive", (char *) NULL };
+    static const char *optionStrings[] = {
+	"active", "passive", NULL };
     enum options {
-        OPT_ACTIVE, OPT_PASSIVE };
+	OPT_ACTIVE, OPT_PASSIVE };
     int index;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?active|passive?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?active|passive?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        Tcl_SetResult(interp, (wmPtr->hints.input ? "passive" : "active"),
-                      TCL_STATIC);
-        return TCL_OK;
+	Tcl_SetResult(interp, (wmPtr->hints.input ? "passive" : "active"),
+		TCL_STATIC);
+	return TCL_OK;
     }
 
     if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
-                            &index) != TCL_OK) {
-        return TCL_ERROR;
+			    &index) != TCL_OK) {
+	return TCL_ERROR;
     }
     if (index == OPT_ACTIVE) {
-        wmPtr->hints.input = False;
+	wmPtr->hints.input = False;
     } else { /* OPT_PASSIVE */
-        wmPtr->hints.input = True;
+	wmPtr->hints.input = True;
     }
     return TCL_OK;
 }
+#if 0
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmForgetCmd --
+ *
+ *	This procedure is invoked to process the "wm forget" Tcl command.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
 
+static int
+WmForgetCmd(tkwin, winPtr, interp, objc, objv)
+    Tk_Window tkwin;		/* Main window of the application. */
+    TkWindow *winPtr;           /* Toplevel or Frame to work with */
+    Tcl_Interp *interp;		/* Current interpreter. */
+    int objc;			/* Number of arguments. */
+    Tcl_Obj *CONST objv[];	/* Argument objects. */
+{
+#if 1
+    Tcl_AppendResult(interp, "wm forget is not yet supported", (char*)NULL);
+    return TCL_ERROR;
+#else
+    register Tk_Window frameWin = (Tk_Window)winPtr;
+    char *oldClass = (char*)Tk_Class(frameWin);
+
+    if (Tk_IsTopLevel(frameWin)) {
+	MacDrawable *macWin = (MacDrawable *) winPtr->window;
+	CGrafPtr destPort = TkMacOSXGetDrawablePort(winPtr->window);
+
+	TkFocusJoin(winPtr);
+	Tk_UnmapWindow(frameWin);
+
+	if (destPort != NULL) {
+	    WindowRef winRef;
+	    winRef = GetWindowFromPort(destPort);
+	    TkMacOSXUnregisterMacWindow(winRef);
+	    DisposeWindow(winRef);
+	}
+	macWin->grafPtr = NULL;
+	macWin->toplevel = winPtr->parentPtr->privatePtr->toplevel;
+	macWin->flags &= ~TK_HOST_EXISTS;
+
+	RemapWindows(winPtr, macWin);
+	TkWmDeadWindow(winPtr);
+	winPtr->flags &= ~(TK_TOP_HIERARCHY|TK_TOP_LEVEL|TK_HAS_WRAPPER|TK_WIN_MANAGED);
+
+	TkMapTopFrame(frameWin);
+    } else {
+	/* Already not managed by wm - ignore it */
+    }
+    return TCL_OK;
+#endif
+}
+#endif
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1309,30 +1452,30 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmFrameCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmFrameCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     Window window;
     char buf[TCL_INTEGER_SPACE];
 
     if (objc != 3) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window");
+	return TCL_ERROR;
     }
     window = wmPtr->reparent;
     if (window == None) {
-        window = Tk_WindowId((Tk_Window) winPtr);
+	window = Tk_WindowId((Tk_Window) winPtr);
     }
     sprintf(buf, "0x%x", (unsigned int) window);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1351,12 +1494,12 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmGeometryCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmGeometryCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     char xSign, ySign;
@@ -1364,38 +1507,38 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     char *argv3;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?newGeometry?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?newGeometry?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        char buf[16 + TCL_INTEGER_SPACE * 4];
+	char buf[16 + TCL_INTEGER_SPACE * 4];
 
-        xSign = (wmPtr->flags & WM_NEGATIVE_X) ? '-' : '+';
-        ySign = (wmPtr->flags & WM_NEGATIVE_Y) ? '-' : '+';
-        if (wmPtr->gridWin != NULL) {
-            width = wmPtr->reqGridWidth + (winPtr->changes.width
-                                           - winPtr->reqWidth)/wmPtr->widthInc;
-            height = wmPtr->reqGridHeight + (winPtr->changes.height
-                                             - winPtr->reqHeight)/wmPtr->heightInc;
-        } else {
-            width = winPtr->changes.width;
-            height = winPtr->changes.height;
-        }
-        sprintf(buf, "%dx%d%c%d%c%d", width, height, xSign, wmPtr->x,
-                ySign, wmPtr->y);
-        Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        return TCL_OK;
+	xSign = (wmPtr->flags & WM_NEGATIVE_X) ? '-' : '+';
+	ySign = (wmPtr->flags & WM_NEGATIVE_Y) ? '-' : '+';
+	if (wmPtr->gridWin != NULL) {
+	    width = wmPtr->reqGridWidth + (winPtr->changes.width
+		    - winPtr->reqWidth)/wmPtr->widthInc;
+	    height = wmPtr->reqGridHeight + (winPtr->changes.height
+		    - winPtr->reqHeight)/wmPtr->heightInc;
+	} else {
+	    width = winPtr->changes.width;
+	    height = winPtr->changes.height;
+	}
+	sprintf(buf, "%dx%d%c%d%c%d", width, height, xSign, wmPtr->x,
+		ySign, wmPtr->y);
+	Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	return TCL_OK;
     }
     argv3 = Tcl_GetString(objv[3]);
     if (*argv3 == '\0') {
-        wmPtr->width = -1;
-        wmPtr->height = -1;
-        WmUpdateGeom(wmPtr, winPtr);
-        return TCL_OK;
+	wmPtr->width = -1;
+	wmPtr->height = -1;
+	WmUpdateGeom(wmPtr, winPtr);
+	return TCL_OK;
     }
     return ParseGeometry(interp, argv3, winPtr);
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1414,78 +1557,78 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmGridCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmGridCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int reqWidth, reqHeight, widthInc, heightInc;
 
     if ((objc != 3) && (objc != 7)) {
-        Tcl_WrongNumArgs(interp, 2, objv,
-                         "window ?baseWidth baseHeight widthInc heightInc?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv,
+		"window ?baseWidth baseHeight widthInc heightInc?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->sizeHintsFlags & PBaseSize) {
-            char buf[TCL_INTEGER_SPACE * 4];
+	if (wmPtr->sizeHintsFlags & PBaseSize) {
+	    char buf[TCL_INTEGER_SPACE * 4];
 
-            sprintf(buf, "%d %d %d %d", wmPtr->reqGridWidth,
-                    wmPtr->reqGridHeight, wmPtr->widthInc,
-                    wmPtr->heightInc);
-            Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        }
-        return TCL_OK;
+	    sprintf(buf, "%d %d %d %d", wmPtr->reqGridWidth,
+		    wmPtr->reqGridHeight, wmPtr->widthInc,
+		    wmPtr->heightInc);
+	    Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	}
+	return TCL_OK;
     }
     if (*Tcl_GetString(objv[3]) == '\0') {
-        /*
-         * Turn off gridding and reset the width and height
-         * to make sense as ungridded numbers.
-         */
+	/*
+	 * Turn off gridding and reset the width and height
+	 * to make sense as ungridded numbers.
+	 */
 
-        wmPtr->sizeHintsFlags &= ~(PBaseSize|PResizeInc);
-        if (wmPtr->width != -1) {
-            wmPtr->width = winPtr->reqWidth + (wmPtr->width
-                                               - wmPtr->reqGridWidth)*wmPtr->widthInc;
-            wmPtr->height = winPtr->reqHeight + (wmPtr->height
-                                                 - wmPtr->reqGridHeight)*wmPtr->heightInc;
-        }
-        wmPtr->widthInc = 1;
-        wmPtr->heightInc = 1;
+	wmPtr->sizeHintsFlags &= ~(PBaseSize|PResizeInc);
+	if (wmPtr->width != -1) {
+	    wmPtr->width = winPtr->reqWidth + (wmPtr->width
+		    - wmPtr->reqGridWidth)*wmPtr->widthInc;
+	    wmPtr->height = winPtr->reqHeight + (wmPtr->height
+		    - wmPtr->reqGridHeight)*wmPtr->heightInc;
+	}
+	wmPtr->widthInc = 1;
+	wmPtr->heightInc = 1;
     } else {
-        if ((Tcl_GetIntFromObj(interp, objv[3], &reqWidth) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[4], &reqHeight) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[5], &widthInc) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[6], &heightInc) != TCL_OK)) {
-            return TCL_ERROR;
-        }
-        if (reqWidth < 0) {
-            Tcl_SetResult(interp, "baseWidth can't be < 0", TCL_STATIC);
-            return TCL_ERROR;
-        }
-        if (reqHeight < 0) {
-            Tcl_SetResult(interp, "baseHeight can't be < 0", TCL_STATIC);
-            return TCL_ERROR;
-        }
-        if (widthInc < 0) {
-            Tcl_SetResult(interp, "widthInc can't be < 0", TCL_STATIC);
-            return TCL_ERROR;
-        }
-        if (heightInc < 0) {
-            Tcl_SetResult(interp, "heightInc can't be < 0", TCL_STATIC);
-            return TCL_ERROR;
-        }
-        Tk_SetGrid((Tk_Window) winPtr, reqWidth, reqHeight, widthInc,
-                   heightInc);
+	if ((Tcl_GetIntFromObj(interp, objv[3], &reqWidth) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[4], &reqHeight) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[5], &widthInc) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[6], &heightInc) != TCL_OK)) {
+	    return TCL_ERROR;
+	}
+	if (reqWidth < 0) {
+	    Tcl_SetResult(interp, "baseWidth can't be < 0", TCL_STATIC);
+	    return TCL_ERROR;
+	}
+	if (reqHeight < 0) {
+	    Tcl_SetResult(interp, "baseHeight can't be < 0", TCL_STATIC);
+	    return TCL_ERROR;
+	}
+	if (widthInc <= 0) {
+	    Tcl_SetResult(interp, "widthInc can't be <= 0", TCL_STATIC);
+	    return TCL_ERROR;
+	}
+	if (heightInc <= 0) {
+	    Tcl_SetResult(interp, "heightInc can't be <= 0", TCL_STATIC);
+	    return TCL_ERROR;
+	}
+	Tk_SetGrid((Tk_Window) winPtr, reqWidth, reqHeight, widthInc,
+		heightInc);
     }
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1504,12 +1647,12 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmGroupCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmGroupCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     Tk_Window tkwin2;
@@ -1517,38 +1660,38 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     int length;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?pathName?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?pathName?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->hints.flags & WindowGroupHint) {
-            Tcl_SetResult(interp, wmPtr->leaderName, TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->hints.flags & WindowGroupHint) {
+	    Tcl_SetResult(interp, wmPtr->leaderName, TCL_STATIC);
+	}
+	return TCL_OK;
     }
     argv3 = Tcl_GetStringFromObj(objv[3], &length);
     if (*argv3 == '\0') {
-        wmPtr->hints.flags &= ~WindowGroupHint;
-        if (wmPtr->leaderName != NULL) {
-            ckfree(wmPtr->leaderName);
-        }
-        wmPtr->leaderName = NULL;
+	wmPtr->hints.flags &= ~WindowGroupHint;
+	if (wmPtr->leaderName != NULL) {
+	    ckfree(wmPtr->leaderName);
+	}
+	wmPtr->leaderName = NULL;
     } else {
-        if (TkGetWindowFromObj(interp, tkwin, objv[3], &tkwin2) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        Tk_MakeWindowExist(tkwin2);
-        if (wmPtr->leaderName != NULL) {
-            ckfree(wmPtr->leaderName);
-        }
-        wmPtr->hints.window_group = Tk_WindowId(tkwin2);
-        wmPtr->hints.flags |= WindowGroupHint;
-        wmPtr->leaderName = ckalloc((unsigned) (length + 1));
-        strcpy(wmPtr->leaderName, argv3);
+	if (TkGetWindowFromObj(interp, tkwin, objv[3], &tkwin2) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	Tk_MakeWindowExist(tkwin2);
+	if (wmPtr->leaderName != NULL) {
+	    ckfree(wmPtr->leaderName);
+	}
+	wmPtr->hints.window_group = Tk_WindowId(tkwin2);
+	wmPtr->hints.flags |= WindowGroupHint;
+	wmPtr->leaderName = ckalloc((unsigned) (length + 1));
+	strcpy(wmPtr->leaderName, argv3);
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1567,63 +1710,56 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconbitmapCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconbitmapCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    char *argv3;
     Pixmap pixmap;
+    char *str;
+    int len;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?bitmap?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?bitmap?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->hints.flags & IconPixmapHint) {
-            Tcl_SetResult(interp,
-                          (char *) Tk_NameOfBitmap(winPtr->display, wmPtr->hints.icon_pixmap),
-                          TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->hints.flags & IconPixmapHint) {
+	    Tcl_SetResult(interp, (char*)Tk_NameOfBitmap(winPtr->display,
+		    wmPtr->hints.icon_pixmap), TCL_STATIC);
+	}
+	return TCL_OK;
     }
-    argv3 = Tcl_GetString(objv[3]);
-    if (*argv3 == '\0') {
-        if (wmPtr->hints.icon_pixmap != None) {
-            Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_pixmap);
-            wmPtr->hints.icon_pixmap = None;
-        }
-        wmPtr->hints.flags &= ~IconPixmapHint;
+    str = Tcl_GetStringFromObj(objv[3], &len);
+    if (winPtr->window == None) {
+	Tk_MakeWindowExist((Tk_Window) winPtr);
+    }
+    if (!TkMacOSXHostToplevelExists(winPtr)) {
+	TkMacOSXMakeRealWindowExist(winPtr);
+    }
+    if (WmSetAttribute(winPtr, TkMacOSXDrawableWindow(winPtr->window), interp,
+	    WMATT_TITLEPATH, objv[3]) == TCL_OK) {
+	if (!len) {
+	    if (wmPtr->hints.icon_pixmap != None) {
+		Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_pixmap);
+		wmPtr->hints.icon_pixmap = None;
+	    }
+	    wmPtr->hints.flags &= ~IconPixmapHint;
+	}
     } else {
-        OSErr err;
-        AliasHandle alias;
-        FSRef ref;
-        Boolean isDirectory;
-        err = FSPathMakeRef((unsigned char*) Tcl_GetStringFromObj(objv[3], NULL), &ref, &isDirectory);
-        if (err == noErr) {
-            err = FSNewAlias(NULL, &ref, &alias);
-            if (err == noErr) {
-                WindowRef macWin
-                        = GetWindowFromPort(TkMacOSXGetDrawablePort(winPtr->window));
-                SetWindowProxyAlias(macWin, alias);
-                return TCL_OK;
-            }
-        }
-        pixmap = Tk_GetBitmap(interp, (Tk_Window) winPtr,
-                              Tk_GetUid(Tcl_GetStringFromObj(objv[3], NULL)));
-        if (pixmap == None) {
-            return TCL_ERROR;
-        }
-        wmPtr->hints.icon_pixmap = pixmap;
-        wmPtr->hints.flags |= IconPixmapHint;
+	pixmap = Tk_GetBitmap(interp, (Tk_Window) winPtr, Tk_GetUid(str));
+	if (pixmap == None) {
+	    return TCL_ERROR;
+	}
+	wmPtr->hints.icon_pixmap = pixmap;
+	wmPtr->hints.flags |= IconPixmapHint;
     }
-    
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1642,43 +1778,42 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconifyCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconifyCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     if (objc != 3) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window");
+	return TCL_ERROR;
     }
     if (Tk_Attributes((Tk_Window) winPtr)->override_redirect) {
-        Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
-                         "\": override-redirect flag is set", (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
+		"\": override-redirect flag is set", NULL);
+	return TCL_ERROR;
     }
     if (wmPtr->master != None) {
-        Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
-                         "\": it is a transient", (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
+		"\": it is a transient", NULL);
+	return TCL_ERROR;
     }
     if (wmPtr->iconFor != NULL) {
-        Tcl_AppendResult(interp, "can't iconify ", winPtr->pathName,
-                         ": it is an icon for ", Tk_PathName(wmPtr->iconFor),
-                         (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't iconify ", winPtr->pathName,
+		": it is an icon for ", Tk_PathName(wmPtr->iconFor), NULL);
+	return TCL_ERROR;
     }
     if (winPtr->flags & TK_EMBEDDED) {
-        Tcl_AppendResult(interp, "can't iconify ", winPtr->pathName,
-                         ": it is an embedded window", (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't iconify ", winPtr->pathName,
+		": it is an embedded window", NULL);
+	return TCL_ERROR;
     }
     TkpWmSetState(winPtr, IconicState);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1697,46 +1832,46 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconmaskCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconmaskCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     Pixmap pixmap;
     char *argv3;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?bitmap?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?bitmap?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->hints.flags & IconMaskHint) {
-            Tcl_SetResult(interp,
-                          (char *) Tk_NameOfBitmap(winPtr->display, wmPtr->hints.icon_mask),
-                          TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->hints.flags & IconMaskHint) {
+	    Tcl_SetResult(interp,
+		    (char*)Tk_NameOfBitmap(winPtr->display,
+		    wmPtr->hints.icon_mask), TCL_STATIC);
+	}
+	return TCL_OK;
     }
     argv3 = Tcl_GetString(objv[3]);
     if (*argv3 == '\0') {
-        if (wmPtr->hints.icon_mask != None) {
-            Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
-        }
-        wmPtr->hints.flags &= ~IconMaskHint;
+	if (wmPtr->hints.icon_mask != None) {
+	    Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
+	}
+	wmPtr->hints.flags &= ~IconMaskHint;
     } else {
-        pixmap = Tk_GetBitmap(interp, tkwin, argv3);
-        if (pixmap == None) {
-            return TCL_ERROR;
-        }
-        wmPtr->hints.icon_mask = pixmap;
-        wmPtr->hints.flags |= IconMaskHint;
+	pixmap = Tk_GetBitmap(interp, tkwin, argv3);
+	if (pixmap == None) {
+	    return TCL_ERROR;
+	}
+	wmPtr->hints.icon_mask = pixmap;
+	wmPtr->hints.flags |= IconMaskHint;
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1755,40 +1890,40 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconnameCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconnameCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    CONST char *argv3;
+    const char *argv3;
     int length;
 
     if (objc > 4) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?newName?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?newName?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        Tcl_SetResult(interp,
-                      (char *) ((wmPtr->iconName != NULL) ? wmPtr->iconName : ""),
-                      TCL_STATIC);
-        return TCL_OK;
+	Tcl_SetResult(interp,
+		(char*)((wmPtr->iconName != NULL) ?
+		wmPtr->iconName : ""), TCL_STATIC);
+	return TCL_OK;
     } else {
-        if (wmPtr->iconName != NULL) {
-            ckfree((char *) wmPtr->iconName);
-        }
-        argv3 = Tcl_GetStringFromObj(objv[3], &length);
-        wmPtr->iconName = ckalloc((unsigned) (length + 1));
-        strcpy(wmPtr->iconName, argv3);
-        if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
-            XSetIconName(winPtr->display, winPtr->window, wmPtr->iconName);
-        }
+	if (wmPtr->iconName != NULL) {
+	    ckfree((char *) wmPtr->iconName);
+	}
+	argv3 = Tcl_GetStringFromObj(objv[3], &length);
+	wmPtr->iconName = ckalloc((unsigned) (length + 1));
+	strcpy(wmPtr->iconName, argv3);
+	if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
+	    XSetIconName(winPtr->display, winPtr->window, wmPtr->iconName);
+	}
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1809,16 +1944,13 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
-    Tk_Window tkwin;		/* Main window of the application. */
-    TkWindow *winPtr;           /* Toplevel to work with */
-    Tcl_Interp *interp;		/* Current interpreter. */
-    int objc;			/* Number of arguments. */
-    Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconphotoCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
-#if 0 /* Unused */
-    register WmInfo *wmPtr = winPtr->wmInfoPtr;
-#endif
     Tk_PhotoHandle photo;
     int i, width, height, isDefault = 0;
 
@@ -1843,7 +1975,7 @@ WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
 	photo = Tk_FindPhoto(interp, Tcl_GetString(objv[i]));
 	if (photo == NULL) {
 	    Tcl_AppendResult(interp, "can't use \"", Tcl_GetString(objv[i]),
-		    "\" as iconphoto: not a photo image", (char *) NULL);
+		    "\" as iconphoto: not a photo image", NULL);
 	    return TCL_ERROR;
 	}
 	Tk_PhotoGetSize(photo, &width, &height);
@@ -1854,7 +1986,7 @@ WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
      */
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1874,44 +2006,44 @@ WmIconphotoCmd(tkwin, winPtr, interp, objc, objv)
  */
 
 static int
-WmIconpositionCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconpositionCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int x, y;
 
     if ((objc != 3) && (objc != 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?x y?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?x y?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->hints.flags & IconPositionHint) {
-            char buf[TCL_INTEGER_SPACE * 2];
+	if (wmPtr->hints.flags & IconPositionHint) {
+	    char buf[TCL_INTEGER_SPACE * 2];
 
-            sprintf(buf, "%d %d", wmPtr->hints.icon_x,
-                    wmPtr->hints.icon_y);
-            Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        }
-        return TCL_OK;
+	    sprintf(buf, "%d %d", wmPtr->hints.icon_x,
+		    wmPtr->hints.icon_y);
+	    Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	}
+	return TCL_OK;
     }
     if (*Tcl_GetString(objv[3]) == '\0') {
-        wmPtr->hints.flags &= ~IconPositionHint;
+	wmPtr->hints.flags &= ~IconPositionHint;
     } else {
-        if ((Tcl_GetIntFromObj(interp, objv[3], &x) != TCL_OK)
-            || (Tcl_GetIntFromObj(interp, objv[4], &y) != TCL_OK)){
-            return TCL_ERROR;
-        }
-        wmPtr->hints.icon_x = x;
-        wmPtr->hints.icon_y = y;
-        wmPtr->hints.flags |= IconPositionHint;
+	if ((Tcl_GetIntFromObj(interp, objv[3], &x) != TCL_OK)
+	    || (Tcl_GetIntFromObj(interp, objv[4], &y) != TCL_OK)){
+	    return TCL_ERROR;
+	}
+	wmPtr->hints.icon_x = x;
+	wmPtr->hints.icon_y = y;
+	wmPtr->hints.flags |= IconPositionHint;
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1930,71 +2062,134 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmIconwindowCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmIconwindowCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     Tk_Window tkwin2;
     WmInfo *wmPtr2;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?pathName?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?pathName?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->icon != NULL) {
-            Tcl_SetResult(interp, Tk_PathName(wmPtr->icon), TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->icon != NULL) {
+	    Tcl_SetResult(interp, Tk_PathName(wmPtr->icon), TCL_STATIC);
+	}
+	return TCL_OK;
     }
     if (*Tcl_GetString(objv[3]) == '\0') {
-        wmPtr->hints.flags &= ~IconWindowHint;
-        if (wmPtr->icon != NULL) {
-            wmPtr2 = ((TkWindow *) wmPtr->icon)->wmInfoPtr;
-            wmPtr2->iconFor = NULL;
-            wmPtr2->hints.initial_state = WithdrawnState;
-        }
-        wmPtr->icon = NULL;
+	wmPtr->hints.flags &= ~IconWindowHint;
+	if (wmPtr->icon != NULL) {
+	    wmPtr2 = ((TkWindow *) wmPtr->icon)->wmInfoPtr;
+	    wmPtr2->iconFor = NULL;
+	    wmPtr2->hints.initial_state = WithdrawnState;
+	}
+	wmPtr->icon = NULL;
     } else {
-        if (TkGetWindowFromObj(interp, tkwin, objv[3], &tkwin2) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        if (!Tk_IsTopLevel(tkwin2)) {
-            Tcl_AppendResult(interp, "can't use ", Tcl_GetString(objv[3]),
-                             " as icon window: not at top level", (char *) NULL);
-            return TCL_ERROR;
-        }
-        wmPtr2 = ((TkWindow *) tkwin2)->wmInfoPtr;
-        if (wmPtr2->iconFor != NULL) {
-            Tcl_AppendResult(interp, Tcl_GetString(objv[3]),
-                             " is already an icon for ",
-                             Tk_PathName(wmPtr2->iconFor), (char *) NULL);
-            return TCL_ERROR;
-        }
-        if (wmPtr->icon != NULL) {
-            WmInfo *wmPtr3 = ((TkWindow *) wmPtr->icon)->wmInfoPtr;
-            wmPtr3->iconFor = NULL;
-        }
-        Tk_MakeWindowExist(tkwin2);
-        wmPtr->hints.icon_window = Tk_WindowId(tkwin2);
-        wmPtr->hints.flags |= IconWindowHint;
-        wmPtr->icon = tkwin2;
-        wmPtr2->iconFor = (Tk_Window) winPtr;
-        if (!(wmPtr2->flags & WM_NEVER_MAPPED)) {
-            /*
-             * Don't have iconwindows on the Mac.  We just withdraw.
-             */
+	if (TkGetWindowFromObj(interp, tkwin, objv[3], &tkwin2) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	if (!Tk_IsTopLevel(tkwin2)) {
+	    Tcl_AppendResult(interp, "can't use ", Tcl_GetString(objv[3]),
+		    " as icon window: not at top level", NULL);
+	    return TCL_ERROR;
+	}
+	wmPtr2 = ((TkWindow *) tkwin2)->wmInfoPtr;
+	if (wmPtr2->iconFor != NULL) {
+	    Tcl_AppendResult(interp, Tcl_GetString(objv[3]),
+		    " is already an icon for ",
+		    Tk_PathName(wmPtr2->iconFor), NULL);
+	    return TCL_ERROR;
+	}
+	if (wmPtr->icon != NULL) {
+	    WmInfo *wmPtr3 = ((TkWindow *) wmPtr->icon)->wmInfoPtr;
+	    wmPtr3->iconFor = NULL;
+	}
+	Tk_MakeWindowExist(tkwin2);
+	wmPtr->hints.icon_window = Tk_WindowId(tkwin2);
+	wmPtr->hints.flags |= IconWindowHint;
+	wmPtr->icon = tkwin2;
+	wmPtr2->iconFor = (Tk_Window) winPtr;
+	if (!(wmPtr2->flags & WM_NEVER_MAPPED)) {
+	    /*
+	     * Don't have iconwindows on the Mac. We just withdraw.
+	     */
 
-            Tk_UnmapWindow(tkwin2);
-        }
+	    Tk_UnmapWindow(tkwin2);
+	}
     }
     return TCL_OK;
 }
+#if 0
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmManageCmd --
+ *
+ *	This procedure is invoked to process the "wm manage" Tcl command.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
 
+static int
+WmManageCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,           /* Toplevel or Frame to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *CONST objv[])	/* Argument objects. */
+{
+#if 1
+    Tcl_AppendResult(interp, "wm manage is not yet supported", (char*)NULL);
+    return TCL_ERROR;
+#else
+    register Tk_Window frameWin = (Tk_Window)winPtr;
+    register WmInfo *wmPtr = winPtr->wmInfoPtr;
+    char *oldClass = (char*)Tk_Class(frameWin);
+
+    if (!Tk_IsTopLevel(frameWin)) {
+	MacDrawable *macWin = (MacDrawable *) winPtr->window;
+
+	TkFocusSplit(winPtr);
+	Tk_UnmapWindow(frameWin);
+	if (wmPtr == NULL) {
+	    TkWmNewWindow(winPtr);
+	    if (winPtr->window == None) {
+		Tk_MakeWindowExist((Tk_Window) winPtr);
+		macWin = (MacDrawable *) winPtr->window;
+	    }
+	    TkWmMapWindow(winPtr);
+	    Tk_UnmapWindow(frameWin);
+	}
+	wmPtr = winPtr->wmInfoPtr;
+	winPtr->flags &= ~TK_MAPPED;
+	macWin->grafPtr = NULL;
+	macWin->toplevel = macWin;
+	RemapWindows(winPtr, macWin);
+	winPtr->flags |= (TK_TOP_HIERARCHY|TK_TOP_LEVEL|TK_HAS_WRAPPER|TK_WIN_MANAGED);
+	TkMapTopFrame (frameWin);
+    } else if (Tk_IsTopLevel(frameWin)) {
+	/* Already managed by wm - ignore it */
+    }
+    return TCL_OK;
+#endif
+}
+#endif
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2013,30 +2208,31 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmMaxsizeCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmMaxsizeCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int width, height;
 
     if ((objc != 3) && (objc != 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        char buf[TCL_INTEGER_SPACE * 2];
+	char buf[TCL_INTEGER_SPACE * 2];
 
-        sprintf(buf, "%d %d", wmPtr->maxWidth, wmPtr->maxHeight);
-        Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        return TCL_OK;
+	GetMaxSize(winPtr, &width, &height);
+	sprintf(buf, "%d %d", width, height);
+	Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	return TCL_OK;
     }
     if ((Tcl_GetIntFromObj(interp, objv[3], &width) != TCL_OK)
-        || (Tcl_GetIntFromObj(interp, objv[4], &height) != TCL_OK)) {
-        return TCL_ERROR;
+	|| (Tcl_GetIntFromObj(interp, objv[4], &height) != TCL_OK)) {
+	return TCL_ERROR;
     }
     wmPtr->maxWidth = width;
     wmPtr->maxHeight = height;
@@ -2044,7 +2240,7 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2063,30 +2259,31 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmMinsizeCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmMinsizeCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int width, height;
 
     if ((objc != 3) && (objc != 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        char buf[TCL_INTEGER_SPACE * 2];
+	char buf[TCL_INTEGER_SPACE * 2];
 
-        sprintf(buf, "%d %d", wmPtr->minWidth, wmPtr->minHeight);
-        Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        return TCL_OK;
+	GetMinSize(winPtr, &width, &height);
+	sprintf(buf, "%d %d", width, height);
+	Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	return TCL_OK;
     }
     if ((Tcl_GetIntFromObj(interp, objv[3], &width) != TCL_OK)
-        || (Tcl_GetIntFromObj(interp, objv[4], &height) != TCL_OK)) {
-        return TCL_ERROR;
+	|| (Tcl_GetIntFromObj(interp, objv[4], &height) != TCL_OK)) {
+	return TCL_ERROR;
     }
     wmPtr->minWidth = width;
     wmPtr->minHeight = height;
@@ -2094,7 +2291,7 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2114,36 +2311,34 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmOverrideredirectCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmOverrideredirectCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int boolean;
     XSetWindowAttributes atts;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?boolean?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?boolean?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        Tcl_SetBooleanObj(Tcl_GetObjResult(interp),
-                          Tk_Attributes((Tk_Window) winPtr)->override_redirect);
-        return TCL_OK;
+	Tcl_SetBooleanObj(Tcl_GetObjResult(interp),
+		Tk_Attributes((Tk_Window) winPtr)->override_redirect);
+	return TCL_OK;
     }
     if (Tcl_GetBooleanFromObj(interp, objv[3], &boolean) != TCL_OK) {
-        return TCL_ERROR;
+	return TCL_ERROR;
     }
     atts.override_redirect = (boolean) ? True : False;
-    Tk_ChangeWindowAttributes((Tk_Window) winPtr, CWOverrideRedirect,
-                              &atts);
-    wmPtr->style = (boolean) ? plainDBox : documentProc;
+    Tk_ChangeWindowAttributes((Tk_Window) winPtr, CWOverrideRedirect, &atts);
+    ApplyMasterOverrideChanges(winPtr, NULL);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2163,52 +2358,52 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmPositionfromCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmPositionfromCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    static CONST char *optionStrings[] = {
-        "program", "user", (char *) NULL };
+    static const char *optionStrings[] = {
+	"program", "user", NULL };
     enum options {
-        OPT_PROGRAM, OPT_USER };
+	OPT_PROGRAM, OPT_USER };
     int index;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?user/program?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?user/program?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->sizeHintsFlags & USPosition) {
-            Tcl_SetResult(interp, "user", TCL_STATIC);
-        } else if (wmPtr->sizeHintsFlags & PPosition) {
-            Tcl_SetResult(interp, "program", TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->sizeHintsFlags & USPosition) {
+	    Tcl_SetResult(interp, "user", TCL_STATIC);
+	} else if (wmPtr->sizeHintsFlags & PPosition) {
+	    Tcl_SetResult(interp, "program", TCL_STATIC);
+	}
+	return TCL_OK;
     }
     if (*Tcl_GetString(objv[3]) == '\0') {
-        wmPtr->sizeHintsFlags &= ~(USPosition|PPosition);
+	wmPtr->sizeHintsFlags &= ~(USPosition|PPosition);
     } else {
-        if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
-                                &index) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        if (index == OPT_USER) {
-            wmPtr->sizeHintsFlags &= ~PPosition;
-            wmPtr->sizeHintsFlags |= USPosition;
-        } else {
-            wmPtr->sizeHintsFlags &= ~USPosition;
-            wmPtr->sizeHintsFlags |= PPosition;
-        }
+	if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
+				&index) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	if (index == OPT_USER) {
+	    wmPtr->sizeHintsFlags &= ~PPosition;
+	    wmPtr->sizeHintsFlags |= USPosition;
+	} else {
+	    wmPtr->sizeHintsFlags &= ~USPosition;
+	    wmPtr->sizeHintsFlags |= PPosition;
+	}
     }
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2227,12 +2422,12 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmProtocolCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmProtocolCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     register ProtocolHandler *protPtr, *prevPtr;
@@ -2241,33 +2436,34 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     int cmdLength;
 
     if ((objc < 3) || (objc > 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?name? ?command?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?name? ?command?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        /*
-         * Return a list of all defined protocols for the window.
-         */
-        for (protPtr = wmPtr->protPtr; protPtr != NULL;
-             protPtr = protPtr->nextPtr) {
-            Tcl_AppendElement(interp,
-                              Tk_GetAtomName((Tk_Window) winPtr, protPtr->protocol));
-        }
-        return TCL_OK;
+	/*
+	 * Return a list of all defined protocols for the window.
+	 */
+	for (protPtr = wmPtr->protPtr; protPtr != NULL;
+		protPtr = protPtr->nextPtr) {
+	    Tcl_AppendElement(interp,
+		    Tk_GetAtomName((Tk_Window) winPtr, protPtr->protocol));
+	}
+	return TCL_OK;
     }
     protocol = Tk_InternAtom((Tk_Window) winPtr, Tcl_GetString(objv[3]));
     if (objc == 4) {
-        /*
-         * Return the command to handle a given protocol.
-         */
-        for (protPtr = wmPtr->protPtr; protPtr != NULL;
-             protPtr = protPtr->nextPtr) {
-            if (protPtr->protocol == protocol) {
-                Tcl_SetResult(interp, protPtr->command, TCL_STATIC);
-                return TCL_OK;
-            }
-        }
-        return TCL_OK;
+	/*
+	 * Return the command to handle a given protocol.
+	 */
+
+	for (protPtr = wmPtr->protPtr; protPtr != NULL;
+		protPtr = protPtr->nextPtr) {
+	    if (protPtr->protocol == protocol) {
+		Tcl_SetResult(interp, protPtr->command, TCL_STATIC);
+		return TCL_OK;
+	    }
+	}
+	return TCL_OK;
     }
 
     /*
@@ -2277,29 +2473,29 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
      */
 
     for (protPtr = wmPtr->protPtr, prevPtr = NULL; protPtr != NULL;
-         prevPtr = protPtr, protPtr = protPtr->nextPtr) {
-        if (protPtr->protocol == protocol) {
-            if (prevPtr == NULL) {
-                wmPtr->protPtr = protPtr->nextPtr;
-            } else {
-                prevPtr->nextPtr = protPtr->nextPtr;
-            }
-            Tcl_EventuallyFree((ClientData) protPtr, TCL_DYNAMIC);
-            break;
-        }
+	prevPtr = protPtr, protPtr = protPtr->nextPtr) {
+	if (protPtr->protocol == protocol) {
+	    if (prevPtr == NULL) {
+		wmPtr->protPtr = protPtr->nextPtr;
+	    } else {
+		prevPtr->nextPtr = protPtr->nextPtr;
+	    }
+	    Tcl_EventuallyFree((ClientData) protPtr, TCL_DYNAMIC);
+	    break;
+	}
     }
     cmd = Tcl_GetStringFromObj(objv[4], &cmdLength);
     if (cmdLength > 0) {
-        protPtr = (ProtocolHandler *) ckalloc(HANDLER_SIZE(cmdLength));
-        protPtr->protocol = protocol;
-        protPtr->nextPtr = wmPtr->protPtr;
-        wmPtr->protPtr = protPtr;
-        protPtr->interp = interp;
-        strcpy(protPtr->command, cmd);
+	protPtr = (ProtocolHandler *) ckalloc(HANDLER_SIZE(cmdLength));
+	protPtr->protocol = protocol;
+	protPtr->nextPtr = wmPtr->protPtr;
+	wmPtr->protPtr = protPtr;
+	protPtr->interp = interp;
+	strcpy(protPtr->command, cmd);
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2318,52 +2514,64 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmResizableCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmResizableCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     int width, height;
+    WindowAttributes oldAttributes = wmPtr->attributes;
 
     if ((objc != 3) && (objc != 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?width height?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        char buf[TCL_INTEGER_SPACE * 2];
+	char buf[TCL_INTEGER_SPACE * 2];
 
-        sprintf(buf, "%d %d",
-                (wmPtr->flags  & WM_WIDTH_NOT_RESIZABLE) ? 0 : 1,
-                (wmPtr->flags  & WM_HEIGHT_NOT_RESIZABLE) ? 0 : 1);
-        Tcl_SetResult(interp, buf, TCL_VOLATILE);
-        return TCL_OK;
+	sprintf(buf, "%d %d",
+		(wmPtr->flags  & WM_WIDTH_NOT_RESIZABLE) ? 0 : 1,
+		(wmPtr->flags  & WM_HEIGHT_NOT_RESIZABLE) ? 0 : 1);
+	Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	return TCL_OK;
     }
     if ((Tcl_GetBooleanFromObj(interp, objv[3], &width) != TCL_OK)
-        || (Tcl_GetBooleanFromObj(interp, objv[4], &height) != TCL_OK)) {
-        return TCL_ERROR;
+	|| (Tcl_GetBooleanFromObj(interp, objv[4], &height) != TCL_OK)) {
+	return TCL_ERROR;
     }
     if (width) {
-        wmPtr->flags &= ~WM_WIDTH_NOT_RESIZABLE;
+	wmPtr->flags &= ~WM_WIDTH_NOT_RESIZABLE;
+	wmPtr->attributes |= kWindowHorizontalZoomAttribute;
     } else {
-        wmPtr->flags |= WM_WIDTH_NOT_RESIZABLE;
+	wmPtr->flags |= WM_WIDTH_NOT_RESIZABLE;
+	wmPtr->attributes &= ~kWindowHorizontalZoomAttribute;
     }
     if (height) {
-        wmPtr->flags &= ~WM_HEIGHT_NOT_RESIZABLE;
+	wmPtr->flags &= ~WM_HEIGHT_NOT_RESIZABLE;
+	wmPtr->attributes |= kWindowVerticalZoomAttribute;
     } else {
-        wmPtr->flags |= WM_HEIGHT_NOT_RESIZABLE;
+	wmPtr->flags |= WM_HEIGHT_NOT_RESIZABLE;
+	wmPtr->attributes &= ~kWindowVerticalZoomAttribute;
+    }
+    if (width || height) {
+	wmPtr->attributes |= kWindowResizableAttribute;
+    } else {
+	wmPtr->attributes &= ~kWindowResizableAttribute;
     }
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     if (wmPtr->scrollWinPtr != NULL) {
-        TkScrollbarEventuallyRedraw(
-                                    (TkScrollbar *) wmPtr->scrollWinPtr->instanceData);
+	TkScrollbarEventuallyRedraw((TkScrollbar *)
+		wmPtr->scrollWinPtr->instanceData);
     }
     WmUpdateGeom(wmPtr, winPtr);
+    ApplyWindowClassAttributeChanges(winPtr, NULL, wmPtr->macClass,
+	oldAttributes, 1);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2382,53 +2590,53 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmSizefromCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmSizefromCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    static CONST char *optionStrings[] = {
-        "program", "user", (char *) NULL };
+    static const char *optionStrings[] = {
+	"program", "user", NULL };
     enum options {
-        OPT_PROGRAM, OPT_USER };
+	OPT_PROGRAM, OPT_USER };
     int index;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?user|program?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?user|program?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->sizeHintsFlags & USSize) {
-            Tcl_SetResult(interp, "user", TCL_STATIC);
-        } else if (wmPtr->sizeHintsFlags & PSize) {
-            Tcl_SetResult(interp, "program", TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->sizeHintsFlags & USSize) {
+	    Tcl_SetResult(interp, "user", TCL_STATIC);
+	} else if (wmPtr->sizeHintsFlags & PSize) {
+	    Tcl_SetResult(interp, "program", TCL_STATIC);
+	}
+	return TCL_OK;
     }
 
     if (*Tcl_GetString(objv[3]) == '\0') {
-        wmPtr->sizeHintsFlags &= ~(USSize|PSize);
+	wmPtr->sizeHintsFlags &= ~(USSize|PSize);
     } else {
-        if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
-                                &index) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        if (index == OPT_USER) {
-            wmPtr->sizeHintsFlags &= ~PSize;
-            wmPtr->sizeHintsFlags |= USSize;
-        } else { /* OPT_PROGRAM */
-            wmPtr->sizeHintsFlags &= ~USSize;
-            wmPtr->sizeHintsFlags |= PSize;
-        }
+	if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
+				&index) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	if (index == OPT_USER) {
+	    wmPtr->sizeHintsFlags &= ~PSize;
+	    wmPtr->sizeHintsFlags |= USSize;
+	} else { /* OPT_PROGRAM */
+	    wmPtr->sizeHintsFlags &= ~USSize;
+	    wmPtr->sizeHintsFlags |= PSize;
+	}
     }
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     WmUpdateGeom(wmPtr, winPtr);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2447,105 +2655,104 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmStackorderCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmStackorderCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     TkWindow **windows, **window_ptr;
-    static CONST char *optionStrings[] = {
-        "isabove", "isbelow", (char *) NULL };
+    static const char *optionStrings[] = {
+	"isabove", "isbelow", NULL };
     enum options {
-        OPT_ISABOVE, OPT_ISBELOW };
+	OPT_ISABOVE, OPT_ISBELOW };
     int index;
 
     if ((objc != 3) && (objc != 5)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?isabove|isbelow window?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?isabove|isbelow window?");
+	return TCL_ERROR;
     }
 
     if (objc == 3) {
-        windows = TkWmStackorderToplevel(winPtr);
-        if (windows == NULL) {
-            panic("TkWmStackorderToplevel failed");
-        } else {
-            for (window_ptr = windows; *window_ptr ; window_ptr++) {
-                Tcl_AppendElement(interp, (*window_ptr)->pathName);
-            }
-            ckfree((char *) windows);
-            return TCL_OK;
-        }
+	windows = TkWmStackorderToplevel(winPtr);
+	if (windows == NULL) {
+	    Tcl_Panic("TkWmStackorderToplevel failed");
+	} else {
+	    for (window_ptr = windows; *window_ptr ; window_ptr++) {
+		Tcl_AppendElement(interp, (*window_ptr)->pathName);
+	    }
+	    ckfree((char *) windows);
+	    return TCL_OK;
+	}
     } else {
-        TkWindow *winPtr2;
-        int index1=-1, index2=-1, result;
+	TkWindow *winPtr2;
+	int index1=-1, index2=-1, result;
 
-        if (TkGetWindowFromObj(interp, tkwin, objv[4], (Tk_Window *) &winPtr2)
-            != TCL_OK) {
-            return TCL_ERROR;
-        }
+	if (TkGetWindowFromObj(interp, tkwin, objv[4], (Tk_Window *) &winPtr2)
+	    != TCL_OK) {
+	    return TCL_ERROR;
+	}
 
-        if (!Tk_IsTopLevel(winPtr2)) {
-            Tcl_AppendResult(interp, "window \"", winPtr2->pathName,
-                             "\" isn't a top-level window", (char *) NULL);
-            return TCL_ERROR;
-        }
+	if (!Tk_IsTopLevel(winPtr2)) {
+	    Tcl_AppendResult(interp, "window \"", winPtr2->pathName,
+		    "\" isn't a top-level window", NULL);
+	    return TCL_ERROR;
+	}
 
-        if (!Tk_IsMapped(winPtr)) {
-            Tcl_AppendResult(interp, "window \"", winPtr->pathName,
-                             "\" isn't mapped", (char *) NULL);
-            return TCL_ERROR;
-        }
+	if (!Tk_IsMapped(winPtr)) {
+	    Tcl_AppendResult(interp, "window \"", winPtr->pathName,
+		    "\" isn't mapped", NULL);
+	    return TCL_ERROR;
+	}
 
-        if (!Tk_IsMapped(winPtr2)) {
-            Tcl_AppendResult(interp, "window \"", winPtr2->pathName,
-                             "\" isn't mapped", (char *) NULL);
-            return TCL_ERROR;
-        }
+	if (!Tk_IsMapped(winPtr2)) {
+	    Tcl_AppendResult(interp, "window \"", winPtr2->pathName,
+		    "\" isn't mapped", NULL);
+	    return TCL_ERROR;
+	}
 
-        /*
-         * Lookup stacking order of all toplevels that are children
-         * of "." and find the position of winPtr and winPtr2
-         * in the stacking order.
-         */
+	/*
+	 * Lookup stacking order of all toplevels that are children
+	 * of "." and find the position of winPtr and winPtr2
+	 * in the stacking order.
+	 */
 
-        windows = TkWmStackorderToplevel(winPtr->mainPtr->winPtr);
+	windows = TkWmStackorderToplevel(winPtr->mainPtr->winPtr);
 
-        if (windows == NULL) {
-            Tcl_AppendResult(interp, "TkWmStackorderToplevel failed",
-                             (char *) NULL);
-            return TCL_ERROR;
-        } else {
-            for (window_ptr = windows; *window_ptr ; window_ptr++) {
-                if (*window_ptr == winPtr)
-                    index1 = (window_ptr - windows);
-                if (*window_ptr == winPtr2)
-                    index2 = (window_ptr - windows);
-            }
-            if (index1 == -1)
-                panic("winPtr window not found");
-            if (index2 == -1)
-                panic("winPtr2 window not found");
+	if (windows == NULL) {
+	    Tcl_AppendResult(interp, "TkWmStackorderToplevel failed", NULL);
+	    return TCL_ERROR;
+	} else {
+	    for (window_ptr = windows; *window_ptr ; window_ptr++) {
+		if (*window_ptr == winPtr)
+		    index1 = (window_ptr - windows);
+		if (*window_ptr == winPtr2)
+		    index2 = (window_ptr - windows);
+	    }
+	    if (index1 == -1)
+		Tcl_Panic("winPtr window not found");
+	    if (index2 == -1)
+		Tcl_Panic("winPtr2 window not found");
 
-            ckfree((char *) windows);
-        }
+	    ckfree((char *) windows);
+	}
 
-        if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
-                                &index) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        if (index == OPT_ISABOVE) {
-            result = index1 > index2;
-        } else { /* OPT_ISBELOW */
-            result = index1 < index2;
-        }
-        Tcl_SetIntObj(Tcl_GetObjResult(interp), result);
-        return TCL_OK;
+	if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
+				&index) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	if (index == OPT_ISABOVE) {
+	    result = index1 > index2;
+	} else { /* OPT_ISBELOW */
+	    result = index1 < index2;
+	}
+	Tcl_SetIntObj(Tcl_GetObjResult(interp), result);
+	return TCL_OK;
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2564,93 +2771,93 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmStateCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmStateCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
-    static CONST char *optionStrings[] = {
-        "normal", "iconic", "withdrawn", "zoomed", (char *) NULL };
+    static const char *optionStrings[] = {
+	"normal", "iconic", "withdrawn", "zoomed", NULL };
     enum options {
-        OPT_NORMAL, OPT_ICONIC, OPT_WITHDRAWN, OPT_ZOOMED };
+	OPT_NORMAL, OPT_ICONIC, OPT_WITHDRAWN, OPT_ZOOMED };
     int index;
 
     if ((objc < 3) || (objc > 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?state?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?state?");
+	return TCL_ERROR;
     }
     if (objc == 4) {
-        if (wmPtr->iconFor != NULL) {
-            Tcl_AppendResult(interp, "can't change state of ",
-                             Tcl_GetString(objv[2]),
-                             ": it is an icon for ", Tk_PathName(wmPtr->iconFor),
-                             (char *) NULL);
-            return TCL_ERROR;
-        }
-        if (winPtr->flags & TK_EMBEDDED) {
-            Tcl_AppendResult(interp, "can't change state of ",
-                             winPtr->pathName, ": it is an embedded window",
-                             (char *) NULL);
-            return TCL_ERROR;
-        }
+	if (wmPtr->iconFor != NULL) {
+	    Tcl_AppendResult(interp, "can't change state of ",
+		    Tcl_GetString(objv[2]), ": it is an icon for ",
+		    Tk_PathName(wmPtr->iconFor), NULL);
+	    return TCL_ERROR;
+	}
+	if (winPtr->flags & TK_EMBEDDED) {
+	    Tcl_AppendResult(interp, "can't change state of ",
+		    winPtr->pathName, ": it is an embedded window", NULL);
+	    return TCL_ERROR;
+	}
 
-        if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
-                                &index) != TCL_OK) {
-            return TCL_ERROR;
-        }
+	if (Tcl_GetIndexFromObj(interp, objv[3], optionStrings, "argument", 0,
+				&index) != TCL_OK) {
+	    return TCL_ERROR;
+	}
 
-        if (index == OPT_NORMAL) {
-            TkpWmSetState(winPtr, NormalState);
-            /*
-             * This varies from 'wm deiconify' because it does not
-             * force the window to be raised and receive focus
-             */
-        } else if (index == OPT_ICONIC) {
-            if (Tk_Attributes((Tk_Window) winPtr)->override_redirect) {
-                Tcl_AppendResult(interp, "can't iconify \"",
-                                 winPtr->pathName,
-                                 "\": override-redirect flag is set",
-                                 (char *) NULL);
-                return TCL_ERROR;
-            }
-            if (wmPtr->master != None) {
-                Tcl_AppendResult(interp, "can't iconify \"",
-                                 winPtr->pathName,
-                                 "\": it is a transient", (char *) NULL);
-                return TCL_ERROR;
-            }
-            TkpWmSetState(winPtr, IconicState);
-        } else if (index == OPT_WITHDRAWN) {
-            TkpWmSetState(winPtr, WithdrawnState);
-        } else { /* OPT_ZOOMED */
-            TkpWmSetState(winPtr, ZoomState);
-        }
+	if (index == OPT_NORMAL) {
+	    TkpWmSetState(winPtr, NormalState);
+	    /*
+	     * This varies from 'wm deiconify' because it does not
+	     * force the window to be raised and receive focus
+	     */
+	} else if (index == OPT_ICONIC) {
+	    if (Tk_Attributes((Tk_Window) winPtr)->override_redirect) {
+		Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
+			"\": override-redirect flag is set", NULL);
+		return TCL_ERROR;
+	    }
+	    if (wmPtr->master != None) {
+		Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
+			"\": it is a transient", NULL);
+		return TCL_ERROR;
+	    }
+	    TkpWmSetState(winPtr, IconicState);
+	} else if (index == OPT_WITHDRAWN) {
+	    TkpWmSetState(winPtr, WithdrawnState);
+	} else { /* OPT_ZOOMED */
+	    TkpWmSetState(winPtr, ZoomState);
+	}
     } else {
-        if (wmPtr->iconFor != NULL) {
-            Tcl_SetResult(interp, "icon", TCL_STATIC);
-        } else {
-            switch (wmPtr->hints.initial_state) {
-                case NormalState:
-                    Tcl_SetResult(interp, "normal", TCL_STATIC);
-                    break;
-                case IconicState:
-                    Tcl_SetResult(interp, "iconic", TCL_STATIC);
-                    break;
-                case WithdrawnState:
-                    Tcl_SetResult(interp, "withdrawn", TCL_STATIC);
-                    break;
-                case ZoomState:
-                    Tcl_SetResult(interp, "zoomed", TCL_STATIC);
-                    break;
-            }
-        }
+	if (wmPtr->iconFor != NULL) {
+	    Tcl_SetResult(interp, "icon", TCL_STATIC);
+	} else {
+	    if (wmPtr->hints.initial_state == NormalState ||
+		    wmPtr->hints.initial_state == ZoomState) {
+		wmPtr->hints.initial_state = (TkMacOSXIsWindowZoomed(winPtr) ?
+			ZoomState : NormalState);
+	    }
+	    switch (wmPtr->hints.initial_state) {
+		case NormalState:
+		    Tcl_SetResult(interp, "normal", TCL_STATIC);
+		    break;
+		case IconicState:
+		    Tcl_SetResult(interp, "iconic", TCL_STATIC);
+		    break;
+		case WithdrawnState:
+		    Tcl_SetResult(interp, "withdrawn", TCL_STATIC);
+		    break;
+		case ZoomState:
+		    Tcl_SetResult(interp, "zoomed", TCL_STATIC);
+		    break;
+	    }
+	}
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2669,36 +2876,34 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmTitleCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmTitleCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     char *argv3;
     int length;
 
     if (objc > 4) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?newTitle?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?newTitle?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        Tcl_SetResult(interp,
-                      (char *) ((wmPtr->titleUid != NULL) ? wmPtr->titleUid : winPtr->nameUid),
-                      TCL_STATIC);
-        return TCL_OK;
-    } else {
-        argv3 = Tcl_GetStringFromObj(objv[3], &length);
-        wmPtr->titleUid = Tk_GetUid(argv3);
-        if (!(wmPtr->flags & WM_NEVER_MAPPED) && !Tk_IsEmbedded(winPtr)) {
-            TkSetWMName(winPtr, wmPtr->titleUid);
-        }
+	Tcl_SetResult(interp, (char *)((wmPtr->titleUid != NULL) ?
+		wmPtr->titleUid : winPtr->nameUid), TCL_STATIC);
+	return TCL_OK;
+    }
+    argv3 = Tcl_GetStringFromObj(objv[3], &length);
+    wmPtr->titleUid = Tk_GetUid(argv3);
+    if (!(wmPtr->flags & WM_NEVER_MAPPED) && !Tk_IsEmbedded(winPtr)) {
+	TkSetWMName(winPtr, wmPtr->titleUid);
     }
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2717,12 +2922,12 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmTransientCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmTransientCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     Tk_Window master;
@@ -2731,58 +2936,59 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
     int length;
 
     if ((objc != 3) && (objc != 4)) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window ?master?");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?master?");
+	return TCL_ERROR;
     }
     if (objc == 3) {
-        if (wmPtr->master != None) {
-            Tcl_SetResult(interp, wmPtr->masterWindowName, TCL_STATIC);
-        }
-        return TCL_OK;
+	if (wmPtr->master != None) {
+	    Tcl_SetResult(interp, wmPtr->masterWindowName, TCL_STATIC);
+	}
+	return TCL_OK;
     }
     if (Tcl_GetString(objv[3])[0] == '\0') {
-        wmPtr->master = None;
-        if (wmPtr->masterWindowName != NULL) {
-            ckfree(wmPtr->masterWindowName);
-        }
-        wmPtr->masterWindowName = NULL;
-        wmPtr->style = documentProc;
+	wmPtr->master = None;
+	if (wmPtr->masterWindowName != NULL) {
+	    ckfree(wmPtr->masterWindowName);
+	}
+	wmPtr->masterWindowName = NULL;
     } else {
-        if (TkGetWindowFromObj(interp, tkwin, objv[3], &master) != TCL_OK) {
-            return TCL_ERROR;
-        }
-        Tk_MakeWindowExist(master);
+	if (TkGetWindowFromObj(interp, tkwin, objv[3], &master) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	Tk_MakeWindowExist(master);
 
-        if (wmPtr->iconFor != NULL) {
-            Tcl_AppendResult(interp, "can't make \"",
-                             Tcl_GetString(objv[2]),
-                             "\" a transient: it is an icon for ",
-                             Tk_PathName(wmPtr->iconFor),
-                             (char *) NULL);
-            return TCL_ERROR;
-        }
+	if (wmPtr->iconFor != NULL) {
+	    Tcl_AppendResult(interp, "can't make \"", Tcl_GetString(objv[2]),
+		    "\" a transient: it is an icon for ",
+		    Tk_PathName(wmPtr->iconFor), NULL);
+	    return TCL_ERROR;
+	}
 
-        wmPtr2 = ((TkWindow *) master)->wmInfoPtr;
+	wmPtr2 = ((TkWindow *) master)->wmInfoPtr;
 
-        /* Under some circumstances, wmPtr2 is NULL here */
-        if (wmPtr2 != NULL && wmPtr2->iconFor != NULL) {
-            Tcl_AppendResult(interp, "can't make \"",
-                             Tcl_GetString(objv[3]),
-                             "\" a master: it is an icon for ",
-                             Tk_PathName(wmPtr2->iconFor),
-                             (char *) NULL);
-            return TCL_ERROR;
-        }
+	/* Under some circumstances, wmPtr2 is NULL here */
+	if (wmPtr2 != NULL && wmPtr2->iconFor != NULL) {
+	    Tcl_AppendResult(interp, "can't make \"", Tcl_GetString(objv[3]),
+		    "\" a master: it is an icon for ",
+		    Tk_PathName(wmPtr2->iconFor), NULL);
+	    return TCL_ERROR;
+	}
 
-        argv3 = Tcl_GetStringFromObj(objv[3], &length);
-        wmPtr->master = Tk_WindowId(master);
-        wmPtr->masterWindowName = ckalloc((unsigned) length+1);
-        strcpy(wmPtr->masterWindowName, argv3);
-        wmPtr->style = plainDBox;
+	if ((TkWindow *) master == winPtr) {
+	    Tcl_AppendResult(interp, "can't make \"", Tk_PathName(winPtr),
+		    "\" its own master", NULL);
+	    return TCL_ERROR;
+	}
+
+	argv3 = Tcl_GetStringFromObj(objv[3], &length);
+	wmPtr->master = Tk_WindowId(master);
+	wmPtr->masterWindowName = ckalloc((unsigned) length+1);
+	strcpy(wmPtr->masterWindowName, argv3);
     }
+    ApplyMasterOverrideChanges(winPtr, NULL);
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2801,24 +3007,23 @@ Tcl_Obj *CONST objv[];	/* Argument objects. */
  */
 
 static int
-WmWithdrawCmd(tkwin, winPtr, interp, objc, objv)
-Tk_Window tkwin;		/* Main window of the application. */
-TkWindow *winPtr;           /* Toplevel to work with */
-Tcl_Interp *interp;		/* Current interpreter. */
-int objc;			/* Number of arguments. */
-Tcl_Obj *CONST objv[];	/* Argument objects. */
+WmWithdrawCmd(
+    Tk_Window tkwin,		/* Main window of the application. */
+    TkWindow *winPtr,		/* Toplevel to work with */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
 
     if (objc != 3) {
-        Tcl_WrongNumArgs(interp, 2, objv, "window");
-        return TCL_ERROR;
+	Tcl_WrongNumArgs(interp, 2, objv, "window");
+	return TCL_ERROR;
     }
     if (wmPtr->iconFor != NULL) {
-        Tcl_AppendResult(interp, "can't withdraw ", Tcl_GetString(objv[2]),
-                         ": it is an icon for ", Tk_PathName(wmPtr->iconFor),
-                         (char *) NULL);
-        return TCL_ERROR;
+	Tcl_AppendResult(interp, "can't withdraw ", Tcl_GetString(objv[2]),
+		": it is an icon for ", Tk_PathName(wmPtr->iconFor), NULL);
+	return TCL_ERROR;
     }
     TkpWmSetState(winPtr, WithdrawnState);
     return TCL_OK;
@@ -2834,10 +3039,11 @@ WmInfo *wmPtr;
 TkWindow *winPtr;
 {
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
-        Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
-        wmPtr->flags |= WM_UPDATE_PENDING;
+	Tcl_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
+	wmPtr->flags |= WM_UPDATE_PENDING;
     }
-}
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -2854,7 +3060,7 @@ TkWindow *winPtr;
  * Side effects:
  *	Grid-related information will be passed to the window manager, so
  *	that the top-level window associated with tkwin will resize on
- *	even grid units.  If some other window already controls gridding
+ *	even grid units. If some other window already controls gridding
  *	for the top-level window then this procedure call has no effect.
  *
  *----------------------------------------------------------------------
@@ -2862,7 +3068,7 @@ TkWindow *winPtr;
 
 void
 Tk_SetGrid(
-    Tk_Window tkwin,		/* Token for window.  New window mgr info
+    Tk_Window tkwin,		/* Token for window. New window mgr info
 				 * will be posted for the top-level window
 				 * associated with this window. */
     int reqWidth,		/* Width (in grid units) corresponding to
@@ -2874,6 +3080,17 @@ Tk_SetGrid(
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
     WmInfo *wmPtr;
+
+    /*
+     * Ensure widthInc and heightInc are greater than 0
+     */
+
+    if (widthInc <= 0) {
+	widthInc = 1;
+    }
+    if (heightInc <= 0) {
+	heightInc = 1;
+    }
 
     /*
      * Find the top-level window for tkwin, plus the window manager
@@ -2904,7 +3121,7 @@ Tk_SetGrid(
      * in pixel units and there's no easy way to translate them to
      * grid units since the new requested size of the top-level window in
      * pixels may not yet have been registered yet (it may filter up
-     * the hierarchy in DoWhenIdle handlers).  However, if the window
+     * the hierarchy in DoWhenIdle handlers). However, if the window
      * has never been mapped yet then just leave the window size alone:
      * assume that it is intended to be in grid units but just happened
      * to have been specified before this procedure was called.
@@ -2915,7 +3132,7 @@ Tk_SetGrid(
 	wmPtr->height = -1;
     }
 
-    /* 
+    /*
      * Set the new gridding information, and start the process of passing
      * all of this information to the window manager.
      */
@@ -2928,7 +3145,7 @@ Tk_SetGrid(
     wmPtr->sizeHintsFlags |= PBaseSize|PResizeInc;
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
-	Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
+	Tcl_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
 	wmPtr->flags |= WM_UPDATE_PENDING;
     }
 }
@@ -2946,7 +3163,7 @@ Tk_SetGrid(
  *
  * Side effects:
  *	If tkwin currently controls gridding for its top-level window,
- *	gridding is cancelled for that top-level window;  if some other
+ *	gridding is cancelled for that top-level window; if some other
  *	window controls gridding then this procedure has no effect.
  *
  *----------------------------------------------------------------------
@@ -2986,7 +3203,7 @@ Tk_UnsetGrid(
 
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
-	Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
+	Tcl_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
 	wmPtr->flags |= WM_UPDATE_PENDING;
     }
 }
@@ -3011,34 +3228,32 @@ Tk_UnsetGrid(
 
 static void
 TopLevelEventProc(
-    ClientData clientData,		/* Window for which event occurred. */
-    XEvent *eventPtr)			/* Event that just happened. */
+    ClientData clientData,	/* Window for which event occurred. */
+    XEvent *eventPtr)		/* Event that just happened. */
 {
     TkWindow *winPtr = (TkWindow *) clientData;
 
     winPtr->wmInfoPtr->flags |= WM_VROOT_OFFSET_STALE;
     if (eventPtr->type == DestroyNotify) {
-	Tk_ErrorHandler handler;
-
 	if (!(winPtr->flags & TK_ALREADY_DEAD)) {
 	    /*
 	     * A top-level window was deleted externally (e.g., by the window
-	     * manager).  This is probably not a good thing, but cleanup as
-	     * best we can.  The error handler is needed because
+	     * manager). This is probably not a good thing, but cleanup as
+	     * best we can. The error handler is needed because
 	     * Tk_DestroyWindow will try to destroy the window, but of course
 	     * it's already gone.
 	     */
-    
-	    handler = Tk_CreateErrorHandler(winPtr->display, -1, -1, -1,
-		    (Tk_ErrorProc *) NULL, (ClientData) NULL);
+
+	    Tk_ErrorHandler handler = Tk_CreateErrorHandler(winPtr->display,
+		    -1, -1, -1, (Tk_ErrorProc *) NULL, (ClientData) NULL);
 	    Tk_DestroyWindow((Tk_Window) winPtr);
 	    Tk_DeleteErrorHandler(handler);
 	}
 	if (wmTracing) {
-	    printf("TopLevelEventProc: %s deleted\n", winPtr->pathName);
+	    TkMacOSXDbgMsg("TopLevelEventProc: %s deleted", winPtr->pathName);
 	}
     } else if (eventPtr->type == ReparentNotify) {
-	panic("recieved unwanted reparent event");
+	Tcl_Panic("recieved unwanted reparent event");
     }
 }
 
@@ -3063,8 +3278,8 @@ TopLevelEventProc(
 	/* ARGSUSED */
 static void
 TopLevelReqProc(
-    ClientData dummy,			/* Not used. */
-    Tk_Window tkwin)			/* Information about window. */
+    ClientData dummy,		/* Not used. */
+    Tk_Window tkwin)		/* Information about window. */
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
     WmInfo *wmPtr;
@@ -3072,7 +3287,7 @@ TopLevelReqProc(
     wmPtr = winPtr->wmInfoPtr;
     wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
-	Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
+	Tcl_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
 	wmPtr->flags |= WM_UPDATE_PENDING;
     }
 }
@@ -3101,23 +3316,27 @@ TopLevelReqProc(
 
 static void
 UpdateGeometryInfo(
-    ClientData clientData)		/* Pointer to the window's record. */
+    ClientData clientData)	/* Pointer to the window's record. */
 {
     TkWindow *winPtr = (TkWindow *) clientData;
     WmInfo *wmPtr = winPtr->wmInfoPtr;
-    int x, y, width, height;
+    int x, y, width, height, min, max;
     unsigned long serial;
 
     wmPtr->flags &= ~WM_UPDATE_PENDING;
 
+    if (wmPtr->flags & WM_FULLSCREEN) {
+	return;
+    }
+
     /*
-     * Compute the new size for the top-level window.  See the
+     * Compute the new size for the top-level window. See the
      * user documentation for details on this, but the size
      * requested depends on (a) the size requested internally
      * by the window's widgets, (b) the size requested by the
      * user in a "wm geometry" command or via wm-based interactive
      * resizing (if any), and (c) whether or not the window is
-     * gridded.  Don't permit sizes <= 0 because this upsets
+     * gridded. Don't permit sizes <= 0 because this upsets
      * the X server.
      */
 
@@ -3132,6 +3351,30 @@ UpdateGeometryInfo(
     if (width <= 0) {
 	width = 1;
     }
+
+    /*
+     * Account for window max/min width
+     */
+
+    if (wmPtr->gridWin != NULL) {
+	min = winPtr->reqWidth
+		+ (wmPtr->minWidth - wmPtr->reqGridWidth)*wmPtr->widthInc;
+	if (wmPtr->maxWidth > 0) {
+	    max = winPtr->reqWidth
+		    + (wmPtr->maxWidth - wmPtr->reqGridWidth)*wmPtr->widthInc;
+	} else {
+	    max = 0;
+	}
+    } else {
+	min = wmPtr->minWidth;
+	max = wmPtr->maxWidth;
+    }
+    if (width < min) {
+	width = min;
+    } else if ((max > 0) && (width > max)) {
+	width = max;
+    }
+
     if (wmPtr->height == -1) {
 	height = winPtr->reqHeight;
     } else if (wmPtr->gridWin != NULL) {
@@ -3145,8 +3388,31 @@ UpdateGeometryInfo(
     }
 
     /*
+     * Account for window max/min height
+     */
+
+    if (wmPtr->gridWin != NULL) {
+	min = winPtr->reqHeight
+		+ (wmPtr->minHeight - wmPtr->reqGridHeight)*wmPtr->heightInc;
+	if (wmPtr->maxHeight > 0) {
+	    max = winPtr->reqHeight
+		    + (wmPtr->maxHeight-wmPtr->reqGridHeight)*wmPtr->heightInc;
+	} else {
+	    max = 0;
+	}
+    } else {
+	min = wmPtr->minHeight;
+	max = wmPtr->maxHeight;
+    }
+    if (height < min) {
+	height = min;
+    } else if ((max > 0) && (height > max)) {
+	height = max;
+    }
+
+    /*
      * Compute the new position for the upper-left pixel of the window's
-     * decorative frame.  This is tricky, because we need to include the
+     * decorative frame. This is tricky, because we need to include the
      * border widths supplied by a reparented parent in this calculation,
      * but can't use the parent's current overall size since that may
      * change as a result of this code.
@@ -3168,7 +3434,7 @@ UpdateGeometryInfo(
     /*
      * If the window's size is going to change and the window is
      * supposed to not be resizable by the user, then we have to
-     * update the size hints.  There may also be a size-hint-update
+     * update the size hints. There may also be a size-hint-update
      * request pending from somewhere else, too.
      */
 
@@ -3188,41 +3454,39 @@ UpdateGeometryInfo(
      *
      * 1. If the window is embedded and the container is also in this
      *    process, don't actually reconfigure the window; just pass the
-     *    desired size on to the container.  Also, zero out any position
+     *    desired size on to the container. Also, zero out any position
      *    information, since embedded windows are not allowed to move.
      * 2. Sometimes the window manager will give us a different size
      *    than we asked for (e.g. mwm has a minimum size for windows), so
      *    base the size check on what we *asked for* last time, not what we
      *    got.
      * 3. Don't move window unless a new position has been requested for
-     *	  it.  This is because of "features" in some window managers (e.g.
+     *    it. This is because of "features" in some window managers (e.g.
      *    twm, as of 4/24/91) where they don't interpret coordinates
-     *    according to ICCCM.  Moving a window to its current location may
+     *    according to ICCCM. Moving a window to its current location may
      *    cause it to shift position on the screen.
      */
 
     if (Tk_IsEmbedded(winPtr)) {
-        TkWindow *contWinPtr;
+	TkWindow *contWinPtr = TkpGetOtherWindow(winPtr);
 
-	contWinPtr = TkpGetOtherWindow(winPtr);
-	
 	/*
-	 * NOTE: Here we should handle out of process embedding.
+	 * TODO: Here we should handle out of process embedding.
 	 */
 
-	if (contWinPtr != NULL) {	    
+	if (contWinPtr != NULL) {
 	    /*
 	     * This window is embedded and the container is also in this
 	     * process, so we don't need to do anything special about the
 	     * geometry, except to make sure that the desired size is known
-	     * by the container.  Also, zero out any position information,
+	     * by the container. Also, zero out any position information,
 	     * since embedded windows are not allowed to move.
 	     */
 
 	    wmPtr->x = wmPtr->y = 0;
 	    wmPtr->flags &= ~(WM_NEGATIVE_X|WM_NEGATIVE_Y);
 	    Tk_GeometryRequest((Tk_Window) contWinPtr, width, height);
-        }
+	}
 	return;
     }
     serial = NextRequest(winPtr->display);
@@ -3230,28 +3494,29 @@ UpdateGeometryInfo(
 	wmPtr->configWidth = width;
 	wmPtr->configHeight = height;
 	if (wmTracing) {
-	    printf(
-		"UpdateGeometryInfo moving to %d %d, resizing to %d x %d,\n",
-		    x, y, width, height);
+	    TkMacOSXDbgMsg("Moving to %d %d, resizing to %d x %d", x, y,
+		    width, height);
 	}
-	Tk_MoveResizeWindow((Tk_Window) winPtr, x, y, (unsigned) width,
-		(unsigned) height);
+	wmPtr->flags |= WM_SYNC_PENDING;
+	XMoveResizeWindow(winPtr->display, winPtr->window, x, y,
+		(unsigned) width, (unsigned) height);
+	wmPtr->flags &= ~WM_SYNC_PENDING;
     } else if ((width != wmPtr->configWidth)
 	    || (height != wmPtr->configHeight)) {
 	wmPtr->configWidth = width;
 	wmPtr->configHeight = height;
 	if (wmTracing) {
-	    printf("UpdateGeometryInfo resizing to %d x %d\n", width, height);
+	    TkMacOSXDbgMsg("Resizing to %d x %d\n", width, height);
 	}
-	Tk_ResizeWindow((Tk_Window) winPtr, (unsigned) width,
+	wmPtr->flags |= WM_SYNC_PENDING;
+	XResizeWindow(winPtr->display, winPtr->window, (unsigned) width,
 		(unsigned) height);
-    } else {
-	return;
+	wmPtr->flags &= ~WM_SYNC_PENDING;
     }
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * UpdateSizeHints --
  *
@@ -3265,7 +3530,7 @@ UpdateGeometryInfo(
  * Side effects:
  *	Properties get changed for winPtr.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 static void
@@ -3273,86 +3538,14 @@ UpdateSizeHints(
     TkWindow *winPtr)
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
-    XSizeHints *hintsPtr;
 
     wmPtr->flags &= ~WM_UPDATE_SIZE_HINTS;
 
-    hintsPtr = XAllocSizeHints();
-    if (hintsPtr == NULL) {
-	return;
-    }
-
-    /*
-     * Compute the pixel-based sizes for the various fields in the
-     * size hints structure, based on the grid-based sizes in
-     * our structure.
-     */
-
-    if (wmPtr->gridWin != NULL) {
-	hintsPtr->base_width = winPtr->reqWidth
-		- (wmPtr->reqGridWidth * wmPtr->widthInc);
-	if (hintsPtr->base_width < 0) {
-	    hintsPtr->base_width = 0;
-	}
-	hintsPtr->base_height = winPtr->reqHeight
-		- (wmPtr->reqGridHeight * wmPtr->heightInc);
-	if (hintsPtr->base_height < 0) {
-	    hintsPtr->base_height = 0;
-	}
-	hintsPtr->min_width = hintsPtr->base_width
-		+ (wmPtr->minWidth * wmPtr->widthInc);
-	hintsPtr->min_height = hintsPtr->base_height
-		+ (wmPtr->minHeight * wmPtr->heightInc);
-	hintsPtr->max_width = hintsPtr->base_width
-		+ (wmPtr->maxWidth * wmPtr->widthInc);
-	hintsPtr->max_height = hintsPtr->base_height
-		+ (wmPtr->maxHeight * wmPtr->heightInc);
-    } else {
-	hintsPtr->min_width = wmPtr->minWidth;
-	hintsPtr->min_height = wmPtr->minHeight;
-	hintsPtr->max_width = wmPtr->maxWidth;
-	hintsPtr->max_height = wmPtr->maxHeight;
-	hintsPtr->base_width = 0;
-	hintsPtr->base_height = 0;
-    }
-    hintsPtr->width_inc = wmPtr->widthInc;
-    hintsPtr->height_inc = wmPtr->heightInc;
-    hintsPtr->min_aspect.x = wmPtr->minAspect.x;
-    hintsPtr->min_aspect.y = wmPtr->minAspect.y;
-    hintsPtr->max_aspect.x = wmPtr->maxAspect.x;
-    hintsPtr->max_aspect.y = wmPtr->maxAspect.y;
-    hintsPtr->win_gravity = wmPtr->gravity;
-    hintsPtr->flags = wmPtr->sizeHintsFlags | PMinSize | PMaxSize;
-
-    /*
-     * If the window isn't supposed to be resizable, then set the
-     * minimum and maximum dimensions to be the same.
-     */
-
-    if (wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) {
-	if (wmPtr->width >= 0) {
-	    hintsPtr->min_width = wmPtr->width;
-	} else {
-	    hintsPtr->min_width = winPtr->reqWidth;
-	}
-	hintsPtr->max_width = hintsPtr->min_width;
-    }
-    if (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE) {
-	if (wmPtr->height >= 0) {
-	    hintsPtr->min_height = wmPtr->height;
-	} else {
-	    hintsPtr->min_height = winPtr->reqHeight;
-	}
-	hintsPtr->max_height = hintsPtr->min_height;
-    }
-
-    XSetWMNormalHints(winPtr->display, winPtr->window, hintsPtr);
-
-    XFree((char *) hintsPtr);
+    return;
 }
 
 /*
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  *
  * ParseGeometry --
  *
@@ -3367,13 +3560,13 @@ UpdateSizeHints(
  * Side effects:
  *	The size and/or location of winPtr may change.
  *
- *--------------------------------------------------------------
+ *----------------------------------------------------------------------
  */
 
 static int
 ParseGeometry(
     Tcl_Interp *interp,		/* Used for error reporting. */
-    char *string,		/* String containing new geometry.  Has the
+    char *string,		/* String containing new geometry. Has the
 				 * standard form "=wxh+x+y". */
     TkWindow *winPtr)		/* Pointer to top-level window whose
 				 * geometry is to be changed. */
@@ -3392,7 +3585,7 @@ ParseGeometry(
     }
 
     /*
-     * Parse the width and height, if they are present.  Don't
+     * Parse the width and height, if they are present. Don't
      * actually update any of the fields of wmPtr until we've
      * successfully parsed the entire geometry string.
      */
@@ -3427,21 +3620,29 @@ ParseGeometry(
 	} else if (*p != '+') {
 	    goto error;
 	}
-	x = strtol(p+1, &end, 10);
+	p++;
+	if (!isdigit(UCHAR(*p)) && (*p != '-')) {
+	    goto error;
+	}
+	x = strtol(p, &end, 10);
 	p = end;
 	if (*p == '-') {
 	    flags |= WM_NEGATIVE_Y;
 	} else if (*p != '+') {
 	    goto error;
 	}
-	y = strtol(p+1, &end, 10);
+	p++;
+	if (!isdigit(UCHAR(*p)) && (*p != '-')) {
+	    goto error;
+	}
+	y = strtol(p, &end, 10);
 	if (*end != '\0') {
 	    goto error;
 	}
 
 	/*
 	 * Assume that the geometry information came from the user,
-	 * unless an explicit source has been specified.  Otherwise
+	 * unless an explicit source has been specified. Otherwise
 	 * most window managers assume that the size hints were
 	 * program-specified and they ignore them.
 	 */
@@ -3453,7 +3654,7 @@ ParseGeometry(
     }
 
     /*
-     * Everything was parsed OK.  Update the fields of *wmPtr and
+     * Everything was parsed OK. Update the fields of *wmPtr and
      * arrange for the appropriate information to be percolated out
      * to the window manager at the next idle moment.
      */
@@ -3463,21 +3664,25 @@ ParseGeometry(
     if ((x != wmPtr->x) || (y != wmPtr->y)
 	    || ((flags & (WM_NEGATIVE_X|WM_NEGATIVE_Y))
 		    != (wmPtr->flags & (WM_NEGATIVE_X|WM_NEGATIVE_Y)))) {
-	wmPtr->x = x;
-	wmPtr->y = y;
+	if (wmPtr->flags & WM_FULLSCREEN) {
+	    wmPtr->configX = x;
+	    wmPtr->configY = y;
+	} else {
+	    wmPtr->x = x;
+	    wmPtr->y = y;
+	}
 	flags |= WM_MOVE_PENDING;
     }
     wmPtr->flags = flags;
 
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
-	Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
+	Tcl_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
 	wmPtr->flags |= WM_UPDATE_PENDING;
     }
     return TCL_OK;
 
-    error:
-    Tcl_AppendResult(interp, "bad geometry specifier \"",
-	    string, "\"", (char *) NULL);
+error:
+    Tcl_AppendResult(interp, "bad geometry specifier \"", string, "\"", NULL);
     return TCL_ERROR;
 }
 
@@ -3492,7 +3697,7 @@ ParseGeometry(
  *
  * Results:
  *	The locations pointed to by xPtr and yPtr are filled in with
- *	the root coordinates of the (0,0) point in tkwin.  If a virtual
+ *	the root coordinates of the (0,0) point in tkwin. If a virtual
  *	root window is in effect for the window, then the coordinates
  *	in the virtual root are returned.
  *
@@ -3523,49 +3728,49 @@ Tk_GetRootCoords(
 	y += winPtr->changes.y + winPtr->changes.border_width;
 	if (winPtr->flags & TK_TOP_LEVEL) {
 	    if (!(Tk_IsEmbedded(winPtr))) {
-	    	x += winPtr->wmInfoPtr->xInParent;
-	    	y += winPtr->wmInfoPtr->yInParent;
-	    	break;	    	
+		x += winPtr->wmInfoPtr->xInParent;
+		y += winPtr->wmInfoPtr->yInParent;
+		break;
 	    } else {
-	        TkWindow *otherPtr;
-		
-		otherPtr = TkpGetOtherWindow(winPtr);
+		TkWindow *otherPtr = TkpGetOtherWindow(winPtr);
+
 		if (otherPtr != NULL) {
 		    /*
 		     * The container window is in the same application.
 		     * Query its coordinates.
 		     */
 		    winPtr = otherPtr;
-		    
+
 		    /*
 		     * Remember to offset by the container window here,
 		     * since at the end of this if branch, we will
 		     * pop out to the container's parent...
 		     */
-		     
-	            x += winPtr->changes.x + winPtr->changes.border_width;
-	            y += winPtr->changes.y + winPtr->changes.border_width;
-		    
+
+		    x += winPtr->changes.x + winPtr->changes.border_width;
+		    y += winPtr->changes.y + winPtr->changes.border_width;
+
 		} else {
 		    Point theOffset;
-		    
-		    if (gMacEmbedHandler->getOffsetProc != NULL) {
-		        /*
-		         * We do not require that the changes.x & changes.y for 
-		         * a non-Tk master window be kept up to date.  So we
-		         * first subtract off the possibly bogus values that have
-		         * been added on at the top of this pass through the loop,
-		         * and then call out to the getOffsetProc to give us
-		         * the correct offset.
-		         */
-		         
-	                x -= winPtr->changes.x + winPtr->changes.border_width;
-	                y -= winPtr->changes.y + winPtr->changes.border_width;
-	                
-		        gMacEmbedHandler->getOffsetProc((Tk_Window) winPtr, &theOffset);
-		        
-		        x += theOffset.h;
-		        y += theOffset.v;
+
+		    if (tkMacOSXEmbedHandler->getOffsetProc != NULL) {
+			/*
+			 * We do not require that the changes.x & changes.y for
+			 * a non-Tk master window be kept up to date. So we
+			 * first subtract off the possibly bogus values that
+			 * have been added on at the top of this pass through
+			 * the loop, and then call out to the getOffsetProc to
+			 * give us the correct offset.
+			 */
+
+			x -= winPtr->changes.x + winPtr->changes.border_width;
+			y -= winPtr->changes.y + winPtr->changes.border_width;
+
+			tkMacOSXEmbedHandler->getOffsetProc((Tk_Window) winPtr,
+				&theOffset);
+
+			x += theOffset.h;
+			y += theOffset.v;
 		    }
 		    break;
 		}
@@ -3600,7 +3805,7 @@ Tk_GetRootCoords(
 
 Tk_Window
 Tk_CoordsToWindow(
-    int rootX, int rootY,	/* Coordinates of point in root window.  If
+    int rootX, int rootY,	/* Coordinates of point in root window. If
 				 * a virtual-root window manager is in use,
 				 * these coordinates refer to the virtual
 				 * root, not the real root. */
@@ -3620,7 +3825,7 @@ Tk_CoordsToWindow(
     /*
      * Step 1: find the top-level window that contains the desired point.
      */
-     
+
     where.h = rootX;
     where.v = rootY;
     FindWindow(where, &whichWin);
@@ -3631,13 +3836,13 @@ Tk_CoordsToWindow(
     dispPtr = TkGetDisplayList();
     winPtr = (TkWindow *) Tk_IdToWindow(dispPtr->display, rootChild);
     if (winPtr == NULL) {
-        return NULL;
+	return NULL;
     }
 
     /*
      * Step 2: work down through the hierarchy underneath this window.
      * At each level, scan through all the children to find the highest
-     * one in the stacking order that contains the point.  Then repeat
+     * one in the stacking order that contains the point. Then repeat
      * the whole process on that child.
      */
 
@@ -3647,48 +3852,46 @@ Tk_CoordsToWindow(
 	x -= winPtr->changes.x;
 	y -= winPtr->changes.y;
 	nextPtr = NULL;
-	
+
 	/*
-	 * Container windows cannot have children.  So if it is a container,
+	 * Container windows cannot have children. So if it is a container,
 	 * look there, otherwise inspect the children.
 	 */
-	 
+
 	if (Tk_IsContainer(winPtr)) {
 	    childPtr = TkpGetOtherWindow(winPtr);
 	    if (childPtr != NULL) {
 		if (Tk_IsMapped(childPtr)) {
-	            tmpx = x - childPtr->changes.x;
-	            tmpy = y - childPtr->changes.y;
-	            bd = childPtr->changes.border_width;
-	    	          
-	            if ((tmpx >= -bd) && (tmpy >= -bd)
-		        && (tmpx < (childPtr->changes.width + bd))
-		        && (tmpy < (childPtr->changes.height + bd))) {
-		        nextPtr = childPtr;
-	            }
-	    	}
+		    tmpx = x - childPtr->changes.x;
+		    tmpy = y - childPtr->changes.y;
+		    bd = childPtr->changes.border_width;
+
+		    if ((tmpx >= -bd) && (tmpy >= -bd)
+			&& (tmpx < (childPtr->changes.width + bd))
+			&& (tmpy < (childPtr->changes.height + bd))) {
+			nextPtr = childPtr;
+		    }
+		}
 	    }
-	    
 
 	    /*
-	     * NOTE: Here we should handle out of process embedding.
+	     * TODO: Here we should handle out of process embedding.
 	     */
-	
 	} else {
 	    for (childPtr = winPtr->childList; childPtr != NULL;
 		    childPtr = childPtr->nextPtr) {
-	        if (!Tk_IsMapped(childPtr) ||
+		if (!Tk_IsMapped(childPtr) ||
 			(childPtr->flags & TK_TOP_LEVEL)) {
 		    continue;
-	        }
-	        tmpx = x - childPtr->changes.x;
-	        tmpy = y - childPtr->changes.y;
-	        bd = childPtr->changes.border_width;
-	        if ((tmpx >= -bd) && (tmpy >= -bd)
-		        && (tmpx < (childPtr->changes.width + bd))
-		        && (tmpy < (childPtr->changes.height + bd))) {
+		}
+		tmpx = x - childPtr->changes.x;
+		tmpy = y - childPtr->changes.y;
+		bd = childPtr->changes.border_width;
+		if ((tmpx >= -bd) && (tmpy >= -bd)
+			&& (tmpx < (childPtr->changes.width + bd))
+			&& (tmpy < (childPtr->changes.height + bd))) {
 		    nextPtr = childPtr;
-	        }
+		}
 	    }
 	}
 	if (nextPtr == NULL) {
@@ -3705,17 +3908,17 @@ Tk_CoordsToWindow(
  * Tk_TopCoordsToWindow --
  *
  *	Given a Tk Window, and coordinates of a point relative to that window
- *      this procedure returns the top-most child of the window (excluding
- *      toplevels) covering that point, if there exists such a window in this
+ *	this procedure returns the top-most child of the window (excluding
+ *	toplevels) covering that point, if there exists such a window in this
  *	application.
  *	It also sets newX, and newY to the coords of the point relative to the
- *      window returned.
+ *	window returned.
  *
  * Results:
  *	The return result is either a token for the window corresponding
  *	to rootX and rootY, or else NULL to indicate that there is no such
- *	window.  newX and newY are also set to the coords of the point relative
- *      to the returned window.
+ *	window. newX and newY are also set to the coords of the point relative
+ *	to the returned window.
  *
  * Side effects:
  *	None.
@@ -3728,8 +3931,8 @@ Tk_TopCoordsToWindow(
     Tk_Window tkwin,		/* Token for a Tk Window which defines the;
 				 * coordinates for rootX & rootY */
     int rootX, int rootY,	/* Coordinates of a point in tkWin. */
-    int *newX, int *newY)	/* Coordinates of point in the upperMost child of
-                                 * tkWin containing (rootX,rootY) */
+    int *newX, int *newY)	/* Coordinates of point in the upperMost child
+				 * of tkWin containing (rootX,rootY) */
 {
     TkWindow *winPtr, *childPtr;
     TkWindow *nextPtr;		/* Coordinates of highest child found so
@@ -3745,44 +3948,40 @@ Tk_TopCoordsToWindow(
 	children = NULL;
 
 	/*
-	 * Container windows cannot have children.  So if it is a container,
+	 * Container windows cannot have children. So if it is a container,
 	 * look there, otherwise inspect the children.
 	 */
-	 
+
 	if (Tk_IsContainer(winPtr)) {
 	    childPtr = TkpGetOtherWindow(winPtr);
 	    if (childPtr != NULL) {
-		if (Tk_IsMapped(childPtr) && 
-	    	         (x > childPtr->changes.x && 
-	    	             x < childPtr->changes.x +
-				 childPtr->changes.width) &&
-	    	         (y > childPtr->changes.y &&
-	    	             y < childPtr->changes.y +
-				 childPtr->changes.height)) {	    
-	    	    nextPtr = childPtr;
-	    	}
+		if (Tk_IsMapped(childPtr) &&
+			x > childPtr->changes.x &&
+			x < childPtr->changes.x + childPtr->changes.width &&
+			y > childPtr->changes.y &&
+			y < childPtr->changes.y + childPtr->changes.height) {
+		    nextPtr = childPtr;
+		}
 	    }
 
 	    /*
-	     * NOTE: Here we should handle out of process embedding.
+	     * TODO: Here we should handle out of process embedding.
 	     */
-	
 	} else {
-	
 	    for (childPtr = winPtr->childList; childPtr != NULL;
-					   childPtr = childPtr->nextPtr) {
-	        if (!Tk_IsMapped(childPtr) ||
+		    childPtr = childPtr->nextPtr) {
+		if (!Tk_IsMapped(childPtr) ||
 			(childPtr->flags & TK_TOP_LEVEL)) {
 		    continue;
-	        }
-	        if (x < childPtr->changes.x || y < childPtr->changes.y) {
+		}
+		if (x < childPtr->changes.x || y < childPtr->changes.y) {
 		    continue;
-	        }
-	        if (x > childPtr->changes.x + childPtr->changes.width ||
-		        y > childPtr->changes.y + childPtr->changes.height) {
+		}
+		if (x > childPtr->changes.x + childPtr->changes.width ||
+			y > childPtr->changes.y + childPtr->changes.height) {
 		    continue;
-	        }
-	        nextPtr = childPtr;
+		}
+		nextPtr = childPtr;
 	    }
 	}
 	if (nextPtr == NULL) {
@@ -3818,7 +4017,7 @@ Tk_TopCoordsToWindow(
 static void
 UpdateVRootGeometry(
     WmInfo *wmPtr)		/* Window manager information to be
-				 * updated.  The wmPtr->vRoot field must
+				 * updated. The wmPtr->vRoot field must
 				 * be valid. */
 {
     TkWindow *winPtr = wmPtr->winPtr;
@@ -3851,9 +4050,9 @@ UpdateVRootGeometry(
 	    &dummy2, &wmPtr->vRootX, &wmPtr->vRootY,
 	    &wmPtr->vRootWidth, &wmPtr->vRootHeight, &bd, &dummy);
     if (wmTracing) {
-	printf("UpdateVRootGeometry: x = %d, y = %d, width = %d, ",
-		wmPtr->vRootX, wmPtr->vRootY, wmPtr->vRootWidth);
-	printf("height = %d, status = %d\n", wmPtr->vRootHeight, status);
+	TkMacOSXDbgMsg("x = %d, y = %d, width = %d, height = %d, status = %d",
+		wmPtr->vRootX, wmPtr->vRootY, wmPtr->vRootWidth,
+		wmPtr->vRootHeight, status);
     }
     Tk_DeleteErrorHandler(handler);
     if (status == 0) {
@@ -3877,9 +4076,9 @@ UpdateVRootGeometry(
  * Results:
  *	The values at xPtr, yPtr, widthPtr, and heightPtr are set
  *	with the offset and dimensions of the root window corresponding
- *	to tkwin.  If tkwin is being managed by a virtual root window
+ *	to tkwin. If tkwin is being managed by a virtual root window
  *	manager these values correspond to the virtual root window being
- *	used for tkwin;  otherwise the offsets will be 0 and the
+ *	used for tkwin; otherwise the offsets will be 0 and the
  *	dimensions will be those of the screen.
  *
  * Side effects:
@@ -3930,7 +4129,7 @@ Tk_GetVRootGeometry(
  * Tk_MoveToplevelWindow --
  *
  *	This procedure is called instead of Tk_MoveWindow to adjust
- *	the x-y location of a top-level window.  It delays the actual
+ *	the x-y location of a top-level window. It delays the actual
  *	move to a later time and keeps window-manager information
  *	up-to-date with the move
  *
@@ -3955,7 +4154,7 @@ Tk_MoveToplevelWindow(
     WmInfo *wmPtr = winPtr->wmInfoPtr;
 
     if (!(winPtr->flags & TK_TOP_LEVEL)) {
-	panic("Tk_MoveToplevelWindow called with non-toplevel window");
+	Tcl_Panic("Tk_MoveToplevelWindow called with non-toplevel window");
     }
     wmPtr->x = x;
     wmPtr->y = y;
@@ -3979,7 +4178,8 @@ Tk_MoveToplevelWindow(
 	}
 	UpdateGeometryInfo((ClientData) winPtr);
     }
-}
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -4008,15 +4208,14 @@ TkWmRestackToplevel(
 				 * above or below *all* siblings. */
 {
     WmInfo *wmPtr;
-        
+
     WindowRef macWindow, otherMacWindow, frontWindow, tmpWindow;
 
     wmPtr = winPtr->wmInfoPtr;
-    
+
     /*
-     * Get the mac window.  Make sure it exists & is mapped.
+     * Get the mac window. Make sure it exists & is mapped.
      */
-    
     if (winPtr->window == None) {
 	Tk_MakeWindowExist((Tk_Window) winPtr);
     }
@@ -4030,8 +4229,8 @@ TkWmRestackToplevel(
 
 	TkWmMapWindow(winPtr);
     }
-    macWindow = GetWindowFromPort(TkMacOSXGetDrawablePort(winPtr->window));
-    
+    macWindow = TkMacOSXDrawableWindow(winPtr->window);
+
     /*
      * Get the window in which a raise or lower is in relation to.
      */
@@ -4042,22 +4241,21 @@ TkWmRestackToplevel(
 	if (otherPtr->wmInfoPtr->flags & WM_NEVER_MAPPED) {
 	    TkWmMapWindow(otherPtr);
 	}
-	otherMacWindow =GetWindowFromPort(TkMacOSXGetDrawablePort(otherPtr->window));
+	otherMacWindow = TkMacOSXDrawableWindow(otherPtr->window);
     } else {
 	otherMacWindow = NULL;
     }
-	
 
-    frontWindow = FrontNonFloatingWindow();
-       
+    frontWindow = ActiveNonFloatingWindow();
+
     if (aboveBelow == Above) {
 	if (macWindow == frontWindow) {
-	    /* 
+	    /*
 	     * Do nothing - it's already at the top.
 	     */
 	} else if (otherMacWindow == frontWindow || otherMacWindow == NULL) {
 	    /*
-	     * Raise the window to the top.  If the window is visable then
+	     * Raise the window to the top. If the window is visible then
 	     * we also make it the active window.
 	     */
 
@@ -4068,11 +4266,12 @@ TkWmRestackToplevel(
 	    }
 	} else {
 	    /*
-	     * Find the window to be above.  (Front window will actually be the
-	     * window to be behind.)  Front window is NULL if no other windows.
+	     * Find the window to be above. (Front window will actually be the
+	     * window to be behind.) Front window is NULL if no other windows.
 	     */
+
 	    while (frontWindow != NULL &&
-		    ( tmpWindow = GetNextWindow (frontWindow) ) != otherMacWindow) {
+		    (tmpWindow=GetNextWindow(frontWindow)) != otherMacWindow) {
 		frontWindow = tmpWindow;
 	    }
 	    if (frontWindow != NULL) {
@@ -4081,10 +4280,12 @@ TkWmRestackToplevel(
 	}
     } else {
 	/*
-	 * Send behind.  If it was in front find another window to make active.
+	 * Send behind. If it was in front find another window to make active.
 	 */
+
 	if (macWindow == frontWindow) {
-	    if ( ( tmpWindow = GetNextWindow ( macWindow )) != NULL) {
+	    tmpWindow = GetNextWindow(macWindow);
+	    if (tmpWindow != NULL) {
 		SelectWindow(tmpWindow);
 	    }
 	}
@@ -4099,7 +4300,7 @@ TkWmRestackToplevel(
  *
  *	This procedure is called to add a given window to the
  *	WM_COLORMAP_WINDOWS property for its top-level, if it
- *	isn't already there.  It is invoked by the Tk code that
+ *	isn't already there. It is invoked by the Tk code that
  *	creates a new colormap, in order to make sure that colormap
  *	information is propagated to the window manager by default.
  *
@@ -4131,7 +4332,7 @@ TkWmAddToColormapWindows(
     for (topPtr = winPtr->parentPtr; ; topPtr = topPtr->parentPtr) {
 	if (topPtr == NULL) {
 	    /*
-	     * Window is being deleted.  Skip the whole operation.
+	     * Window is being deleted. Skip the whole operation.
 	     */
 
 	    return;
@@ -4181,7 +4382,7 @@ TkWmAddToColormapWindows(
 
     /*
      * On the Macintosh all of this is just an excercise
-     * in compatability as we don't support colormaps.  If 
+     * in compatability as we don't support colormaps. If
      * we did they would be installed here.
      */
 }
@@ -4192,7 +4393,7 @@ TkWmAddToColormapWindows(
  * TkWmRemoveFromColormapWindows --
  *
  *	This procedure is called to remove a given window from the
- *	WM_COLORMAP_WINDOWS property for its top-level.  It is invoked
+ *	WM_COLORMAP_WINDOWS property for its top-level. It is invoked
  *	when windows are deleted.
  *
  * Results:
@@ -4210,11 +4411,10 @@ void
 TkWmRemoveFromColormapWindows(
     TkWindow *winPtr)		/* Window that may be present in
 				 * WM_COLORMAP_WINDOWS property for its
-				 * top-level.  Should not be a top-level
+				 * top-level. Should not be a top-level
 				 * window. */
 {
-    TkWindow *topPtr;
-    TkWindow **oldPtr;
+    TkWindow *topPtr, **oldPtr;
     int count, i, j;
 
     for (topPtr = winPtr->parentPtr; ; topPtr = topPtr->parentPtr) {
@@ -4266,9 +4466,9 @@ TkWmRemoveFromColormapWindows(
  *
  * Results:
  *	*xPtr and *yPtr are filled in with the (virtual) root coordinates
- *	of the mouse pointer for tkwin's display.  If the pointer isn't
+ *	of the mouse pointer for tkwin's display. If the pointer isn't
  *	on tkwin's screen, then -1 values are returned for both
- *	coordinates.  The argument tkwin must be a toplevel window.
+ *	coordinates. The argument tkwin must be a toplevel window.
  *
  * Side effects:
  *	None.
@@ -4282,12 +4482,7 @@ TkGetPointerCoords(
 				 * on which lookup is to be done. */
     int *xPtr, int *yPtr)	/* Store pointer coordinates here. */
 {
-    Point where;
-
-    GetMouse(&where);
-    LocalToGlobal(&where);
-    *xPtr = where.h;
-    *yPtr = where.v;
+    XQueryPointer(NULL, None, NULL, NULL, xPtr, yPtr, NULL, NULL, NULL);
 }
 
 /*
@@ -4296,7 +4491,7 @@ TkGetPointerCoords(
  * InitialWindowBounds --
  *
  *	This function calculates the initial bounds for a new Mac
- *	toplevel window.  Unless the geometry is specified by the user
+ *	toplevel window. Unless the geometry is specified by the user
  *	this code will auto place the windows in a cascade diagonially
  *	across the main monitor of the Mac.
  *
@@ -4312,37 +4507,41 @@ TkGetPointerCoords(
 static void
 InitialWindowBounds(
     TkWindow *winPtr,		/* Window to get initial bounds for. */
+    WindowRef macWindow,
     Rect *geometry)		/* On return the initial bounds. */
 {
-    int x, y;
-    static int defaultX = 5;
-    static int defaultY = 45;
-	
-    if (!(winPtr->wmInfoPtr->sizeHintsFlags & (USPosition | PPosition))) {
-	/* 
-	 * We will override the program & hopefully place the
-	 * window in a "better" location.
-	 */
-        BitMap screenBits;
-        GetQDGlobalsScreenBits(&screenBits);
-	if (((screenBits.bounds.right - defaultX) < 30) ||
-		((screenBits.bounds.bottom - defaultY) < 30)) {
-	    defaultX = 5;
-	    defaultY = 45;
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+
+    if (!(wmPtr->sizeHintsFlags & (USPosition | PPosition))) {
+	WindowRef parent;
+
+	parent = GetFrontWindowOfClass(wmPtr->macClass, false);
+	if (parent && parent == macWindow) {
+	    parent = GetNextWindowOfClass(parent, wmPtr->macClass, false);
 	}
-	x = defaultX;
-	y = defaultY;
-	defaultX += 20;
-	defaultY += 20;
-    } else {
-	x = winPtr->wmInfoPtr->x;
-	y = winPtr->wmInfoPtr->y;
+	if (parent && parent != macWindow) {
+	    Rect bounds;
+
+	    ChkErr(RepositionWindow, macWindow, parent,
+		    kWindowCascadeOnParentWindowScreen);
+	    ChkErr(GetWindowBounds, macWindow, kWindowStructureRgn, &bounds);
+	    wmPtr->x = bounds.left;
+	    wmPtr->y = bounds.top;
+	} else {
+	    static SInt16 menuBarHeight = 0;
+
+	    if (!menuBarHeight) {
+		ChkErr(GetThemeMenuBarHeight, &menuBarHeight);
+	    }
+	    wmPtr->x = 5;
+	    wmPtr->y = menuBarHeight + 5;
+	}
     }
-	
-    geometry->left = x;
-    geometry->top = y;
-    geometry->right = x + winPtr->changes.width;
-    geometry->bottom = y + winPtr->changes.height;
+
+    geometry->left = wmPtr->x;
+    geometry->top = wmPtr->y;
+    geometry->right = wmPtr->x + winPtr->changes.width;
+    geometry->bottom = wmPtr->y + winPtr->changes.height;
 }
 
 /*
@@ -4351,7 +4550,7 @@ InitialWindowBounds(
  * TkMacOSXResizable --
  *
  *	This function determines if the passed in window is part of
- *	a toplevel window that is resizable.  If the window is 
+ *	a toplevel window that is resizable. If the window is
  *	resizable in the x, y or both directions, true is returned.
  *
  * Results:
@@ -4375,7 +4574,7 @@ TkMacOSXResizable(
     while (winPtr->wmInfoPtr == NULL) {
 	winPtr = winPtr->parentPtr;
     }
-    
+
     wmPtr = winPtr->wmInfoPtr;
     if ((wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) &&
 	    (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE)) {
@@ -4391,8 +4590,8 @@ TkMacOSXResizable(
  * TkMacOSXGrowToplevel --
  *
  *	The function is invoked when the user clicks in the grow region
- *	of a Tk window.  The function will handle the dragging
- *	procedure and not return until completed.  Finally, the function
+ *	of a Tk window. The function will handle the dragging
+ *	procedure and not return until completed. Finally, the function
  *	may place information Tk's event queue is the window was resized.
  *
  * Results:
@@ -4411,56 +4610,98 @@ TkMacOSXGrowToplevel(
 {
     Point where = start;
     TkDisplay *dispPtr;
-    Rect       portRect;
+    Rect portRect;
+    CGrafPtr destPort = GetWindowPort(whichWindow);
 
-    GlobalToLocal(&where);
-    GetPortBounds(GetWindowPort(whichWindow), &portRect );
+    QDGlobalToLocalPoint(destPort, &where);
+    GetPortBounds(destPort, &portRect);
     if (where.h > (portRect.right - 16) &&
 	    where.v > (portRect.bottom - 16)) {
-		
 	Window window;
 	TkWindow *winPtr;
 	WmInfo *wmPtr;
-	Rect bounds;
-	long growResult;
+	int minWidth, minHeight, maxWidth, maxHeight;
+	Rect limits, bounds, *maxBounds;
+	Boolean resizeResult;
 
 	window = TkMacOSXGetXWindow(whichWindow);
 	dispPtr = TkGetDisplayList();
 	winPtr = (TkWindow *) Tk_IdToWindow(dispPtr->display, window);
 	wmPtr = winPtr->wmInfoPtr;
-	
-	/* TODO: handle grid size options. */
+	maxBounds = (Rect*)(dispPtr->display->screens->ext_data);
+
 	if ((wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) &&
 		(wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE)) {
 	    return false;
 	}
-	if (wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) {
-	    bounds.left = bounds.right = winPtr->changes.width;
+	GetMinSize(winPtr, &minWidth, &minHeight);
+	GetMaxSize(winPtr, &maxWidth, &maxHeight);
+	if (wmPtr->gridWin != NULL) {
+	    int base = winPtr->reqWidth - (wmPtr->reqGridWidth
+		    * wmPtr->widthInc);
+
+	    if (base < 0) {
+		base = 0;
+	    }
+	    limits.left	 = base + (minWidth * wmPtr->widthInc);
+	    limits.right = base + (maxWidth * wmPtr->widthInc);
+	    base = winPtr->reqHeight - (wmPtr->reqGridHeight
+		    * wmPtr->heightInc);
+	    if (base < 0) {
+		base = 0;
+	    }
+	    limits.top	  = base + (minHeight * wmPtr->heightInc);
+	    limits.bottom = base + (maxHeight * wmPtr->heightInc);
 	} else {
-	    bounds.left = (wmPtr->minWidth < 64) ? 64 : wmPtr->minWidth;
-	    bounds.right = (wmPtr->maxWidth < 64) ? 64 : wmPtr->maxWidth;
+	    limits.left = minWidth;
+	    limits.right = maxWidth;
+	    limits.top = minHeight;
+	    limits.bottom = maxHeight;
+	}
+	if (wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) {
+	    limits.left = limits.right = winPtr->changes.width;
 	}
 	if (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE) {
-	    bounds.top = bounds.bottom = winPtr->changes.height;
-	} else {
-	    bounds.top = (wmPtr->minHeight < 64) ? 64 : wmPtr->minHeight;
-	    bounds.bottom = (wmPtr->maxHeight < 64) ? 64 : wmPtr->maxHeight;
+	    limits.top = limits.bottom = winPtr->changes.height;
 	}
-	
-	growResult = GrowWindow(whichWindow, start, &bounds);
+	if (PtInRect(start, maxBounds)) {
+	    Rect strBounds, strWidths, limitBounds;
 
-	if (growResult != 0) {
-	    SizeWindow(whichWindow,
-		    LoWord(growResult), HiWord(growResult), true);
-	    SetPort( GetWindowPort(whichWindow));
-	    InvalWindowRect(whichWindow,&portRect);	/* TODO: may not be needed */
-	    TkMacOSXInvalClipRgns(winPtr);
-	    TkGenWMConfigureEvent((Tk_Window) winPtr, -1, -1, 
-		    (int) LoWord(growResult), (int) HiWord(growResult),
-		    TK_SIZE_CHANGED);
+	    ChkErr(GetWindowBounds, whichWindow, kWindowStructureRgn,
+		    &strBounds);
+	    ChkErr(GetWindowStructureWidths, whichWindow, &strWidths);
+
+	    limitBounds.left = limits.left + (strBounds.left + strWidths.left);
+	    limitBounds.right = limits.right +
+		    (strBounds.left + strWidths.left + strWidths.right);
+	    limitBounds.top = limits.top + (strBounds.top + strWidths.top);
+	    limitBounds.bottom = limits.bottom +
+		    (strBounds.top + strWidths.top + strWidths.bottom);
+	    if (limitBounds.left < maxBounds->left) {
+		limitBounds.left = maxBounds->left;
+	    }
+	    if (limitBounds.right > maxBounds->right) {
+		limitBounds.right = maxBounds->right;
+	    }
+	    if (limitBounds.top < maxBounds->top) {
+		limitBounds.top = maxBounds->top;
+	    }
+	    if (limitBounds.bottom > maxBounds->bottom) {
+		limitBounds.bottom = maxBounds->bottom;
+	    }
+	    limits.left = limitBounds.left - (strBounds.left + strWidths.left);
+	    limits.right = limitBounds.right -
+		    (strBounds.left + strWidths.left + strWidths.right);
+	    limits.top = limitBounds.top - (strBounds.top + strWidths.top);
+	    limits.bottom = limitBounds.bottom -
+		    (strBounds.top + strWidths.top + strWidths.bottom);
+	}
+	TkMacOSXTrackingLoop(1);
+	resizeResult = ResizeWindow(whichWindow, start, &limits, &bounds);
+	TkMacOSXTrackingLoop(0);
+	if (resizeResult) {
 	    return true;
 	}
-	return false;
     }
     return false;
 }
@@ -4470,7 +4711,7 @@ TkMacOSXGrowToplevel(
  *
  * TkSetWMName --
  *
- *	Set the title for a toplevel window.  If the window is embedded, 
+ *	Set the title for a toplevel window. If the window is embedded,
  *	do not change the window title.
  *
  * Results:
@@ -4487,40 +4728,32 @@ TkSetWMName(
     TkWindow *winPtr,
     Tk_Uid titleUid)
 {
-    CFStringRef  title;
-    WindowRef macWin;
-    
-    if (Tk_IsEmbedded(winPtr)) {
-        return;
-    }
-    
-    if (strlen(titleUid) > 0) {
-        title = CFStringCreateWithBytes(NULL, (unsigned char*) titleUid, strlen(titleUid), 
-                kCFStringEncodingUTF8, false); 
-    } else {
-    	title = NULL;
-    }
-    
-    macWin = GetWindowFromPort(TkMacOSXGetDrawablePort(winPtr->window));
+    CFStringRef title;
 
-    SetWindowTitleWithCFString(macWin, title);
-    
-    if (title != NULL) {
-        CFRelease(title);
+    if (Tk_IsEmbedded(winPtr)) {
+	return;
+    }
+
+    title = CFStringCreateWithBytes(NULL, (const unsigned char*) titleUid,
+	    strlen(titleUid), kCFStringEncodingUTF8, false);
+    if (title) {
+	WindowRef macWin = TkMacOSXDrawableWindow(winPtr->window);
+
+	SetWindowTitleWithCFString(macWin, title);
+	CFRelease(title);
     }
 }
 
-
 /*
  *----------------------------------------------------------------------
  *
  * TkGetTransientMaster --
  *
  *	If the passed window has the TRANSIENT_FOR property set this
- *	will return the master window.  Otherwise it will return None.
+ *	will return the master window. Otherwise it will return None.
  *
  * Results:
- *      The master window or None.
+ *	The master window or None.
  *
  * Side effects:
  *	None.
@@ -4546,7 +4779,7 @@ TkGetTransientMaster(
  *	Returns the X window Id associated with the given WindowRef.
  *
  * Results:
- *	The window id is returned.  None is returned if not a Tk window.
+ *	The window id is returned. None is returned if not a Tk window.
  *
  * Side effects:
  *	None.
@@ -4573,11 +4806,71 @@ TkMacOSXGetXWindow(
 /*
  *----------------------------------------------------------------------
  *
+ * TkMacOSXIsWindowZoomed --
+ *
+ *	Ask Carbon if the given window is in the zoomed out state.
+ *	Because dragging & growing a window can change the Carbon
+ *	zoom state, we cannot rely on wmInfoPtr->hints.initial_state
+ *	for this information.
+ *
+ * Results:
+ *	True if window is zoomed out, false otherwise.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE int
+TkMacOSXIsWindowZoomed(
+    TkWindow *winPtr)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    int maxWidth, maxHeight;
+    Point idealSize;
+
+    if ((wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) &&
+	    (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE)) {
+	return false;
+    }
+    GetMaxSize(winPtr, &maxWidth, &maxHeight);
+    if (wmPtr->gridWin != NULL) {
+	int base = winPtr->reqWidth - (wmPtr->reqGridWidth * wmPtr->widthInc);
+
+	if (base < 0) {
+	    base = 0;
+	}
+	maxWidth = base + (maxWidth * wmPtr->widthInc);
+	base = winPtr->reqHeight - (wmPtr->reqGridHeight * wmPtr->heightInc);
+	if (base < 0) {
+	    base = 0;
+	}
+	maxHeight = base + (maxHeight * wmPtr->heightInc);
+    }
+    if (wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) {
+	idealSize.h = winPtr->changes.width;
+    } else {
+	idealSize.h = maxWidth;
+    }
+    if (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE) {
+	idealSize.v = winPtr->changes.height;
+    } else {
+	idealSize.v = maxHeight;
+    }
+
+    return IsWindowInStandardState(TkMacOSXDrawableWindow(winPtr->window),
+	    &idealSize, NULL);
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * TkMacOSXZoomToplevel --
  *
  *	The function is invoked when the user clicks in the zoom region
- *	of a Tk window.  The function will handle the mouse tracking
- *	for the interaction.  If the window is to be zoomed the window
+ *	of a Tk window or when the window state is set/unset to "zoomed"
+ *	manually. If the window is to be zoomed (in or out), the window
  *	size is changed and events are generated to let Tk know what
  *	happened.
  *
@@ -4593,72 +4886,64 @@ TkMacOSXGetXWindow(
 int
 TkMacOSXZoomToplevel(
     WindowRef whichWindow,	/* The Macintosh window to zoom. */
-    Point where,		/* The current mouse position. */
     short zoomPart)		/* Either inZoomIn or inZoomOut */
 {
     Window window;
-    Tk_Window tkwin;
-    Point location = {0, 0};
-    int xOffset, yOffset;
-    WmInfo *wmPtr;
     TkDisplay *dispPtr;
-    Rect       portRect;
+    TkWindow *winPtr;
+    WmInfo *wmPtr;
+    Point idealSize;
+    int maxWidth, maxHeight;
+    OSStatus err;
 
-    SetPort( GetWindowPort(whichWindow));
-    if (!TrackBox(whichWindow, where, zoomPart)) {
-	return false;
-    }
-
-    /*
-     * We should now zoom the window (as long as it's one of ours).  We 
-     * also need to generate an event to let Tk know that the window size 
-     * has changed.
-     */
     window = TkMacOSXGetXWindow(whichWindow);
     dispPtr = TkGetDisplayList();
-    tkwin = Tk_IdToWindow(dispPtr->display, window);
-    if (tkwin == NULL) {
+    winPtr = (TkWindow *) Tk_IdToWindow(dispPtr->display, window);
+    wmPtr = winPtr->wmInfoPtr;
+
+    if ((wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) &&
+	    (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE)) {
+	return false;
+    }
+    GetMaxSize(winPtr, &maxWidth, &maxHeight);
+    if (wmPtr->gridWin != NULL) {
+	int base = winPtr->reqWidth - (wmPtr->reqGridWidth * wmPtr->widthInc);
+
+	if (base < 0) {
+	    base = 0;
+	}
+	maxWidth = base + (maxWidth * wmPtr->widthInc);
+	base = winPtr->reqHeight - (wmPtr->reqGridHeight * wmPtr->heightInc);
+	if (base < 0) {
+	    base = 0;
+	}
+	maxHeight = base + (maxHeight * wmPtr->heightInc);
+    }
+    if (wmPtr->flags & WM_WIDTH_NOT_RESIZABLE) {
+	idealSize.h = winPtr->changes.width;
+    } else {
+	idealSize.h = maxWidth;
+    }
+    if (wmPtr->flags & WM_HEIGHT_NOT_RESIZABLE) {
+	idealSize.v = winPtr->changes.height;
+    } else {
+	idealSize.v = maxHeight;
+    }
+
+    /* Do nothing if already in desired zoom state */
+    if (!IsWindowInStandardState(whichWindow, &idealSize, NULL) ==
+	    (zoomPart == inZoomIn)) {
 	return false;
     }
 
-    /*
-     * The following block of code works around a bug in the window
-     * definition for Apple's floating windows.  The zoom behavior is
-     * broken - we must manually set the standard state (by default
-     * it's something like 1x1) and we must swap the zoomPart manually
-     * otherwise we always get the same zoomPart and nothing happens.
-     */
-    wmPtr = ((TkWindow *) tkwin)->wmInfoPtr;
-    if (wmPtr->style >= floatProc && wmPtr->style <= floatSideZoomGrowProc) {
-	if (zoomPart == inZoomIn) {
-            BitMap screenBits;
-            Rect   zoomRect;
-            GetQDGlobalsScreenBits(&screenBits);
-	    zoomRect = screenBits.bounds;
-	    InsetRect(&zoomRect, 60, 60);
-	    SetWindowStandardState(whichWindow, &zoomRect);
-	    zoomPart = inZoomOut;
-	} else {
-	    zoomPart = inZoomIn;
-	}
+    err = ChkErr(ZoomWindowIdeal, whichWindow, zoomPart, &idealSize);
+    if (err == noErr) {
+	wmPtr->hints.initial_state =
+		(zoomPart == inZoomIn ? NormalState : ZoomState);
+	return true;
     } else {
-        zoomPart = inZoomIn;
+	return false;
     }
-    
-    ZoomWindow(whichWindow, zoomPart, false);
-    InvalWindowRect(whichWindow,&portRect);
-    TkMacOSXInvalClipRgns((TkWindow *) tkwin);
-
-    LocalToGlobal(&location);
-    TkMacOSXWindowOffset(whichWindow, &xOffset, &yOffset);
-    location.h -= xOffset;
-    location.v -= yOffset;
-    GetPortBounds ( GetWindowPort(whichWindow), &portRect );
-    TkGenWMConfigureEvent(tkwin, location.h, location.v, 
-	    portRect.right - portRect.left,
-	    portRect.bottom - portRect.top,
-	    TK_BOTH_CHANGED);
-    return true;
 }
 
 /*
@@ -4666,8 +4951,8 @@ TkMacOSXZoomToplevel(
  *
  * TkUnsupported1Cmd --
  *
- *	This procedure is invoked to process the 
- *      "::tk::unsupported::MacWindowStyle" Tcl command.
+ *	This procedure is invoked to process the
+ *	"::tk::unsupported::MacWindowStyle" Tcl command.
  *	This command allows you to set the style of decoration
  *	for a Macintosh window.
  *
@@ -4680,342 +4965,256 @@ TkMacOSXZoomToplevel(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
+/* ARGSUSED */
 int
-TkUnsupported1Cmd(
+TkUnsupported1ObjCmd(
     ClientData clientData,	/* Main window associated with
 				 * interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    int argc,			/* Number of arguments. */
-    CONST char **argv)		/* Argument strings. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj * const objv[])	/* Argument objects. */
 {
+    static const char *subcmds[] = {
+	"style", NULL
+    };
+    enum SubCmds {
+	TKMWS_STYLE
+    };
     Tk_Window tkwin = (Tk_Window) clientData;
     TkWindow *winPtr;
-    WmInfo *wmPtr;
-    int c;
-    size_t length;
+    int index;
 
-    if (argc < 3) {
-	Tcl_AppendResult(interp, "wrong # args: should be \"",
-		argv[0], " option window ?arg ...?\"", (char *) NULL);
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 1, objv, "option window ?arg ...?");
 	return TCL_ERROR;
     }
 
-    winPtr = (TkWindow *) Tk_NameToWindow(interp, argv[2], tkwin);
+    winPtr = (TkWindow *) Tk_NameToWindow(interp,
+	    Tcl_GetString(objv[2]), tkwin);
     if (winPtr == NULL) {
 	return TCL_ERROR;
     }
     if (!(winPtr->flags & TK_TOP_LEVEL)) {
+	Tcl_ResetResult(interp);
 	Tcl_AppendResult(interp, "window \"", winPtr->pathName,
-		"\" isn't a top-level window", (char *) NULL);
+		"\" isn't a top-level window", NULL);
 	return TCL_ERROR;
     }
-    wmPtr = winPtr->wmInfoPtr;
-    c = argv[1][0];
-    length = strlen(argv[1]);
-    if ((c == 's')  && (strncmp(argv[1], "style", length) == 0)) {
-        if ((argc < 3) || (argc > 5)) {
-            Tcl_AppendResult(interp, "wrong # arguments: must be \"",
-                    argv[0], " style window ?windowStyle?\"",
-                    " or \"", argv[0], "style window ?class attributes?\"",
-                    (char *) NULL);
-            return TCL_ERROR;
-        }
-	
-	if (argc == 3) {
-	    int appearanceSpec = 0;
-	    
-	    switch (wmPtr->style) {
-	        case -1:
-	            appearanceSpec = 1;
-	            break;
-		case noGrowDocProc:
-		case documentProc:
-		    Tcl_SetResult(interp, "documentProc", TCL_STATIC);
-		    break;
-		case dBoxProc:
-		    Tcl_SetResult(interp, "dBoxProc", TCL_STATIC);
-		    break;
-		case plainDBox:
-		    Tcl_SetResult(interp, "plainDBox", TCL_STATIC);
-		    break;
-		case altDBoxProc:
-		    Tcl_SetResult(interp, "altDBoxProc", TCL_STATIC);
-		    break;
-		case movableDBoxProc:
-		    Tcl_SetResult(interp, "movableDBoxProc", TCL_STATIC);
-		    break;
-		case zoomDocProc:
-		case zoomNoGrow:
-		    Tcl_SetResult(interp, "zoomDocProc", TCL_STATIC);
-		    break;
-                    /* Not supported in Carbon
-		case rDocProc:
-		    Tcl_SetResult(interp, "rDocProc", TCL_STATIC);
-		    break;
-                    */
-		case floatProc:
-		case floatGrowProc:
-		    Tcl_SetResult(interp, "floatProc", TCL_STATIC);
-		    break;
-		case floatZoomProc:
-		case floatZoomGrowProc:
-		    Tcl_SetResult(interp, "floatZoomProc", TCL_STATIC);
-		    break;
-		case floatSideProc:
-		case floatSideGrowProc:
-		    Tcl_SetResult(interp, "floatSideProc", TCL_STATIC);
-		    break;
-		case floatSideZoomProc:
-		case floatSideZoomGrowProc:
-		    Tcl_SetResult(interp, "floatSideZoomProc", TCL_STATIC);
-		    break;
-		default:
-		   panic("invalid style");
-	    }
-	    if (appearanceSpec) {
-	        Tcl_Obj *attributeList, *newResult = NULL;
-	        
-	        switch (wmPtr->macClass) {
-	            case kAlertWindowClass:
-	                newResult = Tcl_NewStringObj("alert", -1);
-	                break;
-	            case kMovableAlertWindowClass:
-	                newResult = Tcl_NewStringObj("moveableAlert", -1);
-	                break;
-	            case kModalWindowClass:
-	                newResult = Tcl_NewStringObj("modal", -1);
-	                break;
-	            case kMovableModalWindowClass:
-	                newResult = Tcl_NewStringObj("moveableModal", -1);
-	                break;
-	            case kFloatingWindowClass:
-	                newResult = Tcl_NewStringObj("floating", -1);
-	                break;
-	            case kDocumentWindowClass:
-	                newResult = Tcl_NewStringObj("document", -1);
-	                break;
-                    case kHelpWindowClass:
-                        newResult = Tcl_NewStringObj("help", -1);
-                        break;
-                    case kToolbarWindowClass:
-                        newResult = Tcl_NewStringObj("toolbar", -1);
-                        break;
-                    default:
-                        panic("invalid class");
-                }
 
- 	        attributeList = Tcl_NewListObj(0, NULL);
-                if (wmPtr->attributes == kWindowNoAttributes) {
-                    Tcl_ListObjAppendElement(interp, attributeList, 
-                            Tcl_NewStringObj("none", -1));
-                } else if (wmPtr->attributes == kWindowStandardDocumentAttributes) {
-                     Tcl_ListObjAppendElement(interp, attributeList, 
-                            Tcl_NewStringObj("standardDocument", -1));
-                } else if (wmPtr->attributes == kWindowStandardFloatingAttributes) {
-                     Tcl_ListObjAppendElement(interp, attributeList, 
-                            Tcl_NewStringObj("standardFloating", -1));                  
-                } else {
-                    if (wmPtr->attributes & kWindowCloseBoxAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("closeBox", -1));
-                    }
-                    if (wmPtr->attributes & kWindowHorizontalZoomAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("horizontalZoom", -1));
-                    }
-                    if (wmPtr->attributes & kWindowVerticalZoomAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("verticalZoom", -1));
-                    }
-                    if (wmPtr->attributes & kWindowCollapseBoxAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("collapseBox", -1));
-                    }
-                    if (wmPtr->attributes & kWindowResizableAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("resizable", -1));
-                    }
-                    if (wmPtr->attributes & kWindowSideTitlebarAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("sideTitlebar", -1));
-                    }
-                    if (wmPtr->attributes & kWindowNoUpdatesAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("noUpdates", -1));
-                    }
-                    if (wmPtr->attributes & kWindowNoActivatesAttribute) {
-                        Tcl_ListObjAppendElement(interp, attributeList, 
-                                Tcl_NewStringObj("noActivates", -1));
-                    }
-                }
-                Tcl_ListObjAppendElement(interp, newResult, attributeList);
-                Tcl_SetObjResult(interp, newResult);       
-	    }
-	    return TCL_OK;
-        } else if (argc == 4) {
-	if (strcmp(argv[3], "documentProc") == 0) {
-	    wmPtr->style = documentProc;
-	} else if (strcmp(argv[3], "noGrowDocProc") == 0) {
-	    wmPtr->style = documentProc;
-	} else if (strcmp(argv[3], "dBoxProc") == 0) {
-	    wmPtr->style = dBoxProc;
-	} else if (strcmp(argv[3], "plainDBox") == 0) {
-	    wmPtr->style = plainDBox;
-	} else if (strcmp(argv[3], "altDBoxProc") == 0) {
-	    wmPtr->style = altDBoxProc;
-	} else if (strcmp(argv[3], "movableDBoxProc") == 0) {
-	    wmPtr->style = movableDBoxProc;
-	} else if (strcmp(argv[3], "zoomDocProc") == 0) {
-	    wmPtr->style = zoomDocProc;
-	} else if (strcmp(argv[3], "zoomNoGrow") == 0) {
-	    wmPtr->style = zoomNoGrow;
-	}
-        /*
-         else
-         if (strcmp(argv[3], "rDocProc") == 0) {
-	    wmPtr->style = rDocProc;
-	}
-        */
-         else if (strcmp(argv[3], "floatProc") == 0) {
-	    wmPtr->style = floatGrowProc;
-	} else if (strcmp(argv[3], "floatGrowProc") == 0) {
-	    wmPtr->style = floatGrowProc;
-	} else if (strcmp(argv[3], "floatZoomProc") == 0) {
-	    wmPtr->style = floatZoomGrowProc;
-	} else if (strcmp(argv[3], "floatZoomGrowProc") == 0) {
-	    wmPtr->style = floatZoomGrowProc;
-	} else if (strcmp(argv[3], "floatSideProc") == 0) {
-	    wmPtr->style = floatSideGrowProc;
-	} else if (strcmp(argv[3], "floatSideGrowProc") == 0) {
-	    wmPtr->style = floatSideGrowProc;
-	} else if (strcmp(argv[3], "floatSideZoomProc") == 0) {
-	    wmPtr->style = floatSideZoomGrowProc;
-	} else if (strcmp(argv[3], "floatSideZoomGrowProc") == 0) {
-	    wmPtr->style = floatSideZoomGrowProc;
-	} else {
-	    Tcl_AppendResult(interp, "bad style: should be documentProc, ",
-	    	    "dBoxProc, plainDBox, altDBoxProc, movableDBoxProc, ",
-	    	    "zoomDocProc, rDocProc, floatProc, floatZoomProc, ",
-		    "floatSideProc, or floatSideZoomProc",
-		    (char *) NULL);
+    if (Tcl_GetIndexFromObj(interp, objv[1], subcmds, "option",
+		0, &index) != TCL_OK) {
+	return TCL_ERROR;
+    }
+    if (((enum SubCmds) index) == TKMWS_STYLE) {
+	if ((objc < 3) || (objc > 5)) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "window ?class attributes?");
 	    return TCL_ERROR;
 	}
-	} else if (argc == 5) {
-	    int oldClass = wmPtr->macClass;
-	    int oldAttributes = wmPtr->attributes;
-	    
-	    if (strcmp(argv[3], "alert") == 0) {
-	        wmPtr->macClass = kAlertWindowClass;
-	    } else if (strcmp(argv[3], "moveableAlert") == 0) {
-	        wmPtr->macClass = kMovableAlertWindowClass;
-	    } else if (strcmp(argv[3], "modal") == 0) {
-	        wmPtr->macClass = kModalWindowClass;
-	    } else if (strcmp(argv[3], "moveableModal") == 0) {
-	        wmPtr->macClass = kMovableModalWindowClass;
-	    } else if (strcmp(argv[3], "floating") == 0) {
-	        wmPtr->macClass = kFloatingWindowClass;
-            } else if (strcmp(argv[3], "document") == 0) {
-                wmPtr->macClass = kDocumentWindowClass;
-            } else if (strcmp(argv[3], "help") == 0) {
-                wmPtr->macClass = kHelpWindowClass;
-            } else if (strcmp(argv[3], "toolbar") == 0) {
-                wmPtr->macClass = kToolbarWindowClass;
-	    } else {
-	        wmPtr->macClass = oldClass;
-	        Tcl_AppendResult(interp, "bad class: should be alert, ",
-	    	        "moveableAlert, modal, moveableModal, floating, ",
-	    	        "help, or document",
-		        (char *) NULL);
-	        return TCL_ERROR;
+	return WmWinStyle(interp, winPtr, objc, objv);
+    }
+    /* won't be reached */
+    return TCL_ERROR;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmWinStyle --
+ *
+ *	This procedure is invoked to process the
+ *	"::tk::unsupported::MacWindowStyle style" subcommand.
+ *	This command allows you to set the style of decoration
+ *	for a Macintosh window.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	Changes the style of a new Mac window.
+ *
+ *----------------------------------------------------------------------
+ */
+static int
+WmWinStyle(
+    Tcl_Interp *interp,		/* Current interpreter. */
+    TkWindow *winPtr,		/* Window to be manipulated. */
+    int objc,			/* Number of arguments. */
+    Tcl_Obj * const objv[])	/* Argument objects. */
+{
+    struct StrIntMap {
+	const char *strValue;
+	UInt32 intValue;
+    };
+    static const struct StrIntMap styleMap[] = {
+	{ "documentProc",	    documentProc		},
+	{ "noGrowDocProc",	    documentProc		},
+	{ "dBoxProc",		    dBoxProc			},
+	{ "plainDBox",		    plainDBox			},
+	{ "altDBoxProc",	    altDBoxProc			},
+	{ "movableDBoxProc",	    movableDBoxProc		},
+	{ "zoomDocProc",	    zoomDocProc			},
+	{ "zoomNoGrow",		    zoomNoGrow			},
+	{ "floatProc",		    floatGrowProc		},
+	{ "floatGrowProc",	    floatGrowProc		},
+	{ "floatZoomProc",	    floatZoomGrowProc		},
+	{ "floatZoomGrowProc",	    floatZoomGrowProc		},
+	{ "floatSideProc",	    floatSideGrowProc		},
+	{ "floatSideGrowProc",	    floatSideGrowProc		},
+	{ "floatSideZoomProc",	    floatSideZoomGrowProc	},
+	{ "floatSideZoomGrowProc",  floatSideZoomGrowProc	},
+	{ NULL,			    0				}
+    };
+    static const struct StrIntMap classMap[] = {
+	{ "alert",	    kAlertWindowClass		},
+	{ "moveableAlert",  kMovableAlertWindowClass	},
+	{ "modal",	    kModalWindowClass		},
+	{ "moveableModal",  kMovableModalWindowClass	},
+	{ "floating",	    kFloatingWindowClass	},
+	{ "document",	    kDocumentWindowClass	},
+	{ "utility",	    kUtilityWindowClass		},
+	{ "help",	    kHelpWindowClass		},
+	{ "sheet",	    kSheetWindowClass		},
+	{ "toolbar",	    kToolbarWindowClass		},
+	{ "plain",	    kPlainWindowClass		},
+	{ "overlay",	    kOverlayWindowClass		},
+	{ "sheetAlert",	    kSheetAlertWindowClass	},
+	{ "altPlain",	    kAltPlainWindowClass	},
+	{ "simple",	    kSimpleWindowClass		},
+	{ "drawer",	    kDrawerWindowClass		},
+	{ NULL,		    0				}
+    };
+    static const struct StrIntMap compositeAttrMap[] = {
+	{ "none",		kWindowNoAttributes			},
+	{ "standardDocument",	kWindowStandardDocumentAttributes	},
+	{ "standardFloating",	kWindowStandardFloatingAttributes	},
+	{ "fullZoom",		kWindowFullZoomAttribute		},
+	{ NULL,			0					}
+    };
+    static const struct StrIntMap attrMap[] = {
+	{ "closeBox",		kWindowCloseBoxAttribute		     },
+	{ "horizontalZoom",	kWindowHorizontalZoomAttribute		     },
+	{ "verticalZoom",	kWindowVerticalZoomAttribute		     },
+	{ "collapseBox",	kWindowCollapseBoxAttribute		     },
+	{ "resizable",		kWindowResizableAttribute		     },
+	{ "sideTitlebar",	kWindowSideTitlebarAttribute		     },
+	{ "toolbarButton",	kWindowToolbarButtonAttribute		     },
+	{ "unifiedTitleAndToolbar", kWindowUnifiedTitleAndToolbarAttribute   },
+	{ "metal",		kWindowMetalAttribute			     },
+	{ "noTitleBar",		kWindowNoTitleBarAttribute		     },
+	{ "texturedSquareCorners", kWindowTexturedSquareCornersAttribute     },
+	{ "metalNoContentSeparator", kWindowMetalNoContentSeparatorAttribute },
+	{ "doesNotCycle",	kWindowDoesNotCycleAttribute		     },
+	{ "noUpdates",		kWindowNoUpdatesAttribute		     },
+	{ "noActivates",	kWindowNoActivatesAttribute		     },
+	{ "opaqueForEvents",	kWindowOpaqueForEventsAttribute		     },
+	{ "noShadow",		kWindowNoShadowAttribute		     },
+	{ "hideOnSuspend",	kWindowHideOnSuspendAttribute		     },
+	{ "hideOnFullScreen",	kWindowHideOnFullScreenAttribute	     },
+	{ "inWindowMenu",	kWindowInWindowMenuAttribute		     },
+	{ "liveResize",		kWindowLiveResizeAttribute		     },
+	{ "ignoreClicks",	kWindowIgnoreClicksAttribute		     },
+	{ "noConstrain",	kWindowNoConstrainAttribute		     },
+	{ NULL,			0					     }
+    };
+    int index, i;
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+
+    if (objc == 3) {
+	if (wmPtr->style != -1) {
+	    for (i = 0; styleMap[i].strValue != NULL; i++) {
+		if (wmPtr->style == (short)(styleMap[i].intValue)) {
+		    Tcl_SetObjResult(interp,
+			    Tcl_NewStringObj(styleMap[i].strValue, -1));
+		    return TCL_OK;
+		}
 	    }
-	    
-	    if (strcmp(argv[4], "none") == 0) {
-	        wmPtr->attributes = kWindowNoAttributes;
-	    } else if (strcmp(argv[4], "standardDocument") == 0) {
-	        wmPtr->attributes = kWindowStandardDocumentAttributes;
-	    } else if (strcmp(argv[4], "standardFloating") == 0) {
-	        wmPtr->attributes = kWindowStandardFloatingAttributes;
-	    } else {
-	        int foundOne = 0;
-	        int attrArgc, i;
-	        CONST char **attrArgv = NULL;
-	        
-	        if (Tcl_SplitList(interp, argv[4], &attrArgc, &attrArgv) != TCL_OK) {
-	            wmPtr->macClass = oldClass;
-	            Tcl_AppendResult(interp, "Ill-formed attributes list: \"",
-	                argv[4], "\".", (char *) NULL);
-	            return TCL_ERROR;
-	        }
-	        	        
-	        wmPtr->attributes = kWindowNoAttributes;
-	        
-	        for (i = 0; i < attrArgc; i++) {
-	            if ((*attrArgv[i] == 'c') 
-	                    && (strcmp(attrArgv[i], "closeBox")  == 0)) {
-	                wmPtr->attributes |= kWindowCloseBoxAttribute;
-	                foundOne = 1;
-	            } else if ((*attrArgv[i] == 'h') 
-	                    && (strcmp(attrArgv[i], "horizontalZoom")  == 0)) {
-	                wmPtr->attributes |= kWindowHorizontalZoomAttribute;
-	                foundOne = 1;
-	            } else if ((*attrArgv[i] == 'v') 
-	                    && (strcmp(attrArgv[i], "verticalZoom")  == 0)) {
-	                wmPtr->attributes |= kWindowVerticalZoomAttribute;
-	                foundOne = 1;
-	            } else if ((*attrArgv[i] == 'c') 
-	                    && (strcmp(attrArgv[i], "collapseBox")  == 0)) {
-	                wmPtr->attributes |= kWindowCollapseBoxAttribute;
-	                foundOne = 1;
-	            } else if ((*attrArgv[i] == 'r') 
-	                    && (strcmp(attrArgv[i], "resizable")  == 0)) {
-	                wmPtr->attributes |= kWindowResizableAttribute;
-	                foundOne = 1;
-	            } else if ((*attrArgv[i] == 's') 
-	                    && (strcmp(attrArgv[i], "sideTitlebar")  == 0)) {
-	                wmPtr->attributes |= kWindowSideTitlebarAttribute;
-			foundOne = 1;
-		    } else if ((*attrArgv[i] == 'n') 
-			       && (strcmp(attrArgv[i], "noActivates")  == 0)) {
-			wmPtr->attributes |= kWindowNoActivatesAttribute;
-			foundOne = 1;
-		    } else if ((*attrArgv[i] == 'n') 
-			       && (strcmp(attrArgv[i], "noUpdates")  == 0)) {
-			wmPtr->attributes |= kWindowNoUpdatesAttribute;
-	                foundOne = 1;
-	            } else {
-	                foundOne = 0;
-	                break;
-	            }
-	        }
-	        
-	        if (attrArgv != NULL) {
-	            ckfree ((char *) attrArgv);
-	        }
-	        
-	        if (foundOne != 1) {
-	            wmPtr->macClass = oldClass;
-	            wmPtr->attributes = oldAttributes;
-	            
-	            Tcl_AppendResult(interp, "bad attribute: \"", argv[4], 
-	                    "\", should be standardDocument, ",
-	    	            "standardFloating, or some combination of ",
-	    	            "closeBox, horizontalZoom, verticalZoom, ",
-	    	            "collapseBox, resizable, or sideTitlebar.",
-		            (char *) NULL);
-	            return TCL_ERROR;
-	        }
+	    Tcl_Panic("invalid style");
+	} else {
+	    Tcl_Obj *attributeList, *newResult = NULL;
+	    WindowAttributes attributes;
+
+	    for (i = 0; classMap[i].strValue != NULL; i++) {
+		if (wmPtr->macClass == classMap[i].intValue) {
+		    newResult = Tcl_NewStringObj(classMap[i].strValue, -1);
+		    break;
+		}
 	    }
-	    
-	    wmPtr->style = -1;
+	    if (newResult == NULL) {
+		Tcl_Panic("invalid class");
+	    }
+
+	    attributeList = Tcl_NewListObj(0, NULL);
+	    attributes = wmPtr->attributes;
+
+	    for (i = 0; compositeAttrMap[i].strValue != NULL; i++) {
+		UInt32 intValue = compositeAttrMap[i].intValue;
+
+		if (intValue && (attributes & intValue) == intValue) {
+		    Tcl_ListObjAppendElement(interp, attributeList,
+			    Tcl_NewStringObj(compositeAttrMap[i].strValue,
+			    -1));
+		    attributes &= ~intValue;
+		    break;
+		}
+	    }
+	    for (i = 0; attrMap[i].strValue != NULL; i++) {
+		if (attributes & attrMap[i].intValue) {
+		    Tcl_ListObjAppendElement(interp, attributeList,
+			    Tcl_NewStringObj(attrMap[i].strValue, -1));
+		}
+	    }
+	    Tcl_ListObjAppendElement(interp, newResult, attributeList);
+	    Tcl_SetObjResult(interp, newResult);
 	}
-    } else {
-	Tcl_AppendResult(interp, "unknown or ambiguous option \"", argv[1],
-		"\": must be style",
-		(char *) NULL);
+    } else if (objc == 4) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[3], styleMap,
+		sizeof(struct StrIntMap), "style", 0, &index) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	wmPtr->style = styleMap[index].intValue;
+    } else if (objc == 5) {
+	int attrObjc;
+	Tcl_Obj **attrObjv = NULL;
+	WindowClass oldClass = wmPtr->macClass;
+	WindowAttributes oldAttributes = wmPtr->attributes;
+
+	if (Tcl_GetIndexFromObjStruct(interp, objv[3], classMap,
+		sizeof(struct StrIntMap), "class", 0, &index) != TCL_OK) {
+	    goto badClassAttrs;
+	}
+	wmPtr->macClass = classMap[index].intValue;
+	if (!IsValidWindowClass(wmPtr->macClass)) {
+	    goto badClassAttrs;
+	}
+	if (Tcl_ListObjGetElements(interp, objv[4], &attrObjc, &attrObjv)
+		!= TCL_OK) {
+	    goto badClassAttrs;
+	}
+	wmPtr->attributes = kWindowNoAttributes;
+	for (i = 0; i < attrObjc; i++) {
+	    if (Tcl_GetIndexFromObjStruct(interp, attrObjv[i],
+		    compositeAttrMap, sizeof(struct StrIntMap),
+		    "attribute", 0, &index) == TCL_OK) {
+		wmPtr->attributes |= compositeAttrMap[index].intValue;
+	    } else if (Tcl_GetIndexFromObjStruct(interp, attrObjv[i],
+		    attrMap, sizeof(struct StrIntMap),
+		    "attribute", 0, &index) == TCL_OK) {
+		Tcl_ResetResult(interp);
+		wmPtr->attributes |= attrMap[index].intValue;
+	    } else {
+		goto badClassAttrs;
+	    }
+	}
+	ApplyWindowClassAttributeChanges(winPtr, NULL, oldClass, oldAttributes,
+		0);
+	wmPtr->style = -1;
+	return TCL_OK;
+
+    badClassAttrs:
+	wmPtr->macClass = oldClass;
+	wmPtr->attributes = oldAttributes;
 	return TCL_ERROR;
     }
-    
     return TCL_OK;
 }
 
@@ -5024,7 +5223,7 @@ TkUnsupported1Cmd(
  *
  * TkpMakeMenuWindow --
  *
- *	Configure the window to be either a undecorated pull-down 
+ *	Configure the window to be either a undecorated pull-down
  *	(or pop-up) menu, or as a toplevel floating menu (palette).
  *
  * Results:
@@ -5040,27 +5239,30 @@ void
 TkpMakeMenuWindow(
     Tk_Window tkwin,		/* New window. */
     int transient)		/* 1 means menu is only posted briefly as
-				 * a popup or pulldown or cascade.  0 means
-				 * menu is always visible, e.g. as a 
+				 * a popup or pulldown or cascade. 0 means
+				 * menu is always visible, e.g. as a
 				 * floating menu. */
 {
+    TkWindow *winPtr = (TkWindow *) tkwin;
+
     if (transient) {
-	((TkWindow *) tkwin)->wmInfoPtr->style = plainDBox;
+	winPtr->wmInfoPtr->macClass = kSimpleWindowClass;
+	winPtr->wmInfoPtr->attributes = kWindowNoActivatesAttribute;
     } else {
-	((TkWindow *) tkwin)->wmInfoPtr->style = floatProc;
-	((TkWindow *) tkwin)->wmInfoPtr->flags |= WM_WIDTH_NOT_RESIZABLE;
-	((TkWindow *) tkwin)->wmInfoPtr->flags |= WM_HEIGHT_NOT_RESIZABLE;
+	winPtr->wmInfoPtr->macClass = kFloatingWindowClass;
+	winPtr->wmInfoPtr->attributes = kWindowStandardFloatingAttributes;
+	winPtr->wmInfoPtr->flags |= WM_WIDTH_NOT_RESIZABLE;
+	winPtr->wmInfoPtr->flags |= WM_HEIGHT_NOT_RESIZABLE;
     }
 }
 
-
 /*
  *----------------------------------------------------------------------
  *
  * TkMacOSXMakeRealWindowExist --
  *
  *	This function finally creates the real Macintosh window that
- *	the Mac actually understands.  
+ *	the Mac actually understands.
  *
  * Results:
  *	None.
@@ -5070,114 +5272,139 @@ TkpMakeMenuWindow(
  *
  *----------------------------------------------------------------------
  */
- 
-void 
+
+void
 TkMacOSXMakeRealWindowExist(
-    TkWindow *winPtr)	/* Tk window. */
+    TkWindow *winPtr)		/* Tk window. */
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
-    WindowRef  newWindow  = NULL;
+    WindowRef newWindow = NULL;
     ControlRef rootControl = NULL;
     MacDrawable *macWin;
-    Rect geometry = {0,0,0,0};
-    Tcl_HashEntry *valueHashPtr;
-    int new;
+    Rect initialBounds = {42, 0, 43, 1}, geometry, strWidths;
+    short structureW, structureH;
     TkMacOSXWindowList *listPtr;
+    OSStatus err;
 
     if (TkMacOSXHostToplevelExists(winPtr)) {
-    	return;
+	return;
     }
-    
+
     macWin = (MacDrawable *) winPtr->window;
 
     /*
      * If this is embedded, make sure its container's toplevel exists,
-     * then return... 
+     * then return...
      */
-    
-    if (Tk_IsEmbedded(winPtr)) {
-	TkWindow *contWinPtr;
 
-	contWinPtr = TkpGetOtherWindow(winPtr);
+    if (Tk_IsEmbedded(winPtr)) {
+	TkWindow *contWinPtr = TkpGetOtherWindow(winPtr);
+
 	if (contWinPtr != NULL) {
-	    TkMacOSXMakeRealWindowExist(contWinPtr->privatePtr->toplevel->winPtr);
+	    TkMacOSXMakeRealWindowExist(
+		    contWinPtr->privatePtr->toplevel->winPtr);
 	    macWin->flags |= TK_HOST_EXISTS;
 	    return;
-	} else if (gMacEmbedHandler != NULL) {
-	    if (gMacEmbedHandler->containerExistProc != NULL) {
-		if (gMacEmbedHandler->containerExistProc((Tk_Window) winPtr) != TCL_OK) {
-	           panic("ContainerExistProc could not make container");
-		}
-	    }
-	    return;
-	} else {
-	    panic("TkMacOSXMakeRealWindowExist could not find container");
 	}
 
+	if (tkMacOSXEmbedHandler == NULL) {
+	    Tcl_Panic("TkMacOSXMakeRealWindowExist could not find container");
+	}
+	if (tkMacOSXEmbedHandler->containerExistProc &&
+		tkMacOSXEmbedHandler->containerExistProc((Tk_Window) winPtr) !=
+		TCL_OK) {
+	    Tcl_Panic("ContainerExistProc could not make container");
+	}
+	return;
+
 	/*
-	 * NOTE: Here we should handle out of process embedding.
+	 * TODO: Here we should handle out of process embedding.
+	 */
+    }
+
+    if (wmPtr->style == -1) {
+	if (!IsValidWindowClass(wmPtr->macClass)) {
+	    TkMacOSXDbgMsg("Invalid window class: %ld", wmPtr->macClass);
+	    wmPtr->macClass = kPlainWindowClass;
+	}
+	wmPtr->attributes = (wmPtr->attributes | kWindowAsyncDragAttribute) &
+		GetAvailableWindowAttributes(wmPtr->macClass);
+	err = ChkErr(CreateNewWindow, wmPtr->macClass, wmPtr->attributes,
+		&initialBounds, &newWindow);
+	if (err != noErr) {
+	    newWindow = NULL;
+	}
+    } else {
+	TkMacOSXDbgMsg("Window creation via NewCWindow API is deprecated, "
+	       "use a window class instead of style %d", wmPtr->style);
+	newWindow = NewCWindow(NULL, &initialBounds, "\p", false,
+		wmPtr->style, (WindowRef) -1, true, 0);
+    }
+
+    if (newWindow == NULL) {
+	Tcl_Panic("couldn't allocate new Mac window");
+    }
+
+    ChkErr(GetWindowStructureWidths, newWindow, &strWidths);
+    if (wmPtr->macClass == kFloatingWindowClass) {
+	/*
+	 * Workaround GetWindowStructureWidths() Carbon bug:
 	 */
 	
+	strWidths.top = 16;
     }
-    
-    InitialWindowBounds(winPtr, &geometry);
-	
-    if (wmPtr->style == -1) {
-        OSStatus err;        
-        /*
-         * There seems to be a bug in CreateNewWindow: If I set the
-         * window geometry to be the too small for the structure region,
-         * then the whole window is positioned incorrectly.
-         * Adding this here makes the positioning work, and the size will
-         * get overwritten when you actually map the contents of the window.
-         */
-         
-        geometry.right += 64;
-        geometry.bottom += 24;
-        err = CreateNewWindow(wmPtr->macClass, wmPtr->attributes, 
-                &geometry, &newWindow);
-        if (err != noErr) {
-            newWindow = NULL;
-        }
-        
-    } else {
-        newWindow = NewCWindow(NULL, &geometry, "\ptemp", false, 
-	    (short) wmPtr->style, (WindowRef) -1, true, 0);
+    wmPtr->xInParent = strWidths.left;
+    wmPtr->yInParent = strWidths.top;
+    structureW = strWidths.left + strWidths.right;
+    structureH = strWidths.top + strWidths.bottom;
+    wmPtr->parentWidth = winPtr->changes.width + structureW;
+    wmPtr->parentHeight = winPtr->changes.height + structureH;
+    InitialWindowBounds(winPtr, newWindow, &geometry);
+    geometry.right +=  structureW;
+    geometry.bottom += structureH;
+    ChkErr(SetWindowBounds, newWindow, kWindowStructureRgn, &geometry);
+
+    TkMacOSXInstallWindowCarbonEventHandler(NULL, newWindow);
+    if (ChkErr(CreateRootControl, newWindow, &rootControl) != noErr ) {
+	Tcl_Panic("couldn't create root control for new Mac window");
     }
-    
-    if (newWindow == NULL) {
-	panic("couldn't allocate new Mac window");
+    if (wmPtr->attributes & kWindowResizableAttribute) {
+	HIViewRef growBoxView;
+
+	err = HIViewFindByID(HIViewGetRoot(newWindow),
+		kHIViewWindowGrowBoxID, &growBoxView);
+	if (err == noErr && !HIGrowBoxViewIsTransparent(growBoxView)) {
+	    ChkErr(HIGrowBoxViewSetTransparent, growBoxView, true);
+	}
     }
-    if (CreateRootControl(newWindow,&rootControl) != noErr ) {
-        panic("couldn't create root control for new Mac window");
-    }
-    
+
     /*
      * Add this window to the list of toplevel windows.
      */
-    
+
     listPtr = (TkMacOSXWindowList *) ckalloc(sizeof(TkMacOSXWindowList));
     listPtr->nextPtr = tkMacOSXWindowListPtr;
     listPtr->winPtr = winPtr;
     tkMacOSXWindowListPtr = listPtr;
-    
-    macWin->grafPtr = GetWindowPort (newWindow);
+
+    macWin->grafPtr = GetWindowPort(newWindow);
     macWin->rootControl = rootControl;
-    MoveWindowStructure(newWindow, geometry.left, geometry.top);
-    SetPort(GetWindowPort(newWindow));
-    
-    if (!windowHashInit) {
-	Tcl_InitHashTable(&windowTable, TCL_ONE_WORD_KEYS);
-	windowHashInit = true;
+
+    if (wmPtr->master != None || winPtr->atts.override_redirect) {
+	ApplyMasterOverrideChanges(winPtr, newWindow);
     }
-    valueHashPtr = Tcl_CreateHashEntry(&windowTable,
-	    (char *) newWindow, &new);
-    if (!new) {
-	panic("same macintosh window allocated twice!");
-    }
-    Tcl_SetHashValue(valueHashPtr, macWin);
-    
+    SetWindowModified(newWindow, false);
+    TkMacOSXRegisterOffScreenWindow((Window) macWin, (GWorldPtr) newWindow);
     macWin->flags |= TK_HOST_EXISTS;
+    ChkErr(GetWindowClass, newWindow, &(wmPtr->macClass));
+    ChkErr(GetWindowAttributes, newWindow, &(wmPtr->attributes));
+
+#ifdef TK_MAC_DEBUG_WINDOWS
+    TkMacOSXInitNamedDebugSymbol(HIToolbox, void, DebugPrintWindow, WindowRef);
+    if (DebugPrintWindow) {
+	DebugPrintWindow(newWindow);
+    }
+#endif /* TK_MAC_DEBUG_WINDOWS */
 }
 
 /*
@@ -5186,10 +5413,7 @@ TkMacOSXMakeRealWindowExist(
  * TkMacOSXRegisterOffScreenWindow --
  *
  *	This function adds the passed in Off Screen Port to the
- *	hash table that maps Mac windows to root X windows. 
- *
- *      FIXME: This is not currently used.  Is there any reason
- *      to keep it? 
+ *	hash table that maps Mac windows to root X windows.
  *
  * Results:
  *	None.
@@ -5200,26 +5424,23 @@ TkMacOSXMakeRealWindowExist(
  *----------------------------------------------------------------------
  */
 
-void 
+void
 TkMacOSXRegisterOffScreenWindow(
-    Window window,	/* Window structure. */
-    GWorldPtr portPtr)	/* Pointer to a Mac GWorld. */
+    Window window,		/* Window structure. */
+    GWorldPtr portPtr)		/* Pointer to a Mac GWorld. */
 {
-    MacDrawable *macWin;
     Tcl_HashEntry *valueHashPtr;
-    int new;
+    int isNew;
 
-    macWin = (MacDrawable *) window;
     if (!windowHashInit) {
 	Tcl_InitHashTable(&windowTable, TCL_ONE_WORD_KEYS);
 	windowHashInit = true;
     }
-    valueHashPtr = Tcl_CreateHashEntry(&windowTable,
-	    (char *) portPtr, &new);
-    if (!new) {
-	panic("same macintosh window allocated twice!");
+    valueHashPtr = Tcl_CreateHashEntry(&windowTable, (char *) portPtr, &isNew);
+    if (!isNew) {
+	Tcl_Panic("Same macintosh window allocated twice!");
     }
-    Tcl_SetHashValue(valueHashPtr, macWin);
+    Tcl_SetHashValue(valueHashPtr, window);
 }
 
 /*
@@ -5227,7 +5448,7 @@ TkMacOSXRegisterOffScreenWindow(
  *
  * TkMacOSXUnregisterMacWindow --
  *
- *	Given a macintosh port window, this function removes the 
+ *	Given a macintosh port window, this function removes the
  *	association between this window and the root X window that
  *	Tk cares about.
  *
@@ -5240,21 +5461,20 @@ TkMacOSXRegisterOffScreenWindow(
  *----------------------------------------------------------------------
  */
 
-void 
+void
 TkMacOSXUnregisterMacWindow(
     WindowRef macWinPtr)	/* Reference to a Mac Window */
 {
- Tcl_HashEntry *entryPtr;
+    Tcl_HashEntry *entryPtr;
+
     if (!windowHashInit) {
-	panic("TkMacOSXUnregisterMacWindow: unmapping before inited");
+	Tcl_Panic("TkMacOSXUnregisterMacWindow: unmapping before inited");
     }
     entryPtr = Tcl_FindHashEntry(&windowTable,(char *) macWinPtr);
     if (!entryPtr) {
-          fprintf(stderr,"Unregister:failed to find window %08x\n", 
-                 (int) macWinPtr );
-    }
-    else {
-      Tcl_DeleteHashEntry(entryPtr);
+	TkMacOSXDbgMsg("Failed to find window %08x", (int) macWinPtr);
+    } else {
+	Tcl_DeleteHashEntry(entryPtr);
     }
 }
 
@@ -5264,7 +5484,7 @@ TkMacOSXUnregisterMacWindow(
  * TkMacOSXSetScrollbarGrow --
  *
  *	Sets a flag for a toplevel window indicating that the passed
- *	Tk scrollbar window will display the grow region for the 
+ *	Tk scrollbar window will display the grow region for the
  *	toplevel window.
  *
  * Results:
@@ -5276,7 +5496,7 @@ TkMacOSXUnregisterMacWindow(
  *----------------------------------------------------------------------
  */
 
-void 
+void
 TkMacOSXSetScrollbarGrow(
     TkWindow *winPtr,		/* Tk scrollbar window. */
     int flag)			/* Boolean value true or false. */
@@ -5290,7 +5510,7 @@ TkMacOSXSetScrollbarGrow(
 	winPtr->privatePtr->toplevel->winPtr->wmInfoPtr->scrollWinPtr = NULL;
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -5299,8 +5519,8 @@ TkMacOSXSetScrollbarGrow(
  *	This is a utility procedure invoked by focus-management code. It
  *	exists because of the extra wrapper windows that exist under
  *	Unix; its job is to map from wrapper windows to the
- *	corresponding toplevel windows.  On PCs and Macs there are no
- *	wrapper windows so no mapping is necessary;  this procedure just
+ *	corresponding toplevel windows. On PCs and Macs there are no
+ *	wrapper windows so no mapping is necessary; this procedure just
  *	determines whether a window is a toplevel or not.
  *
  * Results:
@@ -5373,88 +5593,113 @@ TkpGetWrapperWindow(
 
 void
 TkpWmSetState(winPtr, state)
-     TkWindow *winPtr;		/* Toplevel window to operate on. */
-     int state;			/* One of IconicState, ZoomState, NormalState,
+    TkWindow *winPtr;		/* Toplevel window to operate on. */
+    int state;			/* One of IconicState, ZoomState, NormalState,
 				 * or WithdrawnState. */
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
     WindowRef macWin;
-    
+
     wmPtr->hints.initial_state = state;
     if (wmPtr->flags & WM_NEVER_MAPPED) {
 	return;
     }
 
-    macWin = GetWindowFromPort(TkMacOSXGetDrawablePort (winPtr->window));
+    macWin = TkMacOSXDrawableWindow(winPtr->window);
 
     if (state == WithdrawnState) {
 	Tk_UnmapWindow((Tk_Window) winPtr);
     } else if (state == IconicState) {
+	/*
+	 * The window always gets unmapped. If we can show the
+	 * icon version of the window we also collapse it.
+	 */
+	if (IsWindowCollapsable(macWin) && !IsWindowCollapsed(macWin)) {
+	    CollapseWindow(macWin, true);
+	}
 	Tk_UnmapWindow((Tk_Window) winPtr);
-	    /*
-	     * The window always gets unmapped.  However, if we can show the
-	     * icon version of the window (collapsed) we make the window visable
-	     * and then collapse it.
-	     *
-	     * TODO: This approach causes flashing!
-	     */
-
-	    if (IsWindowCollapsable(macWin)) {
-		ShowWindow(macWin);
-		CollapseWindow( macWin, true);
-	    }
-
     } else if (state == NormalState) {
 	Tk_MapWindow((Tk_Window) winPtr);
-        CollapseWindow((WindowPtr) macWin, false);
+	if (IsWindowCollapsable(macWin) && IsWindowCollapsed(macWin)) {
+	    CollapseWindow(macWin, false);
+	}
+	TkMacOSXZoomToplevel(macWin, inZoomIn);
     } else if (state == ZoomState) {
-	/* TODO: need to support zoomed windows */
+	Tk_MapWindow((Tk_Window) winPtr);
+	if (IsWindowCollapsable(macWin) && IsWindowCollapsed(macWin)) {
+	    CollapseWindow(macWin, false);
+	}
+	TkMacOSXZoomToplevel(macWin, inZoomOut);
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
  * TkpIsWindowFloating --
  *
- *        Returns 1 if a window is floating, 0 otherwise.
+ *	Returns 1 if a window is floating, 0 otherwise.
  *
  * Results:
- *        1 or 0 depending on window's floating attribute.
+ *	1 or 0 depending on window's floating attribute.
  *
  * Side effects:
- *        None.
+ *	None.
  *
  *----------------------------------------------------------------------
  */
 
 int
-TkpIsWindowFloating(WindowRef wRef)
+TkpIsWindowFloating(
+    WindowRef wRef)
 {
     WindowClass class;
 
     if (wRef == NULL) {
-        return 0;
+	return 0;
     }
-    
+
     GetWindowClass(wRef, &class);
     return (class == kFloatingWindowClass);
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
- * TkMacOSXWindowOffset --
+ * TkMacOSXWindowClass --
  *
- *        Determines the x and y offset from the orgin of the toplevel
- *        window dressing (the structure region, ie. title bar) and the
- *        orgin of the content area.
+ *	Returns OS X window class of window
  *
  * Results:
- *        The x & y offset in pixels.
+ *	1 or 0 depending on window's floating attribute.
  *
  * Side effects:
- *        None.
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE WindowClass
+TkMacOSXWindowClass(
+    TkWindow *winPtr)
+{
+    return winPtr->wmInfoPtr->macClass;
+}
+
+/*
+ *--------------------------------------------------------------
+ *
+ * TkMacOSXWindowOffset --
+ *
+ *	Determines the x and y offset from the orgin of the toplevel
+ *	window dressing (the structure region, ie. title bar) and the
+ *	orgin of the content area.
+ *
+ * Results:
+ *	The x & y offset in pixels.
+ *
+ * Side effects:
+ *	None.
  *
  *----------------------------------------------------------------------
  */
@@ -5465,83 +5710,55 @@ TkMacOSXWindowOffset(
     int *xOffset,
     int *yOffset)
 {
-    OSErr err = noErr;
-    static RgnHandle strucRgn = NULL;
-    static RgnHandle contRgn  = NULL;
-    Rect strucRect, contRect;
+    Window window;
+    TkDisplay *dispPtr;
+    TkWindow *winPtr;
 
-    if (!strucRgn) {
-        if(!(strucRgn = NewRgn())) {
-           err = MemError();
-        }
-    }
-    if (!contRgn) {
-        if(!(contRgn = NewRgn())) {
-           err = MemError();
-        }
-    }
-    if (err == noErr) {
-        GetWindowRegion(wRef, kWindowStructureRgn, strucRgn);
-        GetWindowRegion(wRef, kWindowContentRgn, contRgn);
-        GetRegionBounds(strucRgn,&strucRect);
-        GetRegionBounds(contRgn,&contRect);
-        *xOffset = contRect.left - strucRect.left;
-        *yOffset = contRect.top - strucRect.top;
-    } else {
-        *xOffset = 0;
-        *yOffset = 0;
-    }
-    return;
+    window = TkMacOSXGetXWindow(wRef);
+    dispPtr = TkGetDisplayList();
+    winPtr = (TkWindow *) Tk_IdToWindow(dispPtr->display, window);
+    *xOffset = winPtr->wmInfoPtr->xInParent;
+    *yOffset = winPtr->wmInfoPtr->yInParent;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
  * TkpGetMS --
  *
- *        Return a relative time in milliseconds.  It doesn't matter
- *        when the epoch was.
+ *	Return a relative time in milliseconds. It doesn't matter
+ *	when the epoch was.
  *
  * Results:
- *        Number of milliseconds.
+ *	Number of milliseconds.
  *
  * Side effects:
- *        None.
+ *	None.
  *
  *----------------------------------------------------------------------
  */
 
 unsigned long
-TkpGetMS()
+TkpGetMS(void)
 {
-    long long * int64Ptr;
-    UnsignedWide micros;
-    
-    Microseconds(&micros);
-    int64Ptr = (long long *) &micros;
+    Tcl_Time now;
 
-    /*
-     * We need 64 bit math to do this.  This is available in CW 11
-     * and on.  Other's will need to use a different scheme.
-     */
-
-    *int64Ptr /= 1000;
-
-    return (long) *int64Ptr;
+    Tcl_GetTime(&now);
+    return (long) now.sec * 1000 + now.usec / 1000;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
  * XSetInputFocus --
  *
- *        Change the focus window for the application.
+ *	Change the focus window for the application.
  *
  * Results:
- *        None.
+ *	None.
  *
  * Side effects:
- *        None.
+ *	None.
  *
  *----------------------------------------------------------------------
  */
@@ -5554,7 +5771,7 @@ XSetInputFocus(
     Time time)
 {
     /*
-     * Don't need to do a thing.  Tk manages the focus for us.
+     * Don't need to do a thing. Tk manages the focus for us.
      */
 }
 
@@ -5563,53 +5780,52 @@ XSetInputFocus(
  *
  * TkpChangeFocus --
  *
- *        This procedure is a stub on the Mac because we always own the
- *        focus if we are a front most application.
+ *	This procedure is a stub on the Mac because we always own the
+ *	focus if we are a front most application.
  *
  * Results:
- *        The return value is the serial number of the command that
- *        changed the focus.  It may be needed by the caller to filter
- *        out focus change events that were queued before the command.
- *        If the procedure doesn't actually change the focus then
- *        it returns 0.
+ *	The return value is the serial number of the command that
+ *	changed the focus. It may be needed by the caller to filter
+ *	out focus change events that were queued before the command.
+ *	If the procedure doesn't actually change the focus then
+ *	it returns 0.
  *
  * Side effects:
- *        None.
+ *	None.
  *
  *----------------------------------------------------------------------
  */
 
 int
 TkpChangeFocus(winPtr, force)
-    TkWindow *winPtr;           /* Window that is to receive the X focus. */
-    int force;                  /* Non-zero means claim the focus even
-                                 * if it didn't originally belong to
-                                 * topLevelPtr's application. */
+    TkWindow *winPtr;		/* Window that is to receive the X focus. */
+    int force;			/* Non-zero means claim the focus even
+				 * if it didn't originally belong to
+				 * topLevelPtr's application. */
 {
     /*
-     * We don't really need to do anything on the Mac.  Tk will
+     * We don't really need to do anything on the Mac. Tk will
      * keep all this state for us.
      */
 
     if (winPtr->atts.override_redirect) {
-        return 0;
+	return 0;
     }
 
     /*
      * Remember the current serial number for the X server and issue
-     * a dummy server request.  This marks the position at which we
+     * a dummy server request. This marks the position at which we
      * changed the focus, so we can distinguish FocusIn and FocusOut
      * events on either side of the mark.
      */
 
     return NextRequest(winPtr->display);
 }
-
 
 /*
  *----------------------------------------------------------------------
  *
- * TkWmStackorderToplevelWrapperMap --
+ * WmStackorderToplevelWrapperMap --
  *
  *	This procedure will create a table that maps the reparent wrapper
  *	X id for a toplevel to the TkWindow structure that is wraps.
@@ -5627,28 +5843,30 @@ TkpChangeFocus(winPtr, force)
  *
  *----------------------------------------------------------------------
  */
+
 static void
-TkWmStackorderToplevelWrapperMap(winPtr, display, table)
-    TkWindow *winPtr;				/* TkWindow to recurse on */
-    Display *display;                           /* X display of parent window */
-    Tcl_HashTable *table;			/* Maps mac window to TkWindow */
+WmStackorderToplevelWrapperMap(
+    TkWindow *winPtr,		/* TkWindow to recurse on */
+    Display *display,		/* X display of parent window */
+    Tcl_HashTable *table)	/* Maps mac window to TkWindow */
 {
     TkWindow *childPtr;
     Tcl_HashEntry *hPtr;
     WindowRef macWindow;
     int newEntry;
 
-    if (Tk_IsMapped(winPtr) && Tk_IsTopLevel(winPtr) && (winPtr->display == display)) {
-        macWindow = GetWindowFromPort(TkMacOSXGetDrawablePort(winPtr->window));
+    if (Tk_IsMapped(winPtr) && Tk_IsTopLevel(winPtr)
+	    && (winPtr->display == display)) {
+	macWindow = TkMacOSXDrawableWindow(winPtr->window);
 
-        hPtr = Tcl_CreateHashEntry(table,
-            (const char *) macWindow, &newEntry);
-        Tcl_SetHashValue(hPtr, winPtr);
+	hPtr = Tcl_CreateHashEntry(table,
+	    (const char *) macWindow, &newEntry);
+	Tcl_SetHashValue(hPtr, winPtr);
     }
 
     for (childPtr = winPtr->childList; childPtr != NULL;
-            childPtr = childPtr->nextPtr) {
-        TkWmStackorderToplevelWrapperMap(childPtr, display, table);
+	    childPtr = childPtr->nextPtr) {
+	WmStackorderToplevelWrapperMap(childPtr, display, table);
     }
 }
 
@@ -5671,7 +5889,7 @@ TkWmStackorderToplevelWrapperMap(winPtr, display, table)
 
 TkWindow **
 TkWmStackorderToplevel(parentPtr)
-    TkWindow *parentPtr;		/* Parent toplevel window. */
+    TkWindow *parentPtr;	/* Parent toplevel window. */
 {
     WindowRef frontWindow;
     TkWindow *childWinPtr, **windows, **window_ptr;
@@ -5684,10 +5902,10 @@ TkWmStackorderToplevel(parentPtr)
      */
 
     Tcl_InitHashTable(&table, TCL_ONE_WORD_KEYS);
-    TkWmStackorderToplevelWrapperMap(parentPtr, parentPtr->display, &table);
+    WmStackorderToplevelWrapperMap(parentPtr, parentPtr->display, &table);
 
     windows = (TkWindow **) ckalloc((table.numEntries+1)
-        * sizeof(TkWindow *));
+	* sizeof(TkWindow *));
 
     /*
      * Special cases: If zero or one toplevels were mapped
@@ -5696,41 +5914,569 @@ TkWmStackorderToplevel(parentPtr)
 
     switch (table.numEntries) {
     case 0:
-        windows[0] = NULL;
-        goto done;
+	windows[0] = NULL;
+	goto done;
     case 1:
-        hPtr = Tcl_FirstHashEntry(&table, &search);
-        windows[0] = (TkWindow *) Tcl_GetHashValue(hPtr);
-        windows[1] = NULL;
-        goto done;
+	hPtr = Tcl_FirstHashEntry(&table, &search);
+	windows[0] = (TkWindow *) Tcl_GetHashValue(hPtr);
+	windows[1] = NULL;
+	goto done;
     }
 
-    frontWindow = (WindowRef) FrontWindow();
-
+    frontWindow = GetFrontWindowOfClass(kAllWindowClasses, false);
     if (frontWindow == NULL) {
-        ckfree((char *) windows);
-        windows = NULL;
+	ckfree((char *) windows);
+	windows = NULL;
     } else {
-    	window_ptr = windows + table.numEntries;
-    	*window_ptr-- = NULL;
+	window_ptr = windows + table.numEntries;
+	*window_ptr-- = NULL;
 	    while (frontWindow != NULL) {
 		    hPtr = Tcl_FindHashEntry(&table, (char *) frontWindow);
-            if (hPtr != NULL) {
-                childWinPtr = (TkWindow *) Tcl_GetHashValue(hPtr);
-                *window_ptr-- = childWinPtr;
-            }
-            frontWindow = GetNextWindow(frontWindow);
+		if (hPtr != NULL) {
+		    childWinPtr = (TkWindow *) Tcl_GetHashValue(hPtr);
+		    *window_ptr-- = childWinPtr;
+		}
+		frontWindow = GetNextWindow(frontWindow);
 	    }
-        if (window_ptr != (windows-1))
-            panic("num matched toplevel windows does not equal num children");
+	if (window_ptr != (windows-1))
+	    Tcl_Panic("num matched toplevel windows does not equal num "
+		    "children");
     }
 
     done:
     Tcl_DeleteHashTable(&table);
     return windows;
 }
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * ApplyWindowClassAttributeChanges --
+ *
+ *	This procedure applies carbon window class and attribute changes.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
 
+static void
+ApplyWindowClassAttributeChanges(
+    TkWindow *winPtr,
+    WindowRef macWindow,
+    WindowClass oldClass,
+    WindowAttributes oldAttributes,
+    int create)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    WindowAttributes newAttributes = wmPtr->attributes |
+	    kWindowAsyncDragAttribute;
 
+    if (wmPtr->macClass != oldClass || newAttributes != oldAttributes) {
+	Rect strWidths;
 
+	if (!macWindow) {
+	    if (winPtr->window == None) {
+		if (create) {
+		    Tk_MakeWindowExist((Tk_Window) winPtr);
+		} else {
+		    return;
+		}
+	    }
+	    if (!TkMacOSXHostToplevelExists(winPtr)) {
+		if (create) {
+		    TkMacOSXMakeRealWindowExist(winPtr);
+		} else {
+		    return;
+		}
+	    }
+	    macWindow = TkMacOSXDrawableWindow(winPtr->window);
+	}
+	if (wmPtr->macClass != oldClass) {
+	    TK_IF_MAC_OS_X_API (4, HIWindowChangeClass,
+		ChkErr(HIWindowChangeClass, macWindow, wmPtr->macClass);
+	    ) TK_ENDIF
+	    ChkErr(GetWindowClass, macWindow, &(wmPtr->macClass));
+	}
+	if (newAttributes != oldAttributes) {
+	    newAttributes &= GetAvailableWindowAttributes(wmPtr->macClass);
+	    ChkErr(ChangeWindowAttributes, macWindow,
+		    newAttributes & (newAttributes ^ oldAttributes),
+		    oldAttributes & (newAttributes ^ oldAttributes));
+	}
+	ChkErr(GetWindowAttributes, macWindow, &(wmPtr->attributes));
+	if ((wmPtr->attributes ^ oldAttributes) & kWindowResizableAttribute) {
+	    if (wmPtr->attributes & kWindowResizableAttribute) {
+		HIViewRef growBoxView;
+		OSStatus err = HIViewFindByID(HIViewGetRoot(macWindow),
+			kHIViewWindowGrowBoxID, &growBoxView);
 
+		if (err == noErr && !HIGrowBoxViewIsTransparent(growBoxView)) {
+		    ChkErr(HIGrowBoxViewSetTransparent, growBoxView, true);
+		}
+	    }
+	    TkMacOSXInvalClipRgns((Tk_Window) winPtr);
+	    TkMacOSXInvalidateWindow((MacDrawable *)(winPtr->window),
+		    TK_PARENT_WINDOW);
+	}
 
+	/*
+	 * The change of window class/attributes might have changed the window
+	 * structure widths:
+	 */
+	GetWindowStructureWidths(macWindow, &strWidths);
+	wmPtr->xInParent = strWidths.left;
+	wmPtr->yInParent = strWidths.top;
+	wmPtr->parentWidth = winPtr->changes.width + strWidths.left
+		+ strWidths.right;
+	wmPtr->parentHeight = winPtr->changes.height + strWidths.top
+		+ strWidths.bottom;
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * ApplyMasterOverrideChanges --
+ *
+ *	This procedure applies changes to override_redirect or master.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+ApplyMasterOverrideChanges(
+    TkWindow *winPtr,
+    WindowRef macWindow)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    WindowClass oldClass = wmPtr->macClass;
+    WindowAttributes oldAttributes = wmPtr->attributes;
+
+    /*
+     * FIX: We need an UpdateWrapper equivalent to make this 100% correct
+     */
+
+    if (winPtr->atts.override_redirect) {
+	if (oldClass == kDocumentWindowClass) {
+	    wmPtr->macClass = kSimpleWindowClass;
+	    wmPtr->attributes = kWindowNoAttributes;
+	}
+	wmPtr->attributes |= kWindowNoActivatesAttribute;
+    } else {
+	if (oldClass == kSimpleWindowClass &&
+		oldAttributes == kWindowNoActivatesAttribute) {
+	    wmPtr->macClass = kDocumentWindowClass;
+	    wmPtr->attributes = kWindowStandardDocumentAttributes
+		    | kWindowLiveResizeAttribute;
+	}
+	wmPtr->attributes &= ~kWindowNoActivatesAttribute;
+    }
+    if (!macWindow && winPtr->window != None &&
+	    TkMacOSXHostToplevelExists(winPtr)) {
+	macWindow = TkMacOSXDrawableWindow(winPtr->window);
+    }
+    if (macWindow) {
+	WindowGroupRef group;
+
+	ApplyWindowClassAttributeChanges(winPtr, macWindow, oldClass,
+	    oldAttributes, 0);
+
+	if (winPtr->atts.override_redirect && wmPtr->master != None) {
+	    wmPtr->flags |= WM_TOPMOST;
+	} else {
+	    wmPtr->flags &= ~WM_TOPMOST;
+	}
+	group = WmGetWindowGroup(winPtr);
+	if (group && group != GetWindowGroup(macWindow)) {
+	    ChkErr(SetWindowGroup, macWindow, group);
+	}
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WmGetWindowGroup --
+ *
+ *	Gets the window group a toplevel should be placed in.
+ *
+ * Results:
+ *	A WindowGroupRef.
+ *
+ * Side effects:
+ *	A transient window group for the master (if any) may be created.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static WindowGroupRef
+WmGetWindowGroup(
+    TkWindow *winPtr)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    WindowGroupRef group = NULL;
+
+    if (wmPtr->flags & WM_TOPMOST) {
+	group = GetWindowGroupOfClass(kUtilityWindowClass);
+    } else if (wmPtr->master != None) {
+	TkDisplay *dispPtr = TkGetDisplayList();
+	TkWindow *masterWinPtr = (TkWindow *)Tk_IdToWindow(dispPtr->display,
+		wmPtr->master);
+	
+	if (masterWinPtr && masterWinPtr->window != None &&
+		TkMacOSXHostToplevelExists(masterWinPtr)) {
+	    WindowRef masterMacWin =
+		    TkMacOSXDrawableWindow(masterWinPtr->window);
+
+	    if (masterMacWin && GetWindowProperty(masterMacWin, 'Tk  ', 'TsGp',
+		    sizeof(group), NULL, &group) != noErr) {
+		ChkErr(CreateWindowGroup, 0, &group);
+		if (group) {
+		    ChkErr(SetWindowGroupParent, group,
+			    GetWindowGroup(masterMacWin));
+		    ChkErr(SetWindowGroupOwner, group, masterMacWin);
+		    ChkErr(SetWindowProperty, masterMacWin, 'Tk  ', 'TsGp',
+			    sizeof(group), &group);
+		}
+	    }
+	}
+    }
+    if (!group) {
+	group = GetWindowGroupOfClass(wmPtr->macClass);
+    }
+    return group;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXMakeFullscreen --
+ *
+ *	This procedure sets a fullscreen window to the size of the screen.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+TkMacOSXMakeFullscreen(
+    TkWindow *winPtr,
+    WindowRef window,
+    int fullscreen,
+    Tcl_Interp *interp)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    int result = TCL_OK, wasFullscreen = (wmPtr->flags & WM_FULLSCREEN);
+
+    if (fullscreen) {
+	int screenWidth =  WidthOfScreen(Tk_Screen(winPtr));
+	int screenHeight = HeightOfScreen(Tk_Screen(winPtr));
+	/*
+	 * Check max width and height if set by the user.
+	 */
+	if ((wmPtr->maxWidth > 0 && wmPtr->maxWidth < screenWidth)
+		|| (wmPtr->maxHeight > 0 && wmPtr->maxHeight < screenHeight)) {
+	    if (interp) {
+		Tcl_AppendResult(interp,
+			"can't set fullscreen attribute for \"",
+			winPtr->pathName,
+			"\": max width/height is too small", NULL);
+	    }
+	    result = TCL_ERROR;
+	    wmPtr->flags &= ~WM_FULLSCREEN;
+	} else {
+	    Rect bounds, screenBounds = {0, 0, screenHeight, screenWidth};
+
+	    ChkErr(GetWindowBounds, window, kWindowContentRgn, &bounds);
+	    if (!EqualRect(&bounds, &screenBounds)) {
+		if (!wasFullscreen) {
+		    wmPtr->configX = wmPtr->x;
+		    wmPtr->configY = wmPtr->y;
+		    wmPtr->configAttributes = wmPtr->attributes;
+		    wmPtr->attributes &= ~kWindowResizableAttribute;
+		    ApplyWindowClassAttributeChanges(winPtr, window,
+			    wmPtr->macClass, wmPtr->configAttributes, 0);
+		}
+		wmPtr->flags |= WM_SYNC_PENDING;
+		ChkErr(SetWindowBounds, window, kWindowContentRgn,
+			&screenBounds);
+		wmPtr->flags &= ~WM_SYNC_PENDING;
+	    }
+	    wmPtr->flags |= WM_FULLSCREEN;
+	}
+    } else {
+	wmPtr->flags &= ~WM_FULLSCREEN;
+    }
+    if (wasFullscreen && !(wmPtr->flags & WM_FULLSCREEN)) {
+	WindowAttributes oldAttributes = wmPtr->attributes;
+	Rect bounds = {wmPtr->configY, wmPtr->configX,
+		wmPtr->configY + wmPtr->yInParent + wmPtr->configHeight,
+		wmPtr->configX + wmPtr->xInParent + wmPtr->configWidth};
+
+	wmPtr->attributes |= wmPtr->configAttributes &
+		kWindowResizableAttribute;
+	ApplyWindowClassAttributeChanges(winPtr, window, wmPtr->macClass,
+		oldAttributes, 0);
+	wmPtr->flags |= WM_SYNC_PENDING;
+	ChkErr(SetWindowBounds, window, kWindowStructureRgn, &bounds);
+	wmPtr->flags &= ~WM_SYNC_PENDING;
+    }
+    TkMacOSXEnterExitFullscreen(winPtr, IsWindowActive(window));
+    return result;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXEnterExitFullscreen --
+ *
+ *	This procedure enters or exits fullscreen mode if required.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TkMacOSXEnterExitFullscreen(
+    TkWindow *winPtr,
+    int active)
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    SystemUIMode mode;
+    SystemUIOptions options;
+
+    GetSystemUIMode(&mode, &options);
+    if (wmPtr->flags & WM_FULLSCREEN && active) {
+	static SystemUIMode fullscreenMode = 0;
+	static SystemUIOptions fullscreenOptions = 0;
+
+	if (!fullscreenMode) {
+	    TK_IF_HI_TOOLBOX (3,
+		fullscreenMode = kUIModeAllSuppressed;
+	    ) TK_ELSE_HI_TOOLBOX (3,
+		fullscreenMode = kUIModeAllHidden;
+		fullscreenOptions = kUIOptionAutoShowMenuBar;
+	    ) TK_ENDIF
+	}
+	if (mode != fullscreenMode) {
+	    ChkErr(SetSystemUIMode, fullscreenMode, fullscreenOptions);
+	}
+    } else {
+	if (mode != kUIModeNormal) {
+	    ChkErr(SetSystemUIMode, kUIModeNormal, 0);
+	}
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * GetMinSize --
+ *
+ *	This function computes the current minWidth and minHeight values for
+ *	a window, taking into account the possibility that they may be
+ *	defaulted.
+ *
+ * Results:
+ *	The values at *minWidthPtr and *minHeightPtr are filled in with the
+ *	minimum allowable dimensions of wmPtr's window, in grid units. If the
+ *	requested minimum is smaller than the system required minimum, then
+ *	this function computes the smallest size that will satisfy both the
+ *	system and the grid constraints.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+GetMinSize(
+    TkWindow *winPtr,		/* Toplevel window to operate on. */
+    int *minWidthPtr,		/* Where to store the current minimum width of
+				 * the window. */
+    int *minHeightPtr)		/* Where to store the current minimum height
+				 * of the window. */
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    int minWidth = 1, minHeight = 1;
+
+    /*
+     * Compute the minimum width & height by taking the default client size and
+     * rounding it up to the nearest grid unit. Return the greater of the
+     * default minimum and the specified minimum.
+     */
+
+    switch (wmPtr->macClass) {
+	case kDocumentWindowClass:
+	case kMovableAlertWindowClass:
+	case kMovableModalWindowClass:
+	    minWidth = 72;
+	    if (wmPtr->attributes & kWindowResizableAttribute) {
+		minHeight = 15;
+	    }
+	    if (wmPtr->attributes & kWindowToolbarButtonAttribute) {
+		minWidth += 29;
+	    }
+	    break;
+	case kFloatingWindowClass:
+	case kUtilityWindowClass:
+	    minWidth = 59;
+	    if (wmPtr->attributes & kWindowResizableAttribute) {
+		minHeight = 11;
+	    }
+	    if (wmPtr->attributes & kWindowSideTitlebarAttribute) {
+		int tmp = minWidth;
+		minWidth = minHeight;
+		minHeight = tmp;
+	    } else if (wmPtr->attributes & kWindowToolbarButtonAttribute) {
+		minWidth += 29;
+	    }
+	    break;
+	default:
+	    if (wmPtr->attributes & kWindowResizableAttribute) {
+		minWidth = 15;
+		minHeight = 15;
+	    }
+	    break;
+    }
+
+    if (wmPtr->gridWin != NULL) {
+	int base = winPtr->reqWidth - (wmPtr->reqGridWidth * wmPtr->widthInc);
+	if (base < 0) {
+	    base = 0;
+	}
+	minWidth = ((minWidth - base) + wmPtr->widthInc-1)/wmPtr->widthInc;
+	base = winPtr->reqHeight - (wmPtr->reqGridHeight * wmPtr->heightInc);
+	if (base < 0) {
+	    base = 0;
+	}
+	minHeight = ((minHeight - base) + wmPtr->heightInc-1)/wmPtr->heightInc;
+    }
+    if (minWidth < wmPtr->minWidth) {
+	minWidth = wmPtr->minWidth;
+    }
+    if (minHeight < wmPtr->minHeight) {
+	minHeight = wmPtr->minHeight;
+    }
+    *minWidthPtr = minWidth;
+    *minHeightPtr = minHeight;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * GetMaxSize --
+ *
+ *	This function computes the current maxWidth and maxHeight values for
+ *	a window, taking into account the possibility that they may be
+ *	defaulted.
+ *
+ * Results:
+ *	The values at *maxWidthPtr and *maxHeightPtr are filled in with the
+ *	maximum allowable dimensions of wmPtr's window, in grid units. If no
+ *	maximum has been specified for the window, then this function computes
+ *	the largest sizes that will fit on the screen.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+GetMaxSize(
+    TkWindow *winPtr,		/* Toplevel window to operate on. */
+    int *maxWidthPtr,		/* Where to store the current maximum width of
+				 * the window. */
+    int *maxHeightPtr)		/* Where to store the current maximum height
+				 * of the window. */
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    Rect *maxBounds = (Rect*)(winPtr->display->screens->ext_data);
+
+    if (wmPtr->maxWidth > 0) {
+	*maxWidthPtr = wmPtr->maxWidth;
+    } else {
+	int maxWidth = maxBounds->right - maxBounds->left - wmPtr->xInParent;
+	if (wmPtr->gridWin != NULL) {
+	    maxWidth = wmPtr->reqGridWidth
+		    + (maxWidth - winPtr->reqWidth)/wmPtr->widthInc;
+	}
+	*maxWidthPtr = maxWidth;
+    }
+    if (wmPtr->maxHeight > 0) {
+	*maxHeightPtr = wmPtr->maxHeight;
+    } else {
+	int maxHeight = maxBounds->bottom - maxBounds->top - wmPtr->yInParent;
+	if (wmPtr->gridWin != NULL) {
+	    maxHeight = wmPtr->reqGridHeight
+		    + (maxHeight - winPtr->reqHeight)/wmPtr->heightInc;
+	}
+	*maxHeightPtr = maxHeight;
+    }
+}
+#if 0
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * RemapWindows
+ *
+ *	Adjust parent/child relation ships of
+ *	the given window hierarchy.
+ *
+ * Results:
+ *	none
+ *
+ * Side effects:
+ *	keeps windowing system (X11) happy
+ *
+ *----------------------------------------------------------------------
+ */
+static void
+RemapWindows(TkWindow *winPtr, MacDrawable *parentWin)
+{
+    TkWindow *childPtr;
+
+    /* Remove the OS specific window.
+     * It will get rebuilt when the window gets Mapped.
+     */
+    if (winPtr->window != None) {
+	MacDrawable *macWin = (MacDrawable *) winPtr->window;
+	macWin->grafPtr = NULL;
+	macWin->toplevel = parentWin->toplevel;
+	winPtr->flags &= ~TK_MAPPED;
+#ifdef TK_REBUILD_TOPLEVEL
+	winPtr->flags |= TK_REBUILD_TOPLEVEL;
+#endif
+    }
+
+    /* Repeat for all the children */
+    for (childPtr = winPtr->childList; childPtr != NULL;
+	 childPtr = childPtr->nextPtr) {
+	RemapWindows(childPtr, (MacDrawable *) winPtr->window);
+    }
+}
+#endif
