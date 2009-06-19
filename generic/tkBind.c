@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- *  RCS: @(#) $Id: tkBind.c,v 1.45 2007/12/13 15:24:13 dgp Exp $
+ *  RCS: @(#) $Id: tkBind.c,v 1.45.2.2 2009/04/11 04:26:59 das Exp $
  */
 
 #include "tkInt.h"

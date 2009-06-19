@@ -1,3 +1,167 @@
+2009-04-15  Don Porter  <dgp@users.sourceforge.net>
+
+	*** 8.5.7 TAGGED FOR RELEASE ***
+
+	* changes:	Updated for 8.5.7 release.
+
+2009-04-14  Stuart Cassoff  <stwo@users.sourceforge.net>
+
+	* unix/tcl.m4:	Removed -Wno-implicit-int from CFLAGS_WARNING.
+
+2009-04-10  Don Porter  <dgp@users.sourceforge.net>
+
+	* changes:	Updated for 8.5.7 release.
+
+	* generic/tk.h:		Bump to 8.5.7 for release.
+	* library/tk.tcl:
+	* unix/configure.in:
+	* unix/tk.spec:
+	* win/configure.in:
+	* README:
+
+	* unix/configure:	autoconf-2.59
+	* win/configure:
+
+2009-04-10  Joe English  <jenglish@users.sourceforge.net
+
+	* library/palette.tcl(tk_setPalette): Don't set 
+	*selectColor: #b03060; this makes radio- and checkbuttons
+	look wrong post-TIP#109.
+
+2009-04-10  Daniel Steffen  <das@users.sourceforge.net>
+
+	* unix/configure.in (Darwin):	use Darwin SUSv3 extensions if
+					available.
+	* unix/configure:		autoconf-2.59
+	* unix/tkConfig.h.in:		autoheader-2.59
+
+	* library/msgbox.tcl: don't set msgbox bitmap background on TkAqua.
+
+	* library/demos/filebox.tcl: only show "Motif Style Dialog" checkbutton
+	on X11 windowingsystem.
+
+	* library/demos/widget: GOOBE: use ttk::cursor
+
+	* library/ttk/cursors.tcl: backport ttk::cursor from HEAD
+
+	* library/demos/knightstour.tcl: fix knightstour demo not running from
+	interactive wish.
+
+	* library/console.tcl (::tk::ConsoleInit): remove redundant TkAqua
+	Quit menu item.
+
+	* generic/tkPointer.c (Tk_UpdatePointer): use all 5 buttons.
+
+	* generic/tkMenu.c (PostProcessEntry): delay call to
+	TkpConfigureMenuEntry() until all menu entry attributes are setup.
+
+	* library/menu.tcl (::tk::MbPost): fix error thrown in y position
+	computation with indicatoron.
+
+	* generic/tkMenubutton.c: s/DEF_BUTTON_JUSTIFY/DEF_MENUBUTTON_JUSTIFY/
+
+	* generic/tkTextBTree.c (TkBTreeDeleteIndexRange): add bounds check
+	to startEnd array access (fixes testsuite crash).
+
+	* tests/unixFont.test: only use xlsfonts with X11 windowingsystem.
+
+2009-04-10  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkCanvPs.c (TkPostscriptInfo): [Bug 1466509]: Eliminate old
+	and misleading comments mentioning prolog.ps.
+	* generic/prolog.ps, library/prolog.ps: Remove unused files.
+	* unix/Makefile.in, win/Makefile.in: Stop building distributions that
+	include the removed files or trying to install them.
+
+	* library/tk.tcl: [Bug 2116837]: Add event definitions to handle the
+	standard virtual events when Caps Lock is on.
+
+2009-04-03  Joe English  <jenglish@users.sourceforge.net>
+
+	* unix/tkUnixWm.c: [Bug 1789819]: Don't Panic.
+
+2009-03-25  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/ttk/ttkTheme.c (BuildOptionMap, NewElementImpl):
+	[Bug 2178820]: Ensure that zero-size allocations don't happen; some
+	malloc implementations don't like it at all.
+
+	* win/wish.exe.manifest.in: [Bug 1871101]: Add magic to make Tk not be
+	blurred on Vista with large fonts.
+
+2009-03-03  Pat Thoyts  <patthoyts@users.sourceforge.net>
+
+	* generic/tkFileFilter.c: Backported some fixes for uninitialized
+	* generic/tkFont.c:       variables identified by das using clang
+	* generic/tkListbox.c:    analysis.
+
+2009-02-27  Pat Thoyts  <patthoyts@users.sourceforge.net>
+
+	* generic/tkWindow.c: [Bug 2645457] check for dead windows after
+	calling Tk_MakeWindowExist to avoid a crash when mapping dead windows.
+
+2009-02-23  Pat Thoyts  <patthoyts@users.sourceforge.net>
+
+	* win/tkWinCursor.c: [Patch 2542828] use stock Win32 help arrow
+	cursor when question_arrow requested (danckaert)
+
+	* win/rc/*.cur: [Patch 2513104] fix cursor hotspots (cjmcdonald)
+
+	* win/tkWinMenu.c: Applied patch for menu image display bug
+	[Bug 1329198, 456299] [Patch 2507419] (cjmcdonald)
+
+2009-02-17  Jeff Hobbs  <jeffh@ActiveState.com>
+
+	* win/tcl.m4, win/configure: Check if cl groks _WIN64 already to
+	avoid CC manipulation that can screw up later configure checks.
+	Use 'd'ebug runtime in 64-bit builds.
+
+2009-02-16  Jeff Hobbs  <jeffh@ActiveState.com>
+
+	* win/configure.in, win/configure: align better with tcl
+	version. Ensures finding correct CPP for Win64.
+
+2008-02-06  Daniel Steffen  <das@users.sourceforge.net>
+
+	* generic/tkImgPhoto.c:		fix numerous leaks discovered with the
+	* generic/tkMenu.c:		Mac OS X Instruments.app Leaks tool.
+	* generic/tkText.c:
+	* generic/tkTextImage.c:
+	* generic/tkTextIndex.c:
+	* generic/tkUndo.c:
+	* generic/ttk/ttkFrame.c:
+	* macosx/tkMacOSXWm.c:
+
+2009-01-22  Kevin B. Kenny  <kennykb@acm.org>
+
+	* unix/tcl.m4: Corrected a typo ($(SHLIB_VERSION) should be
+	${SHLIB_VERSION}).
+	* unix/configure: Autoconf 2.59
+	
+2009-01-19  Kevin B. Kenny  <kennykb@acm.org>
+
+	* unix/Makefile.in: Added a CONFIG_INSTALL_DIR parameter so that
+	* unix/tcl.m4:      distributors can control where tclConfig.sh goes.
+	Made the installation of 'ldAix' conditional
+	upon actually being on an AIX system.  Allowed for downstream
+	packagers to customize SHLIB_VERSION on BSD-derived systems.
+	Thanks to Stuart Cassoff for [Patch 907924].
+	* unix/configure: Autoconf 2.59
+	
+2009-01-14  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkImgPhoto.c: fix for aMSN compatibility [tcl-Bug 2507326]
+
+2009-01-11  George Peter Staplin  <georgeps@users.sourceforge.net>
+
+	* generic/tkEvent.c: Backport a fix from 8.6 for a NULL pointer
+	dereference in CreateXIC.
+
+2009-01-07  Pat Thoyts  <patthoyts@users.sourceforge.net>
+
+	* win/tkWinWm.c: Backported fix for [Bug 1847002] to prevent the
+	bypassing of grab restrictions via the taskbar on Windows.
+
 2008-12-22  Don Porter  <dgp@users.sourceforge.net>
 
 	*** 8.5.6 TAGGED FOR RELEASE ***
