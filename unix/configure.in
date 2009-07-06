@@ -3,7 +3,7 @@ dnl	This file is an input file used by the GNU "autoconf" program to
 dnl	generate the file "configure", which is run during Tk installation
 dnl	to configure the system for the local environment.
 #
-# RCS: @(#) $Id: configure.in,v 1.153.2.7 2008/12/21 21:02:58 dgp Exp $
+# RCS: @(#) $Id: configure.in,v 1.153.2.9 2009/04/10 18:13:06 dgp Exp $
 
 AC_INIT([tk],[8.5])
 AC_PREREQ(2.59)
@@ -27,7 +27,7 @@ m4_ifdef([SC_USE_CONFIG_HEADERS], [
 TK_VERSION=8.5
 TK_MAJOR_VERSION=8
 TK_MINOR_VERSION=5
-TK_PATCH_LEVEL=".6"
+TK_PATCH_LEVEL=".7"
 VERSION=${TK_VERSION}
 LOCALES="cs da de el en en_gb eo es fr hu it nl pl pt ru sv"
 
@@ -322,6 +322,45 @@ dnl 	    AC_TRY_LINK([#include <math.h>], [double f = sin(1.0);],
 dnl 		tcl_cv_ld_weak_l=yes, tcl_cv_ld_weak_l=no)
 dnl 	    LDFLAGS=$hold_ldflags])
 dnl     fi
+dnl     AC_CHECK_HEADERS(AvailabilityMacros.h)
+dnl     if test "$ac_cv_header_AvailabilityMacros_h" = yes; then
+dnl 	AC_CACHE_CHECK([if weak import is available], tcl_cv_cc_weak_import, [
+dnl 	    hold_cflags=$CFLAGS; CFLAGS="$CFLAGS -Werror"
+dnl 	    AC_TRY_LINK([
+dnl 		    #ifdef __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__
+dnl 		    #if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1020
+dnl 		    #error __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1020
+dnl 		    #endif
+dnl 		    #elif MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+dnl 		    #error MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+dnl 		    #endif
+dnl 		    int rand(void) __attribute__((weak_import));
+dnl 		], [rand();],
+dnl 		tcl_cv_cc_weak_import=yes, tcl_cv_cc_weak_import=no)
+dnl 	    CFLAGS=$hold_cflags])
+dnl 	if test $tcl_cv_cc_weak_import = yes; then
+dnl 	    AC_DEFINE(HAVE_WEAK_IMPORT, 1, [Is weak import available?])
+dnl 	fi
+dnl 	AC_CACHE_CHECK([if Darwin SUSv3 extensions are available],
+dnl 	    tcl_cv_cc_darwin_c_source, [
+dnl 	    hold_cflags=$CFLAGS; CFLAGS="$CFLAGS -Werror"
+dnl 	    AC_TRY_COMPILE([
+dnl 		    #ifdef __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__
+dnl 		    #if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1050
+dnl 		    #error __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1050
+dnl 		    #endif
+dnl 		    #elif MAC_OS_X_VERSION_MIN_REQUIRED < 1050
+dnl 		    #error MAC_OS_X_VERSION_MIN_REQUIRED < 1050
+dnl 		    #endif
+dnl 		    #define _DARWIN_C_SOURCE 1
+dnl 		    #include <sys/cdefs.h>
+dnl 		],,tcl_cv_cc_darwin_c_source=yes, tcl_cv_cc_darwin_c_source=no)
+dnl 	    CFLAGS=$hold_cflags])
+dnl 	if test $tcl_cv_cc_darwin_c_source = yes; then
+dnl 	    AC_DEFINE(_DARWIN_C_SOURCE, 1,
+dnl 		    [Are Darwin SUSv3 extensions available?])
+dnl 	fi
+dnl     fi
 dnl else
     tk_aqua=no
 dnl fi
@@ -575,12 +614,12 @@ WISH_RSRC_FILE='wish$(VERSION).rsrc'
 dnl if test "`uname -s`" = "Darwin" ; then
 dnl     SC_ENABLE_FRAMEWORK
 dnl     TK_SHLIB_LD_EXTRAS="-compatibility_version ${TK_VERSION} -current_version ${TK_VERSION}`echo ${TK_PATCH_LEVEL} | awk ['{match($0, "\\\.[0-9]+"); print substr($0,RSTART,RLENGTH)}']`"
-dnl     TK_SHLIB_LD_EXTRAS="${TK_SHLIB_LD_EXTRAS}"' -install_name ${DYLIB_INSTALL_DIR}/${TK_LIB_FILE} -unexported_symbols_list $$(f=$(TCL_STUB_LIB_FILE).E && nm -gjp $(TCL_BIN_DIR)/$(TCL_STUB_LIB_FILE) | grep ^_[[^_]] > $$f && echo $$f)'
+dnl     TK_SHLIB_LD_EXTRAS="${TK_SHLIB_LD_EXTRAS}"' -install_name "${DYLIB_INSTALL_DIR}"/${TK_LIB_FILE} -unexported_symbols_list $$(f=$(TCL_STUB_LIB_FILE).E && nm -gjp "$(TCL_BIN_DIR)"/$(TCL_STUB_LIB_FILE) | grep ^_[[^_]] > $$f && echo $$f)'
 dnl     echo "$LDFLAGS " | grep -q -- '-prebind ' && TK_SHLIB_LD_EXTRAS="${TK_SHLIB_LD_EXTRAS}"' -seg1addr 0xb000000'
 dnl     TK_SHLIB_LD_EXTRAS="${TK_SHLIB_LD_EXTRAS}"' -sectcreate __TEXT __info_plist Tk-Info.plist'
 dnl     EXTRA_WISH_LIBS='-sectcreate __TEXT __info_plist Wish-Info.plist'
-dnl     EXTRA_APP_CC_SWITCHES='-mdynamic-no-pic'
-dnl     tk_config_files="${tk_config_files} [Tk-Info.plist:../macosx/Tk-Info.plist.in Wish-Info.plist:../macosx/Wish-Info.plist.in]"
+dnl     EXTRA_APP_CC_SWITCHES="${EXTRA_APP_CC_SWITCHES}"' -mdynamic-no-pic'
+dnl     AC_CONFIG_FILES([Tk-Info.plist:../macosx/Tk-Info.plist.in Wish-Info.plist:../macosx/Wish-Info.plist.in])
 dnl     for l in ${LOCALES}; do CFBUNDLELOCALIZATIONS="${CFBUNDLELOCALIZATIONS}<string>$l</string>"; done
 dnl     TK_YEAR="`date +%Y`"
 dnl fi
@@ -631,7 +670,7 @@ if test "$FRAMEWORK_BUILD" = "1" ; then
     # needs to go into the Makefile even when using autoheader, so that we  
     # can pick up a potential make override of VERSION. Also, don't put this
     # into CFLAGS as it should not go into tkConfig.sh
-    EXTRA_CC_SWITCHES='-DTK_FRAMEWORK_VERSION=\"$(VERSION)\"'
+    EXTRA_CC_SWITCHES="$EXTRA_CC_SWITCHES"' -DTK_FRAMEWORK_VERSION=\"$(VERSION)\"'
 else
     # libdir must be a fully qualified path and not ${exec_prefix}/lib
     eval libdir="$libdir"

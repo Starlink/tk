@@ -17,7 +17,7 @@
  *	   Department of Computer Science,
  *	   Australian National University.
  *
- * RCS: @(#) $Id: tkImgPhoto.c,v 1.76.2.1 2008/11/19 00:37:35 nijtmans Exp $
+ * RCS: @(#) $Id: tkImgPhoto.c,v 1.76.2.3 2009/02/06 08:13:23 das Exp $
  */
 
 #include "tkInt.h"
@@ -478,6 +478,7 @@ PhotoFormatThreadExitProc(
     while (tsdPtr->formatList != NULL) {
 	freePtr = tsdPtr->formatList;
 	tsdPtr->formatList = tsdPtr->formatList->nextPtr;
+	ckfree((char *) freePtr->name);
 	ckfree((char *) freePtr);
     }
 }
@@ -543,6 +544,10 @@ Tk_CreatePhotoImageFormat(
 	copyPtr->nextPtr = tsdPtr->oldFormatList;
 	tsdPtr->oldFormatList = copyPtr;
     } else {
+	/* for compatibility with aMSN: make a copy of formatPtr->name */
+	char *name = ckalloc(strlen(formatPtr->name) + 1);
+	strcpy(name, formatPtr->name);
+	copyPtr->name = name;
 	copyPtr->nextPtr = tsdPtr->formatList;
 	tsdPtr->formatList = copyPtr;
     }
@@ -2461,6 +2466,8 @@ ImgPhotoGet(
 	    WhitePixelOfScreen(Tk_Screen(tkwin));
     gcValues.background = (black != NULL)? black->pixel:
 	    BlackPixelOfScreen(Tk_Screen(tkwin));
+    Tk_FreeColor(white);
+    Tk_FreeColor(black);
     gcValues.graphics_exposures = False;
     instancePtr->gc = Tk_GetGC(tkwin,
 	    GCForeground|GCBackground|GCGraphicsExposures, &gcValues);
