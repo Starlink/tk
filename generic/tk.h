@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tk.h,v 1.109.2.10 2008/12/21 21:02:58 dgp Exp $
+ * RCS: @(#) $Id: tk.h,v 1.109.2.11 2009/04/10 18:13:05 dgp Exp $
  */
 
 #ifndef _TK
@@ -50,15 +50,15 @@ extern "C" {
  * the version of Tcl that this release of Tk is compiled against.
  */
 
-#define TK_MAJOR_VERSION   8
+#define TK_MAJOR_VERSION	8
 #define TK_MINOR_VERSION	5
-#define TK_RELEASE_LEVEL   TCL_FINAL_RELEASE
+#define TK_RELEASE_LEVEL	TCL_FINAL_RELEASE
 #define TK_RELEASE_SERIAL	6
 
 #define TK_VERSION		"8.5"
 #define TK_PATCH_LEVEL		"8.5.6"
 
-/* 
+/*
  * A special definition used to allow this header file to be included from
  * windows or mac resource files so that they can obtain version information.
  * RC_INVOKED is defined by default by the windows RC tool and manually set
@@ -67,9 +67,9 @@ extern "C" {
  * Resource compilers don't like all the C stuff, like typedefs and procedure
  * declarations, that occur below, so block them out.
  */
-    
+
 #ifndef RC_INVOKED
-    
+
 #ifndef _XLIB_H
 #   if defined(MAC_OSX_TK)
 #	include <X11/Xlib.h>
@@ -86,7 +86,7 @@ extern "C" {
 # undef TCL_STORAGE_CLASS
 # define TCL_STORAGE_CLASS DLLEXPORT
 #endif
-
+
 /*
  * Decide whether or not to use input methods.
  */
@@ -156,7 +156,7 @@ typedef enum {
  */
 
 typedef struct Tk_OptionSpec {
-    Tk_OptionType type;		/* Type of option, such as TK_OPTION_COLOR; 
+    Tk_OptionType type;		/* Type of option, such as TK_OPTION_COLOR;
 				 * see definitions above. Last option in table
 				 * must have type TK_OPTION_END. */
     const char *optionName;	/* Name used to specify option in Tcl
@@ -183,7 +183,7 @@ typedef struct Tk_OptionSpec {
     int flags;			/* Any combination of the values defined
 				 * below. */
     ClientData clientData;	/* An alternate place to put option-specific
-    				 * data. Used for the monochrome default value
+				 * data. Used for the monochrome default value
 				 * for colors, etc. */
     int typeMask;		/* An arbitrary bit mask defined by the class
 				 * manager; typically bits correspond to
@@ -195,7 +195,7 @@ typedef struct Tk_OptionSpec {
 } Tk_OptionSpec;
 
 /*
- * Flag values for Tk_OptionSpec structures.  These flags are shared by
+ * Flag values for Tk_OptionSpec structures. These flags are shared by
  * Tk_ConfigSpec structures, so be sure to coordinate any changes carefully.
  */
 
@@ -217,7 +217,7 @@ typedef void (Tk_CustomOptionRestoreProc) _ANSI_ARGS_((ClientData clientData,
 	Tk_Window tkwin, char *internalPtr, char *saveInternalPtr));
 typedef void (Tk_CustomOptionFreeProc) _ANSI_ARGS_((ClientData clientData,
 	Tk_Window tkwin, char *internalPtr));
-    
+
 typedef struct Tk_ObjCustomOption {
     const char *name; /* Name of the custom option. */
     Tk_CustomOptionSetProc *setProc;
@@ -225,18 +225,17 @@ typedef struct Tk_ObjCustomOption {
 				 * value from a Tcl_Obj */
     Tk_CustomOptionGetProc *getProc;
 				/* Function to use to get a Tcl_Obj
-					 * representation from an internal
-					 * representation of an option. */
+				 * representation from an internal
+				 * representation of an option. */
     Tk_CustomOptionRestoreProc *restoreProc;
 				/* Function to use to restore a saved value
 				 * for the internal representation. */
     Tk_CustomOptionFreeProc *freeProc;
 				/* Function to use to free the internal
-					 * representation of an option. */
+				 * representation of an option. */
     ClientData clientData;	/* Arbitrary one-word value passed to the
 				 * handling procs. */
 } Tk_ObjCustomOption;
-
 
 /*
  * Macro to use to fill in "offset" fields of the Tk_OptionSpec structure.
@@ -289,7 +288,7 @@ typedef struct Tk_SavedOptions {
 				 * restore certain options. */
     int numItems;		/* The number of valid items in items field. */
     Tk_SavedOption items[TK_NUM_SAVED_OPTIONS];
-					/* Items used to hold old values. */
+				/* Items used to hold old values. */
     struct Tk_SavedOptions *nextPtr;
 				/* Points to next structure in list; needed if
 				 * too many options changed to hold all the
@@ -331,7 +330,7 @@ typedef struct Tk_CustomOption {
 } Tk_CustomOption;
 
 /*
- * Structure used to specify information for Tk_ConfigureWidget.  Each
+ * Structure used to specify information for Tk_ConfigureWidget. Each
  * structure gives complete information for one option, including how the
  * option is specified on the command line, where it appears in the option
  * database, etc.
@@ -355,7 +354,7 @@ typedef struct Tk_ConfigSpec {
 				 * tkConfig.c. */
     Tk_CustomOption *customPtr;	/* If type is TK_CONFIG_CUSTOM then this is a
 				 * pointer to info about how to parse and
-				 * print the option.  Otherwise it is
+				 * print the option. Otherwise it is
 				 * irrelevant. */
 } Tk_ConfigSpec;
 
@@ -367,10 +366,10 @@ typedef struct Tk_ConfigSpec {
 typedef enum {
     TK_CONFIG_BOOLEAN, TK_CONFIG_INT, TK_CONFIG_DOUBLE, TK_CONFIG_STRING,
     TK_CONFIG_UID, TK_CONFIG_COLOR, TK_CONFIG_FONT, TK_CONFIG_BITMAP,
-    TK_CONFIG_BORDER, TK_CONFIG_RELIEF, TK_CONFIG_CURSOR, 
-    TK_CONFIG_ACTIVE_CURSOR, TK_CONFIG_JUSTIFY, TK_CONFIG_ANCHOR, 
+    TK_CONFIG_BORDER, TK_CONFIG_RELIEF, TK_CONFIG_CURSOR,
+    TK_CONFIG_ACTIVE_CURSOR, TK_CONFIG_JUSTIFY, TK_CONFIG_ANCHOR,
     TK_CONFIG_SYNONYM, TK_CONFIG_CAP_STYLE, TK_CONFIG_JOIN_STYLE,
-    TK_CONFIG_PIXELS, TK_CONFIG_MM, TK_CONFIG_WINDOW, TK_CONFIG_CUSTOM, 
+    TK_CONFIG_PIXELS, TK_CONFIG_MM, TK_CONFIG_WINDOW, TK_CONFIG_CUSTOM,
     TK_CONFIG_END
 } Tk_ConfigTypes;
 
@@ -401,13 +400,13 @@ typedef enum {
  */
 
 typedef struct {
-    char *key;		/* The key string that flags the option in the
-			 * argv array. */
-    int type;		/* Indicates option type;  see below. */
-    char *src;		/* Value to be used in setting dst;  usage
-			 * depends on type. */
-    char *dst;		/* Address of value to be modified;  usage
-			 * depends on type. */
+    char *key;			/* The key string that flags the option in the
+				 * argv array. */
+    int type;			/* Indicates option type; see below. */
+    char *src;			/* Value to be used in setting dst; usage
+				 * depends on type. */
+    char *dst;			/* Address of value to be modified; usage
+				 * depends on type. */
     char *help;			/* Documentation message describing this
 				 * option. */
 } Tk_ArgvInfo;
@@ -508,7 +507,7 @@ typedef enum {
 
 /*
  * The following structure is used by Tk_GetFontMetrics() to return
- * information about the properties of a Tk_Font.  
+ * information about the properties of a Tk_Font.
  */
 
 typedef struct Tk_FontMetrics {
@@ -627,16 +626,16 @@ typedef struct Tk_GeomMgr {
  *
  *---------------------------------------------------------------------------
  */
-#define VirtualEvent       (MappingNotify + 1)
-#define ActivateNotify     (MappingNotify + 2)
+
+#define VirtualEvent	    (MappingNotify + 1)
+#define ActivateNotify	    (MappingNotify + 2)
 #define DeactivateNotify    (MappingNotify + 3)
 #define MouseWheelEvent     (MappingNotify + 4)
-#define TK_LASTEVENT       (MappingNotify + 5)
+#define TK_LASTEVENT	    (MappingNotify + 5)
 
 #define MouseWheelMask	    (1L << 28)
-#define ActivateMask       (1L << 29)
+#define ActivateMask	    (1L << 29)
 #define VirtualEventMask    (1L << 30)
-
 
 /*
  * A virtual event shares most of its fields with the XKeyEvent and
@@ -656,7 +655,7 @@ typedef struct {
     Bool send_event;		/* True if this came from a SendEvent
 				 * request. */
     Display *display;		/* Display the event was read from. */
-    Window event;	    /* Window on which event was requested. */
+    Window event;		/* Window on which event was requested. */
     Window root;		/* Root window that the event occured on. */
     Window subwindow;		/* Child window. */
     Time time;			/* Milliseconds. */
@@ -664,7 +663,7 @@ typedef struct {
 				 * window. */
     int x_root, y_root;		/* Coordinates relative to root. */
     unsigned int state;		/* Key or button mask */
-    Tk_Uid name;	    /* Name of virtual event. */
+    Tk_Uid name;		/* Name of virtual event. */
     Bool same_screen;		/* Same screen flag. */
     Tcl_Obj *user_data;		/* Application-specific data reference; Tk
 				 * will decrement the reference count *once*
@@ -678,7 +677,7 @@ typedef struct {
     Bool send_event;		/* True if this came from a SendEvent
 				 * request. */
     Display *display;		/* Display the event was read from. */
-    Window window;	    /* Window in which event occurred. */
+    Window window;		/* Window in which event occurred. */
 } XActivateDeactivateEvent;
 typedef XActivateDeactivateEvent XActivateEvent;
 typedef XActivateDeactivateEvent XDeactivateEvent;
@@ -692,23 +691,23 @@ typedef XActivateDeactivateEvent XDeactivateEvent;
  *--------------------------------------------------------------
  */
 
-#define Tk_Display(tkwin)		(((Tk_FakeWin *) (tkwin))->display)
-#define Tk_ScreenNumber(tkwin)		(((Tk_FakeWin *) (tkwin))->screenNum)
+#define Tk_Display(tkwin)	(((Tk_FakeWin *) (tkwin))->display)
+#define Tk_ScreenNumber(tkwin)	(((Tk_FakeWin *) (tkwin))->screenNum)
 #define Tk_Screen(tkwin) \
     (ScreenOfDisplay(Tk_Display(tkwin), Tk_ScreenNumber(tkwin)))
-#define Tk_Depth(tkwin)			(((Tk_FakeWin *) (tkwin))->depth)
-#define Tk_Visual(tkwin)		(((Tk_FakeWin *) (tkwin))->visual)
-#define Tk_WindowId(tkwin)		(((Tk_FakeWin *) (tkwin))->window)
-#define Tk_PathName(tkwin) 		(((Tk_FakeWin *) (tkwin))->pathName)
-#define Tk_Name(tkwin)			(((Tk_FakeWin *) (tkwin))->nameUid)
-#define Tk_Class(tkwin) 		(((Tk_FakeWin *) (tkwin))->classUid)
-#define Tk_X(tkwin)			(((Tk_FakeWin *) (tkwin))->changes.x)
-#define Tk_Y(tkwin)			(((Tk_FakeWin *) (tkwin))->changes.y)
-#define Tk_Width(tkwin)			(((Tk_FakeWin *) (tkwin))->changes.width)
+#define Tk_Depth(tkwin)		(((Tk_FakeWin *) (tkwin))->depth)
+#define Tk_Visual(tkwin)	(((Tk_FakeWin *) (tkwin))->visual)
+#define Tk_WindowId(tkwin)	(((Tk_FakeWin *) (tkwin))->window)
+#define Tk_PathName(tkwin) 	(((Tk_FakeWin *) (tkwin))->pathName)
+#define Tk_Name(tkwin)		(((Tk_FakeWin *) (tkwin))->nameUid)
+#define Tk_Class(tkwin) 	(((Tk_FakeWin *) (tkwin))->classUid)
+#define Tk_X(tkwin)		(((Tk_FakeWin *) (tkwin))->changes.x)
+#define Tk_Y(tkwin)		(((Tk_FakeWin *) (tkwin))->changes.y)
+#define Tk_Width(tkwin)		(((Tk_FakeWin *) (tkwin))->changes.width)
 #define Tk_Height(tkwin) \
     (((Tk_FakeWin *) (tkwin))->changes.height)
-#define Tk_Changes(tkwin)		(&((Tk_FakeWin *) (tkwin))->changes)
-#define Tk_Attributes(tkwin)		(&((Tk_FakeWin *) (tkwin))->atts)
+#define Tk_Changes(tkwin)	(&((Tk_FakeWin *) (tkwin))->changes)
+#define Tk_Attributes(tkwin)	(&((Tk_FakeWin *) (tkwin))->atts)
 #define Tk_IsEmbedded(tkwin) \
     (((Tk_FakeWin *) (tkwin))->flags & TK_EMBEDDED)
 #define Tk_IsContainer(tkwin) \
@@ -725,8 +724,8 @@ typedef XActivateDeactivateEvent XDeactivateEvent;
     (((Tk_FakeWin *) (tkwin))->flags & TK_TOP_HIERARCHY)
 #define Tk_IsManageable(tkwin) \
     (((Tk_FakeWin *) (tkwin))->flags & TK_WM_MANAGEABLE)
-#define Tk_ReqWidth(tkwin)		(((Tk_FakeWin *) (tkwin))->reqWidth)
-#define Tk_ReqHeight(tkwin)		(((Tk_FakeWin *) (tkwin))->reqHeight)
+#define Tk_ReqWidth(tkwin)	(((Tk_FakeWin *) (tkwin))->reqWidth)
+#define Tk_ReqHeight(tkwin)	(((Tk_FakeWin *) (tkwin))->reqHeight)
 /* Tk_InternalBorderWidth is deprecated */
 #define Tk_InternalBorderWidth(tkwin) \
     (((Tk_FakeWin *) (tkwin))->internalBorderLeft)
@@ -738,10 +737,10 @@ typedef XActivateDeactivateEvent XDeactivateEvent;
     (((Tk_FakeWin *) (tkwin))->internalBorderTop)
 #define Tk_InternalBorderBottom(tkwin) \
     (((Tk_FakeWin *) (tkwin))->internalBorderBottom)
-#define Tk_MinReqWidth(tkwin)		(((Tk_FakeWin *) (tkwin))->minReqWidth)
-#define Tk_MinReqHeight(tkwin)		(((Tk_FakeWin *) (tkwin))->minReqHeight)
-#define Tk_Parent(tkwin)		(((Tk_FakeWin *) (tkwin))->parentPtr)
-#define Tk_Colormap(tkwin)		(((Tk_FakeWin *) (tkwin))->atts.colormap)
+#define Tk_MinReqWidth(tkwin)	(((Tk_FakeWin *) (tkwin))->minReqWidth)
+#define Tk_MinReqHeight(tkwin)	(((Tk_FakeWin *) (tkwin))->minReqHeight)
+#define Tk_Parent(tkwin)	(((Tk_FakeWin *) (tkwin))->parentPtr)
+#define Tk_Colormap(tkwin)	(((Tk_FakeWin *) (tkwin))->atts.colormap)
 
 /*
  * The structure below is needed by the macros above so that they can access
@@ -805,7 +804,7 @@ typedef struct Tk_FakeWin {
  * TK_ALREADY_DEAD:		1 means the window is in the process of
  *				being destroyed already.
  * TK_NEED_CONFIG_NOTIFY:	1 means that the window has been reconfigured
- *				before it was made to exist.  At the time of
+ *				before it was made to exist. At the time of
  *				making it exist a ConfigureNotify event needs
  *				to be generated.
  * TK_GRAB_FLAG:		Used to manage grabs. See tkGrab.c for details
@@ -864,7 +863,6 @@ typedef struct Tk_FakeWin {
  *				into a toplevel using [wm manage].
  */
 
-
 #define TK_MAPPED		1
 #define TK_TOP_LEVEL		2
 #define TK_ALREADY_DEAD		4
@@ -917,7 +915,7 @@ typedef struct Tk_SmoothMethod {
 
 #define TK_TAG_SPACE 3
 
-typedef struct Tk_Item  {
+typedef struct Tk_Item {
     int id;			/* Unique identifier for this item (also
 				 * serves as first tag for item). */
     struct Tk_Item *nextPtr;	/* Next in display list of all items in this
@@ -943,8 +941,8 @@ typedef struct Tk_Item  {
 				 * this canvas. Later items in list are drawn
 				 * just below earlier ones. */
     Tk_State state;		/* State of item. */
-    char *reserved1;			/* reserved for future use */
-
+    char *reserved1;		/* reserved for future use */
+    int redraw_flags;		/* Some flags used in the canvas */
 
     /*
      *------------------------------------------------------------------
@@ -1060,7 +1058,7 @@ typedef struct Tk_ItemType {
     Tk_ItemScaleProc *scaleProc;/* Procedure to rescale items of this type. */
     Tk_ItemTranslateProc *translateProc;
 				/* Procedure to translate items of this
-					 * type. */
+				 * type. */
     Tk_ItemIndexProc *indexProc;/* Procedure to determine index of indicated
 				 * character. NULL if item doesn't support
 				 * indexing. */
@@ -1075,11 +1073,11 @@ typedef struct Tk_ItemType {
 				 * item. */
     Tk_ItemDCharsProc *dCharsProc;
 				/* Procedure to delete characters from an
-					 * item. */
+				 * item. */
     struct Tk_ItemType *nextPtr;/* Used to link types together into a list. */
-    char *reserved1;			/* Reserved for future extension. */
-    int   reserved2;			/* Carefully compatible with */
-    char *reserved3;			/* Jan Nijtmans dash patch */
+    char *reserved1;		/* Reserved for future extension. */
+    int reserved2;		/* Carefully compatible with */
+    char *reserved3;		/* Jan Nijtmans dash patch */
     char *reserved4;
 } Tk_ItemType;
 
@@ -1095,19 +1093,19 @@ typedef struct Tk_ItemType {
 
 typedef struct Tk_CanvasTextInfo {
     Tk_3DBorder selBorder;	/* Border and background for selected
-				 * characters.  Read-only to items.*/
+				 * characters. Read-only to items.*/
     int selBorderWidth;		/* Width of border around selection. Read-only
 				 * to items. */
     XColor *selFgColorPtr;	/* Foreground color for selected text.
 				 * Read-only to items. */
-    Tk_Item *selItemPtr;	/* Pointer to selected item.  NULL means
+    Tk_Item *selItemPtr;	/* Pointer to selected item. NULL means
 				 * selection isn't in this canvas. Writable by
 				 * items. */
     int selectFirst;		/* Character index of first selected
-				 * character.  Writable by items. */
+				 * character. Writable by items. */
     int selectLast;		/* Character index of last selected character.
 				 * Writable by items. */
-
+    Tk_Item *anchorItemPtr;	/* Item corresponding to "selectAnchor": not
 				 * necessarily selItemPtr. Read-only to
 				 * items. */
     int selectAnchor;		/* Character index of fixed end of selection
@@ -1115,15 +1113,15 @@ typedef struct Tk_CanvasTextInfo {
 				 * as one end of the selection). Writable by
 				 * items. */
     Tk_3DBorder insertBorder;	/* Used to draw vertical bar for insertion
-				 * cursor.  Read-only to items. */
-    int insertWidth;		/* Total width of insertion cursor.  Read-only
+				 * cursor. Read-only to items. */
+    int insertWidth;		/* Total width of insertion cursor. Read-only
 				 * to items. */
     int insertBorderWidth;	/* Width of 3-D border around insert cursor.
 				 * Read-only to items. */
     Tk_Item *focusItemPtr;	/* Item that currently has the input focus, or
 				 * NULL if no such item. Read-only to items. */
     int gotFocus;		/* Non-zero means that the canvas widget has
-				 * the input focus.  Read-only to items.*/
+				 * the input focus. Read-only to items.*/
     int cursorOn;		/* Non-zero means that an insertion cursor
 				 * should be displayed in focusItemPtr.
 				 * Read-only to items.*/
@@ -1182,7 +1180,7 @@ typedef struct Tk_Outline {
     Pixmap disabledStipple;	/* Outline Stipple pattern if state is
 				 * disabled. */
 } Tk_Outline;
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -1247,7 +1245,7 @@ struct Tk_ImageType {
 				 * output for the image. */
     struct Tk_ImageType *nextPtr;
 				/* Next in list of all image types currently
-				 * known.  Filled in by Tk, not by image
+				 * known. Filled in by Tk, not by image
 				 * manager. */
     char *reserved;		/* reserved for future expansion */
 };
@@ -1273,13 +1271,13 @@ typedef void *Tk_PhotoHandle;
 
 typedef struct Tk_PhotoImageBlock {
     unsigned char *pixelPtr;	/* Pointer to the first pixel. */
-    int		width;		/* Width of block, in pixels. */
-    int		height;		/* Height of block, in pixels. */
-    int		pitch;		/* Address difference between corresponding
+    int width;			/* Width of block, in pixels. */
+    int height;			/* Height of block, in pixels. */
+    int pitch;			/* Address difference between corresponding
 				 * pixels in successive lines. */
-    int		pixelSize;	/* Address difference between successive
+    int pixelSize;		/* Address difference between successive
 				 * pixels in the same line. */
-    int		offset[4];	/* Address differences between the red, green,
+    int offset[4];		/* Address differences between the red, green,
 				 * blue and alpha components of the pixel and
 				 * the pixel as a whole. */
 } Tk_PhotoImageBlock;
@@ -1372,7 +1370,7 @@ struct Tk_PhotoImageFormat {
 #define Tk_CreateImageType Tk_CreateOldImageType
 #define Tk_CreatePhotoImageFormat Tk_CreateOldPhotoImageFormat
 #endif
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -1384,6 +1382,7 @@ struct Tk_PhotoImageFormat {
 /*
  * Style support version tag.
  */
+
 #define TK_STYLE_VERSION_1      0x1
 #define TK_STYLE_VERSION        TK_STYLE_VERSION_1
 
@@ -1527,7 +1526,6 @@ typedef Tk_RestrictAction (Tk_RestrictProc) _ANSI_ARGS_((
 typedef int (Tk_SelectionProc) _ANSI_ARGS_((ClientData clientData,
 	int offset, char *buffer, int maxBytes));
 
-
 /*
  *--------------------------------------------------------------
  *
@@ -1542,7 +1540,7 @@ typedef int (Tk_SelectionProc) _ANSI_ARGS_((ClientData clientData,
  * Allow users to say that they don't want to alter their source to add extra
  * arguments to Tk_PhotoPutBlock() et al; DO NOT DEFINE THIS WHEN BUILDING TK.
  *
-
+ * This goes after the inclusion of the stubbed-decls so that the declarations
  * of what is actually there can be correct.
  */
 
@@ -1583,7 +1581,6 @@ typedef int (Tk_SelectionProc) _ANSI_ARGS_((ClientData clientData,
  * Tcl commands exported by Tk:
  */
 
-
 #undef TCL_STORAGE_CLASS
 #define TCL_STORAGE_CLASS DLLIMPORT
 
@@ -1592,11 +1589,11 @@ typedef int (Tk_SelectionProc) _ANSI_ARGS_((ClientData clientData,
 /*
  * end block for C++
  */
-    
+
 #ifdef __cplusplus
 }
 #endif
-    
+
 #endif /* _TK */
 
 /*
