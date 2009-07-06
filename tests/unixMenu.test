@@ -7,13 +7,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: unixMenu.test,v 1.7 2002/07/13 20:28:36 dgp Exp $
+# RCS: @(#) $Id: unixMenu.test,v 1.10 2007/05/09 12:52:44 das Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 test unixMenu-1.1 {TkpNewMenu - normal menu} unix {
@@ -306,7 +303,7 @@ test unixMenu-17.1 {GetMenuSeparatorGeometry} unix {
     list [catch {tk::TearOffMenu .m1 40 40}] [destroy .m1]
 } {0 {}}
 
-test unixMenu-18.1 {GetTearoffEntryGeometry} unix {
+test unixMenu-18.1 {GetTearoffEntryGeometry} {unix nonUnixUserInteraction} {
     catch {destroy .m1}
     menubutton .mb -text "test" -menu .mb.m
     menu .mb.m
@@ -556,7 +553,7 @@ test unixMenu-20.1 {DrawTearoffEntry - menubar} unix {
     . configure -menu .m1
     list [catch {update} msg] $msg [. configure -menu ""] [destroy .m1]
 } {0 {} {} {}}
-test unixMenu-20.2 {DrawTearoffEntry - non-menubar} unix {
+test unixMenu-20.2 {DrawTearoffEntry - non-menubar} {unix nonUnixUserInteraction} {
     catch {destroy .m1}
     menu .m1
     .m1 add command -label foo
@@ -822,7 +819,7 @@ test unixMenu-25.4 {TkpComputeStandardMenuGeometry - separator} unix {
     .m1 add separator
     list [update idletasks] [destroy .m1]
 } {{} {}}
-test unixMenu-25.5 {TkpComputeStandardMenuGeometry - tearoff entry} {unixOnly} {
+test unixMenu-25.5 {TkpComputeStandardMenuGeometry - tearoff entry} {unix nonUnixUserInteraction} {
     catch {destroy .m1}
     menubutton .mb -text "test" -menu .mb.m
     menu .mb.m
@@ -895,7 +892,7 @@ test unixMenu-25.14 {TkpComputeStandardMenuGeometry - second indicator less or e
     .m1 invoke 2
     list [update idletasks] [destroy .m1] [image delete image1]
 } {{} {} {}}
-test unixMenu-25.15 {TkpComputeStandardMenuGeometry - second indicator larger } {unixOnly testImageType} {
+test unixMenu-25.15 {TkpComputeStandardMenuGeometry - second indicator larger } {unix testImageType} {
     catch {destroy .m1}
     catch {image delete image1}
     image create test image1
@@ -949,5 +946,5 @@ test unixMenu-26.1 {TkpMenuInit - nothing to do} {} {}
 
 # cleanup
 deleteWindows
-::tcltest::cleanupTests
+cleanupTests
 return

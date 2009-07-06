@@ -1,61 +1,60 @@
-/* 
+/*
  * tkWinWindow.c --
  *
- *	Xlib emulation routines for Windows related to creating,
- *	displaying and destroying windows.
+ *	Xlib emulation routines for Windows related to creating, displaying
+ *	and destroying windows.
  *
  * Copyright (c) 1995-1997 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinWindow.c,v 1.10 2002/06/14 22:25:12 jenglish Exp $
+ * RCS: @(#) $Id: tkWinWindow.c,v 1.15.4.1 2008/07/26 11:49:30 patthoyts Exp $
  */
 
 #include "tkWinInt.h"
 
 typedef struct ThreadSpecificData {
-    int initialized;            /* 0 means table below needs initializing. */
-    Tcl_HashTable windowTable;  /* The windowTable maps from HWND to 
-				 * Tk_Window handles. */
+    int initialized;		/* 0 means table below needs initializing. */
+    Tcl_HashTable windowTable;  /* The windowTable maps from HWND to Tk_Window
+				 * handles. */
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
 
 /*
- * Forward declarations for procedures defined in this file:
+ * Forward declarations for functions defined in this file:
  */
 
-static void		NotifyVisibility _ANSI_ARGS_((XEvent *eventPtr,
-			    TkWindow *winPtr));
+static void		NotifyVisibility(XEvent *eventPtr, TkWindow *winPtr);
 
 /*
  *----------------------------------------------------------------------
  *
  * Tk_AttachHWND --
  *
- *	This function binds an HWND and a reflection procedure to
- *	the specified Tk_Window. 
+ *	This function binds an HWND and a reflection function to the specified
+ *	Tk_Window.
  *
  * Results:
  *	Returns an X Window that encapsulates the HWND.
  *
  * Side effects:
- *	May allocate a new X Window.  Also enters the HWND into the
- *	global window table.
+ *	May allocate a new X Window. Also enters the HWND into the global
+ *	window table.
  *
  *----------------------------------------------------------------------
  */
 
 Window
-Tk_AttachHWND(tkwin, hwnd)
-    Tk_Window tkwin;
-    HWND hwnd;
+Tk_AttachHWND(
+    Tk_Window tkwin,
+    HWND hwnd)
 {
     int new;
     Tcl_HashEntry *entryPtr;
     TkWinDrawable *twdPtr = (TkWinDrawable *) Tk_WindowId(tkwin);
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
 	Tcl_InitHashTable(&tsdPtr->windowTable, TCL_ONE_WORD_KEYS);
@@ -63,12 +62,12 @@ Tk_AttachHWND(tkwin, hwnd)
     }
 
     /*
-     * Allocate a new drawable if necessary.  Otherwise, remove the
-     * previous HWND from from the window table.
+     * Allocate a new drawable if necessary. Otherwise, remove the previous
+     * HWND from from the window table.
      */
 
     if (twdPtr == NULL) {
-	twdPtr = (TkWinDrawable*) ckalloc(sizeof(TkWinDrawable));
+	twdPtr = (TkWinDrawable *) ckalloc(sizeof(TkWinDrawable));
 	twdPtr->type = TWD_WINDOW;
 	twdPtr->window.winPtr = (TkWindow *) tkwin;
     } else if (twdPtr->window.handle != NULL) {
@@ -93,8 +92,8 @@ Tk_AttachHWND(tkwin, hwnd)
  *
  * Tk_HWNDToWindow --
  *
- *	This function retrieves a Tk_Window from the window table
- *	given an HWND.
+ *	This function retrieves a Tk_Window from the window table given an
+ *	HWND.
  *
  * Results:
  *	Returns the matching Tk_Window.
@@ -106,18 +105,18 @@ Tk_AttachHWND(tkwin, hwnd)
  */
 
 Tk_Window
-Tk_HWNDToWindow(hwnd)
-    HWND hwnd;
+Tk_HWNDToWindow(
+    HWND hwnd)
 {
     Tcl_HashEntry *entryPtr;
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
 	Tcl_InitHashTable(&tsdPtr->windowTable, TCL_ONE_WORD_KEYS);
 	tsdPtr->initialized = 1;
     }
-    entryPtr = Tcl_FindHashEntry(&tsdPtr->windowTable, (char*)hwnd);
+    entryPtr = Tcl_FindHashEntry(&tsdPtr->windowTable, (char *) hwnd);
     if (entryPtr != NULL) {
 	return (Tk_Window) Tcl_GetHashValue(entryPtr);
     }
@@ -141,8 +140,8 @@ Tk_HWNDToWindow(hwnd)
  */
 
 HWND
-Tk_GetHWND(window)
-    Window window;
+Tk_GetHWND(
+    Window window)
 {
     return ((TkWinDrawable *) window)->window.handle;
 }
@@ -152,9 +151,8 @@ Tk_GetHWND(window)
  *
  * TkpPrintWindowId --
  *
- *	This routine stores the string representation of the
- *	platform dependent window handle for an X Window in the
- *	given buffer.
+ *	This routine stores the string representation of the platform
+ *	dependent window handle for an X Window in the given buffer.
  *
  * Results:
  *	Returns the result in the specified buffer.
@@ -166,17 +164,22 @@ Tk_GetHWND(window)
  */
 
 void
-TkpPrintWindowId(buf, window)
-    char *buf;			/* Pointer to string large enough to hold
-				 * the hex representation of a pointer. */
-    Window window;		/* Window to be printed into buffer. */
+TkpPrintWindowId(
+    char *buf,			/* Pointer to string large enough to hold the
+				 * hex representation of a pointer. */
+    Window window)		/* Window to be printed into buffer. */
 {
     HWND hwnd = (window) ? Tk_GetHWND(window) : 0;
+
     /*
-     * Use pointer representation, because Win64 is P64 (*not* LP64).
-     * Windows doesn't print the 0x for %p, so we do it.
+     * Use pointer representation, because Win64 is P64 (*not* LP64). Windows
+     * doesn't print the 0x for %p, so we do it.
+     * bug #2026405: cygwin does output 0x for %p so test and recover.
      */
+
     sprintf(buf, "0x%p", hwnd);
+    if (buf[2] == '0' && buf[3] == 'x')
+	sprintf(buf, "%p", hwnd);
 }
 
 /*
@@ -184,16 +187,15 @@ TkpPrintWindowId(buf, window)
  *
  * TkpScanWindowId --
  *
- *	Given a string which represents the platform dependent window
- *	handle, produce the X Window id for the window.
+ *	Given a string which represents the platform dependent window handle,
+ *	produce the X Window id for the window.
  *
  * Results:
- *	The return value is normally TCL_OK;  in this case *idPtr
- *	will be set to the X Window id equivalent to string.  If
- *	string is improperly formed then TCL_ERROR is returned and
- *	an error message will be left in the interp's result.  If the
- *	number does not correspond to a Tk Window, then *idPtr will
- *	be set to None.
+ *	The return value is normally TCL_OK; in this case *idPtr will be set
+ *	to the X Window id equivalent to string. If string is improperly
+ *	formed then TCL_ERROR is returned and an error message will be left in
+ *	the interp's result. If the number does not correspond to a Tk Window,
+ *	then *idPtr will be set to None.
  *
  * Side effects:
  *	None.
@@ -202,28 +204,29 @@ TkpPrintWindowId(buf, window)
  */
 
 int
-TkpScanWindowId(interp, string, idPtr)
-    Tcl_Interp *interp;		/* Interpreter to use for error reporting. */
-    CONST char *string;		/* String containing a (possibly signed)
+TkpScanWindowId(
+    Tcl_Interp *interp,		/* Interpreter to use for error reporting. */
+    CONST char *string,		/* String containing a (possibly signed)
 				 * integer in a form acceptable to strtol. */
-    Window *idPtr;		/* Place to store converted result. */
+    Window *idPtr)		/* Place to store converted result. */
 {
     Tk_Window tkwin;
-    Window number;
+    Window number, *numberPtr = &number;
 
     /*
-     * We want sscanf for the 64-bit check, but if that doesn't work,
-     * then Tcl_GetInt manages the error correctly.
+     * We want sscanf for the 64-bit check, but if that doesn't work, then
+     * Tcl_GetInt manages the error correctly.
      */
+
     if (
 #ifdef _WIN64
-	(sscanf(string, "0x%p", &number) != 1) &&
+	    (sscanf(string, "0x%p", &number) != 1) &&
 #endif
-	Tcl_GetInt(interp, string, (int *)&number) != TCL_OK) {
+	    Tcl_GetInt(interp, string, (int *) numberPtr) != TCL_OK) {
 	return TCL_ERROR;
     }
 
-    tkwin = Tk_HWNDToWindow((HWND)number);
+    tkwin = Tk_HWNDToWindow((HWND) number);
     if (tkwin) {
 	*idPtr = Tk_WindowId(tkwin);
     } else {
@@ -237,8 +240,8 @@ TkpScanWindowId(interp, string, idPtr)
  *
  * TkpMakeWindow --
  *
- *	Creates a Windows window object based on the current attributes
- *	of the specified TkWindow.
+ *	Creates a Windows window object based on the current attributes of the
+ *	specified TkWindow.
  *
  * Results:
  *	Returns a pointer to a new TkWinDrawable cast to a Window.
@@ -250,14 +253,14 @@ TkpScanWindowId(interp, string, idPtr)
  */
 
 Window
-TkpMakeWindow(winPtr, parent)
-    TkWindow *winPtr;
-    Window parent;
+TkpMakeWindow(
+    TkWindow *winPtr,
+    Window parent)
 {
     HWND parentWin;
     int style;
     HWND hwnd;
-    
+
     if (parent != None) {
 	parentWin = Tk_GetHWND(parent);
 	style = WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
@@ -267,15 +270,15 @@ TkpMakeWindow(winPtr, parent)
     }
 
     /*
-     * Create the window, then ensure that it is at the top of the
-     * stacking order.
+     * Create the window, then ensure that it is at the top of the stacking
+     * order.
      */
 
     hwnd = CreateWindowEx(WS_EX_NOPARENTNOTIFY, TK_WIN_CHILD_CLASS_NAME, NULL,
-	    style, Tk_X(winPtr), Tk_Y(winPtr), Tk_Width(winPtr),
+	    (DWORD) style, Tk_X(winPtr), Tk_Y(winPtr), Tk_Width(winPtr),
 	    Tk_Height(winPtr), parentWin, NULL, Tk_GetHINSTANCE(), NULL);
     SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
-		    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+	    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
     return Tk_AttachHWND((Tk_Window)winPtr, hwnd);
 }
 
@@ -290,29 +293,29 @@ TkpMakeWindow(winPtr, parent)
  *	None.
  *
  * Side effects:
- *	Sends the WM_DESTROY message to the window and then destroys
- *	it the Win32 resources associated with the window.
+ *	Sends the WM_DESTROY message to the window and then destroys it the
+ *	Win32 resources associated with the window.
  *
  *----------------------------------------------------------------------
  */
 
 void
-XDestroyWindow(display, w)
-    Display* display;
-    Window w;
+XDestroyWindow(
+    Display *display,
+    Window w)
 {
     Tcl_HashEntry *entryPtr;
     TkWinDrawable *twdPtr = (TkWinDrawable *)w;
     TkWindow *winPtr = TkWinGetWinPtr(w);
     HWND hwnd = Tk_GetHWND(w);
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     display->request++;
 
     /*
-     * Remove references to the window in the pointer module then
-     * release the drawable.
+     * Remove references to the window in the pointer module then release the
+     * drawable.
      */
 
     TkPointerDeadWindow(winPtr);
@@ -325,8 +328,8 @@ XDestroyWindow(display, w)
     ckfree((char *)twdPtr);
 
     /*
-     * Don't bother destroying the window if we are going to destroy
-     * the parent later.
+     * Don't bother destroying the window if we are going to destroy the
+     * parent later.
      */
 
     if (hwnd != NULL && !(winPtr->flags & TK_DONT_DESTROY_WINDOW)) {
@@ -345,16 +348,15 @@ XDestroyWindow(display, w)
  *	None
  *
  * Side effects:
- *	Causes the window state to change, and generates a MapNotify
- *	event.
+ *	Causes the window state to change, and generates a MapNotify event.
  *
  *----------------------------------------------------------------------
  */
 
 void
-XMapWindow(display, w)
-    Display* display;
-    Window w;
+XMapWindow(
+    Display *display,
+    Window w)
 {
     XEvent event;
     TkWindow *parentPtr;
@@ -366,14 +368,14 @@ XMapWindow(display, w)
     winPtr->flags |= TK_MAPPED;
 
     /*
-     * Check to see if this window is visible now.  If all of the parent
-     * windows up to the first toplevel are mapped, then this window and
-     * its mapped children have just become visible.
+     * Check to see if this window is visible now. If all of the parent
+     * windows up to the first toplevel are mapped, then this window and its
+     * mapped children have just become visible.
      */
 
     if (!(winPtr->flags & TK_TOP_HIERARCHY)) {
 	for (parentPtr = winPtr->parentPtr; ;
-	        parentPtr = parentPtr->parentPtr) {
+		parentPtr = parentPtr->parentPtr) {
 	    if ((parentPtr == NULL) || !(parentPtr->flags & TK_MAPPED)) {
 		return;
 	    }
@@ -391,7 +393,7 @@ XMapWindow(display, w)
 	event.xmap.override_redirect = winPtr->atts.override_redirect;
 	Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
     }
-    
+
     /*
      * Generate VisibilityNotify events for this window and its mapped
      * children.
@@ -412,10 +414,10 @@ XMapWindow(display, w)
  * NotifyVisibility --
  *
  *	This function recursively notifies the mapped children of the
- *	specified window of a change in visibility.  Note that we don't
- *	properly report the visibility state, since Windows does not
- *	provide that info.  The eventPtr argument must point to an event
- *	that has been completely initialized except for the window slot.
+ *	specified window of a change in visibility. Note that we don't
+ *	properly report the visibility state, since Windows does not provide
+ *	that info. The eventPtr argument must point to an event that has been
+ *	completely initialized except for the window slot.
  *
  * Results:
  *	None.
@@ -427,15 +429,15 @@ XMapWindow(display, w)
  */
 
 static void
-NotifyVisibility(eventPtr, winPtr)
-    XEvent *eventPtr;		/* Initialized VisibilityNotify event. */
-    TkWindow *winPtr;		/* Window to notify. */
+NotifyVisibility(
+    XEvent *eventPtr,		/* Initialized VisibilityNotify event. */
+    TkWindow *winPtr)		/* Window to notify. */
 {
     if (winPtr->atts.event_mask & VisibilityChangeMask) {
 	eventPtr->xvisibility.window = winPtr->window;
 	Tk_QueueWindowEvent(eventPtr, TCL_QUEUE_TAIL);
     }
-    for (winPtr = winPtr->childList; winPtr != NULL; 
+    for (winPtr = winPtr->childList; winPtr != NULL;
 	    winPtr = winPtr->nextPtr) {
 	if (winPtr->flags & TK_MAPPED) {
 	    NotifyVisibility(eventPtr, winPtr);
@@ -454,16 +456,15 @@ NotifyVisibility(eventPtr, winPtr)
  *	None
  *
  * Side effects:
- *	Causes the window state to change, and generates an UnmapNotify
- *	event.
+ *	Causes the window state to change, and generates an UnmapNotify event.
  *
  *----------------------------------------------------------------------
  */
 
 void
-XUnmapWindow(display, w)
-    Display* display;
-    Window w;
+XUnmapWindow(
+    Display *display,
+    Window w)
 {
     XEvent event;
     TkWindow *winPtr = TkWinGetWinPtr(w);
@@ -471,8 +472,8 @@ XUnmapWindow(display, w)
     display->request++;
 
     /*
-     * Bug fix: Don't short circuit this routine based on TK_MAPPED because
-     * it will be cleared before XUnmapWindow is called.
+     * Bug fix: Don't short circuit this routine based on TK_MAPPED because it
+     * will be cleared before XUnmapWindow is called.
      */
 
     ShowWindow(Tk_GetHWND(w), SW_HIDE);
@@ -507,16 +508,14 @@ XUnmapWindow(display, w)
  */
 
 void
-XMoveResizeWindow(display, w, x, y, width, height)
-    Display* display;
-    Window w;
-    int x;			/* Position relative to parent. */
-    int y;
-    unsigned int width;
-    unsigned int height;
+XMoveResizeWindow(
+    Display *display,
+    Window w,
+    int x, int y,		/* Position relative to parent. */
+    unsigned int width, unsigned int height)
 {
     display->request++;
-    MoveWindow(Tk_GetHWND(w), x, y, width, height, TRUE);
+    MoveWindow(Tk_GetHWND(w), x, y, (int) width, (int) height, TRUE);
 }
 
 /*
@@ -536,11 +535,10 @@ XMoveResizeWindow(display, w, x, y, width, height)
  */
 
 void
-XMoveWindow(display, w, x, y)
-    Display* display;
-    Window w;
-    int x;
-    int y;
+XMoveWindow(
+    Display *display,
+    Window w,
+    int x, int y)		/* Position relative to parent */
 {
     TkWindow *winPtr = TkWinGetWinPtr(w);
 
@@ -567,18 +565,17 @@ XMoveWindow(display, w, x, y)
  */
 
 void
-XResizeWindow(display, w, width, height)
-    Display* display;
-    Window w;
-    unsigned int width;
-    unsigned int height;
+XResizeWindow(
+    Display *display,
+    Window w,
+    unsigned int width, unsigned int height)
 {
     TkWindow *winPtr = TkWinGetWinPtr(w);
 
     display->request++;
 
-    MoveWindow(Tk_GetHWND(w), winPtr->changes.x, winPtr->changes.y, width,
-	    height, TRUE);
+    MoveWindow(Tk_GetHWND(w), winPtr->changes.x, winPtr->changes.y, (int)width,
+	    (int)height, TRUE);
 }
 
 /*
@@ -598,15 +595,14 @@ XResizeWindow(display, w, width, height)
  */
 
 void
-XRaiseWindow(display, w)
-    Display* display;
-    Window w;
+XRaiseWindow(
+    Display *display,
+    Window w)
 {
     HWND window = Tk_GetHWND(w);
 
     display->request++;
-    SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0,
-	    SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 }
 
 /*
@@ -621,19 +617,19 @@ XRaiseWindow(display, w)
  *	None.
  *
  * Side effects:
- *	Changes the attributes of the specified window.  Note that we
- *	ignore the passed in values and use the values stored in the
- *	TkWindow data structure.
+ *	Changes the attributes of the specified window. Note that we ignore
+ *	the passed in values and use the values stored in the TkWindow data
+ *	structure.
  *
  *----------------------------------------------------------------------
  */
 
 void
-XConfigureWindow(display, w, value_mask, values)
-    Display* display;
-    Window w;
-    unsigned int value_mask;
-    XWindowChanges* values;
+XConfigureWindow(
+    Display *display,
+    Window w,
+    unsigned int valueMask,
+    XWindowChanges *values)
 {
     TkWindow *winPtr = TkWinGetWinPtr(w);
     HWND hwnd = Tk_GetHWND(w);
@@ -644,7 +640,7 @@ XConfigureWindow(display, w, value_mask, values)
      * Change the shape and/or position of the window.
      */
 
-    if (value_mask & (CWX|CWY|CWWidth|CWHeight)) {
+    if (valueMask & (CWX|CWY|CWWidth|CWHeight)) {
 	MoveWindow(hwnd, winPtr->changes.x, winPtr->changes.y,
 		winPtr->changes.width, winPtr->changes.height, TRUE);
     }
@@ -653,9 +649,10 @@ XConfigureWindow(display, w, value_mask, values)
      * Change the stacking order of the window.
      */
 
-    if (value_mask & CWStackMode) {
+    if (valueMask & CWStackMode) {
 	HWND sibling;
-	if ((value_mask & CWSibling) && (values->sibling != None)) {
+
+	if ((valueMask & CWSibling) && (values->sibling != None)) {
 	    sibling = Tk_GetHWND(values->sibling);
 	} else {
 	    sibling = NULL;
@@ -681,9 +678,9 @@ XConfigureWindow(display, w, value_mask, values)
  */
 
 void
-XClearWindow(display, w)
-    Display* display;
-    Window w;
+XClearWindow(
+    Display *display,
+    Window w)
 {
     RECT rc;
     HBRUSH brush;
@@ -715,9 +712,9 @@ XClearWindow(display, w)
  *
  * XChangeWindowAttributes --
  *
- *	This function is called when the attributes on a window are
- *	updated.  Since Tk maintains all of the window state, the only
- *	relevant value is the cursor.
+ *	This function is called when the attributes on a window are updated.
+ *	Since Tk maintains all of the window state, the only relevant value is
+ *	the cursor.
  *
  * Results:
  *	None.
@@ -729,11 +726,11 @@ XClearWindow(display, w)
  */
 
 void
-XChangeWindowAttributes(display, w, valueMask, attributes)
-    Display* display;
-    Window w;
-    unsigned long valueMask;
-    XSetWindowAttributes* attributes;
+XChangeWindowAttributes(
+    Display *display,
+    Window w,
+    unsigned long valueMask,
+    XSetWindowAttributes* attributes)
 {
     if (valueMask & CWCursor) {
 	XDefineCursor(display, w, attributes->cursor);
@@ -745,8 +742,8 @@ XChangeWindowAttributes(display, w, valueMask, attributes)
  *
  * TkWinSetWindowPos --
  *
- *	Adjust the stacking order of a window relative to a second
- *	window (or NULL).
+ *	Adjust the stacking order of a window relative to a second window (or
+ *	NULL).
  *
  * Results:
  *	None.
@@ -758,16 +755,16 @@ XChangeWindowAttributes(display, w, valueMask, attributes)
  */
 
 void
-TkWinSetWindowPos(hwnd, siblingHwnd, pos)
-    HWND hwnd;			/* Window to restack. */
-    HWND siblingHwnd;		/* Sibling window. */
-    int pos;			/* One of Above or Below. */
+TkWinSetWindowPos(
+    HWND hwnd,			/* Window to restack. */
+    HWND siblingHwnd,		/* Sibling window. */
+    int pos)			/* One of Above or Below. */
 {
     HWND temp;
 
     /*
-     * Since Windows does not support Above mode, we place the
-     * specified window below the sibling and then swap them.
+     * Since Windows does not support Above mode, we place the specified
+     * window below the sibling and then swap them.
      */
 
     if (siblingHwnd) {
@@ -792,8 +789,8 @@ TkWinSetWindowPos(hwnd, siblingHwnd, pos)
  * TkpWindowWasRecentlyDeleted --
  *
  *	Determines whether we know if the window given as argument was
- *	recently deleted. Called by the generic code error handler to
- *	handle BadWindow events.
+ *	recently deleted. Called by the generic code error handler to handle
+ *	BadWindow events.
  *
  * Results:
  *	Always 0. We do not keep this information on Windows.
@@ -805,9 +802,17 @@ TkWinSetWindowPos(hwnd, siblingHwnd, pos)
  */
 
 int
-TkpWindowWasRecentlyDeleted(win, dispPtr)
-    Window win;
-    TkDisplay *dispPtr;
+TkpWindowWasRecentlyDeleted(
+    Window win,
+    TkDisplay *dispPtr)
 {
     return 0;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

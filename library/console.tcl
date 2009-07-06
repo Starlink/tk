@@ -4,7 +4,7 @@
 # can be used by non-unix systems that do not have built-in support
 # for shells.
 #
-# RCS: @(#) $Id: console.tcl,v 1.22.2.7 2007/11/09 07:08:51 das Exp $
+# RCS: @(#) $Id: console.tcl,v 1.37 2007/12/13 15:26:27 dgp Exp $
 #
 # Copyright (c) 1995-1997 Sun Microsystems, Inc.
 # Copyright (c) 1998-2000 Ajuba Solutions.
@@ -24,7 +24,7 @@ namespace eval ::tk::console {
     variable showMatches 1   ; # show multiple expand matches
 
     variable inPlugin [info exists embed_args]
-    variable defaultPrompt  ; # default prompt if tcl_prompt1 isn't used
+    variable defaultPrompt   ; # default prompt if tcl_prompt1 isn't used
 
 
     if {$inPlugin} {
@@ -50,73 +50,94 @@ proc ::tk::ConsoleInit {} {
 	wm withdraw .
     }
 
-    if {$tcl_platform(platform) eq "macintosh"
-	    || [tk windowingsystem] eq "aqua"} {
+    if {[tk windowingsystem] eq "aqua"} {
 	set mod "Cmd"
     } else {
 	set mod "Ctrl"
     }
 
-    if {[catch {menu .menubar} err]} { bgerror "INIT: $err" }
-    .menubar add cascade -label File -menu .menubar.file -underline 0
-    .menubar add cascade -label Edit -menu .menubar.edit -underline 0
+    if {[catch {menu .menubar} err]} {
+	bgerror "INIT: $err"
+    }
+    AmpMenuArgs .menubar add cascade -label [mc &File] -menu .menubar.file
+    AmpMenuArgs .menubar add cascade -label [mc &Edit] -menu .menubar.edit
 
     menu .menubar.file -tearoff 0
-    .menubar.file add command -label [mc "Source..."] \
-	    -underline 0 -command tk::ConsoleSource
-    .menubar.file add command -label [mc "Hide Console"] \
-	    -underline 0 -command {wm withdraw .}
-    .menubar.file add command -label [mc "Clear Console"] \
-	    -underline 0 -command {.console delete 1.0 "promptEnd linestart"}
-   if {$tcl_platform(platform) eq "macintosh"
-	    || [tk windowingsystem] eq "aqua"} {
-	.menubar.file add command -label [mc "Quit"] \
-		-command exit -accel Cmd-Q
+    AmpMenuArgs .menubar.file add command -label [mc "&Source..."] \
+	    -command {tk::ConsoleSource}
+    AmpMenuArgs .menubar.file add command -label [mc "&Hide Console"] \
+	    -command {wm withdraw .}
+    AmpMenuArgs .menubar.file add command -label [mc "&Clear Console"] \
+	    -command {.console delete 1.0 "promptEnd linestart"}
+    if {[tk windowingsystem] eq "aqua"} {
+	AmpMenuArgs .menubar.file add command \
+		-label [mc &Quit] -command {exit} -accel "Cmd-Q"
     } else {
-	.menubar.file add command -label [mc "Exit"] \
-		-underline 1 -command exit
+	AmpMenuArgs .menubar.file add command -label [mc E&xit] -command {exit}
     }
 
     menu .menubar.edit -tearoff 0
-    .menubar.edit add command -label [mc "Cut"] -underline 2 \
-	    -command { event generate .console <<Cut>> } -accel "$mod+X"
-    .menubar.edit add command -label [mc "Copy"] -underline 0 \
-	    -command { event generate .console <<Copy>> } -accel "$mod+C"
-    .menubar.edit add command -label [mc "Paste"] -underline 1 \
-	    -command { event generate .console <<Paste>> } -accel "$mod+V"
+    AmpMenuArgs	.menubar.edit add command -label [mc Cu&t]   -accel "$mod+X"\
+	    -command {event generate .console <<Cut>>}
+    AmpMenuArgs	.menubar.edit add command -label [mc &Copy]  -accel "$mod+C"\
+	    -command {event generate .console <<Copy>>}
+    AmpMenuArgs	.menubar.edit add command -label [mc P&aste] -accel "$mod+V"\
+	    -command {event generate .console <<Paste>>}
 
     if {$tcl_platform(platform) ne "windows"} {
-	.menubar.edit add command -label [mc "Clear"] -underline 2 \
-		-command { event generate .console <<Clear>> }
+	AmpMenuArgs .menubar.edit add command -label [mc Cl&ear] \
+		-command {event generate .console <<Clear>>}
     } else {
-	.menubar.edit add command -label [mc "Delete"] -underline 0 \
-		-command { event generate .console <<Clear>> } -accel "Del"
-	
-	.menubar add cascade -label Help -menu .menubar.help -underline 0
+	AmpMenuArgs .menubar.edit add command -label [mc &Delete] \
+		-command {event generate .console <<Clear>>} -accel "Del"
+
+	AmpMenuArgs .menubar add cascade -label [mc &Help] -menu .menubar.help
 	menu .menubar.help -tearoff 0
-	.menubar.help add command -label [mc "About..."] \
-		-underline 0 -command tk::ConsoleAbout
+	AmpMenuArgs .menubar.help add command -label [mc &About...] \
+		-command tk::ConsoleAbout
     }
+
+    AmpMenuArgs .menubar.edit add separator
+    AmpMenuArgs .menubar.edit add command -label [mc "&Increase Font Size"] \
+        -accel "$mod++" -command {event generate .console <<Console_FontSizeIncr>>}
+    AmpMenuArgs .menubar.edit add command -label [mc "&Decrease Font Size"] \
+        -accel "$mod+-" -command {event generate .console <<Console_FontSizeDecr>>}
 
     . configure -menu .menubar
 
-    set con [text .console  -yscrollcommand [list .sb set] -setgrid true]
-    scrollbar .sb -command [list $con yview]
-    pack .sb -side right -fill both
-    pack $con -fill both -expand 1 -side left
-    switch -exact $tcl_platform(platform) {
-	"macintosh" {
-	    $con configure -font {Monaco 10 normal} -highlightthickness 0
-	}
-	"windows" {
-	    $con configure -font systemfixed
-	}
-	"unix" {
-	    if {[tk windowingsystem] eq "aqua"} {
-		$con configure -font {Monaco 10 normal} -highlightthickness 0
-	    }
-	}
+    # See if we can find a better font than the TkFixedFont
+    font create TkConsoleFont {*}[font configure TkFixedFont]
+    set families [font families]
+    switch -exact -- [tk windowingsystem] {
+        aqua { set preferred {Monaco 10} }
+        win32 { set preferred {ProFontWindows 8 Consolas 8} }
+        default { set preferred {} }
     }
+    foreach {family size} $preferred {
+        if {[lsearch -exact $families $family] != -1} {
+            font configure TkConsoleFont -family $family -size $size
+            break
+        }
+    }
+
+    # Provide the right border for the text widget (platform dependent).
+    ::ttk::style layout ConsoleFrame {
+        Entry.field -sticky news -border 1 -children {
+            ConsoleFrame.padding -sticky news
+        }
+    }
+    ::ttk::frame .consoleframe -style ConsoleFrame
+
+    set con [text .console -yscrollcommand [list .sb set] -setgrid true \
+                 -borderwidth 0 -highlightthickness 0 -font TkConsoleFont]
+    if {[tk windowingsystem] eq "aqua"} {
+        scrollbar .sb -command [list $con yview]
+    } else {
+        ::ttk::scrollbar .sb -command [list $con yview]
+    }
+    pack .sb  -in .consoleframe -fill both -side right -padx 1 -pady 1
+    pack $con -in .consoleframe -fill both -expand 1 -side left -padx 1 -pady 1
+    pack .consoleframe -fill both -expand 1 -side left
 
     ConsoleBind $con
 
@@ -130,6 +151,9 @@ proc ::tk::ConsoleInit {} {
     $con tag configure find	-background \#FFFF00
 
     focus $con
+
+    # Avoid listing this console in [winfo interps]
+    if {[info command ::send] eq "::send"} {rename ::send {}}
 
     wm protocol . WM_DELETE_WINDOW { wm withdraw . }
     wm title . [mc "Console"]
@@ -316,7 +340,9 @@ proc ::tk::ConsoleBind {w} {
     bindtags $w [list $w Console PostConsole [winfo toplevel $w] all]
 
     ## Get all Text bindings into Console
-    foreach ev [bind Text] { bind Console $ev [bind Text $ev] }	
+    foreach ev [bind Text] {
+	bind Console $ev [bind Text $ev]
+    }
     ## We really didn't want the newline insertion...
     bind Console <Control-Key-o> {}
     ## ...or any Control-v binding (would block <<Paste>>)
@@ -356,22 +382,40 @@ proc ::tk::ConsoleBind {w} {
 	<<Console_Transpose>>		<Control-Key-t>
 	<<Console_ClearLine>>		<Control-Key-u>
 	<<Console_SaveCommand>>		<Control-Key-z>
+        <<Console_FontSizeIncr>>	<Control-Key-plus>
+        <<Console_FontSizeDecr>>	<Control-Key-minus>
     } {
 	event add $ev $key
 	bind Console $key {}
     }
-
+    if {[tk windowingsystem] eq "aqua"} {
+	foreach {ev key} {
+	    <<Console_FontSizeIncr>>	<Command-Key-plus>
+	    <<Console_FontSizeDecr>>	<Command-Key-minus>
+	} {
+	    event add $ev $key
+	    bind Console $key {}
+	}
+    }
     bind Console <<Console_Expand>> {
-	if {[%W compare insert > promptEnd]} {::tk::console::Expand %W}
+	if {[%W compare insert > promptEnd]} {
+	    ::tk::console::Expand %W
+	}
     }
     bind Console <<Console_ExpandFile>> {
-	if {[%W compare insert > promptEnd]} {::tk::console::Expand %W path}
+	if {[%W compare insert > promptEnd]} {
+	    ::tk::console::Expand %W path
+	}
     }
     bind Console <<Console_ExpandProc>> {
-	if {[%W compare insert > promptEnd]} {::tk::console::Expand %W proc}
+	if {[%W compare insert > promptEnd]} {
+	    ::tk::console::Expand %W proc
+	}
     }
     bind Console <<Console_ExpandVar>> {
-	if {[%W compare insert > promptEnd]} {::tk::console::Expand %W var}
+	if {[%W compare insert > promptEnd]} {
+	    ::tk::console::Expand %W var
+	}
     }
     bind Console <<Console_Eval>> {
 	%W mark set insert {end - 1c}
@@ -380,7 +424,8 @@ proc ::tk::ConsoleBind {w} {
 	break
     }
     bind Console <Delete> {
-	if {[%W tag nextrange sel 1.0 end] ne "" && [%W compare sel.first >= promptEnd]} {
+	if {{} ne [%W tag nextrange sel 1.0 end] \
+		&& [%W compare sel.first >= promptEnd]} {
 	    %W delete sel.first sel.last
 	} elseif {[%W compare insert >= promptEnd]} {
 	    %W delete insert
@@ -388,7 +433,8 @@ proc ::tk::ConsoleBind {w} {
 	}
     }
     bind Console <BackSpace> {
-	if {[%W tag nextrange sel 1.0 end] ne "" && [%W compare sel.first >= promptEnd]} {
+	if {{} ne [%W tag nextrange sel 1.0 end] \
+		&& [%W compare sel.first >= promptEnd]} {
 	    %W delete sel.first sel.last
 	} elseif {[%W compare insert != 1.0] && \
 		[%W compare insert > promptEnd]} {
@@ -411,11 +457,15 @@ proc ::tk::ConsoleBind {w} {
     }
     bind Console <Control-e> [bind Console <End>]
     bind Console <Control-d> {
-	if {[%W compare insert < promptEnd]} break
+	if {[%W compare insert < promptEnd]} {
+	    break
+	}
 	%W delete insert
     }
     bind Console <<Console_KillLine>> {
-	if {[%W compare insert < promptEnd]} break
+	if {[%W compare insert < promptEnd]} {
+	    break
+	}
 	if {[%W compare insert == {insert lineend}]} {
 	    %W delete insert
 	} else {
@@ -469,16 +519,12 @@ proc ::tk::ConsoleBind {w} {
     }
     bind Console <F9> {
 	eval destroy [winfo child .]
-	if {$tcl_platform(platform) eq "macintosh"} {
-	    if {[catch {source [file join $tk_library console.tcl]}]} {source -rsrc console}
-	} else {
-	    source [file join $tk_library console.tcl]
-	}
+	source [file join $tk_library console.tcl]
     }
-    if {$::tcl_platform(platform) eq "macintosh" || [tk windowingsystem] eq "aqua"} {
-	    bind Console <Command-q> {
-		exit
-	    }
+    if {[tk windowingsystem] eq "aqua"} {
+	bind Console <Command-q> {
+	    exit
+	}
     }
     bind Console <<Cut>> {
         # Same as the copy event
@@ -505,6 +551,14 @@ proc ::tk::ConsoleBind {w} {
 		tk::ConsoleInsert %W $x
 	    }
 	}
+    }
+    bind Console <<Console_FontSizeIncr>> {
+        set size [font configure TkConsoleFont -size]
+        font configure TkConsoleFont -size [incr size]
+    }
+    bind Console <<Console_FontSizeDecr>> {
+        set size [font configure TkConsoleFont -size]
+        font configure TkConsoleFont -size [incr size -1]
     }
 
     ##
@@ -554,7 +608,7 @@ proc ::tk::ConsoleInsert {w s} {
 	return
     }
     catch {
-	if {[$w compare sel.first <= insert]
+	if {[$w compare sel.first <= insert] \
 		&& [$w compare sel.last >= insert]} {
 	    $w tag remove sel sel.first promptEnd
 	    $w delete sel.first sel.last
@@ -620,10 +674,16 @@ Tk $::tk_patchLevel"
 #	w	- console text widget
 
 proc ::tk::console::TagProc w {
-    if {!$::tk::console::magicKeys} { return }
+    if {!$::tk::console::magicKeys} {
+	return
+    }
     set exp "\[^\\\\\]\[\[ \t\n\r\;{}\"\$\]"
     set i [$w search -backwards -regexp $exp insert-1c promptEnd-1c]
-    if {$i eq ""} {set i promptEnd} else {append i +2c}
+    if {$i eq ""} {
+	set i promptEnd
+    } else {
+	append i +2c
+    }
     regsub -all "\[\[\\\\\\?\\*\]" [$w get $i "insert-1c wordend"] {\\\0} c
     if {[llength [EvalAttached [list info commands $c]]]} {
 	$w tag add proc $i "insert-1c wordend"
@@ -655,30 +715,42 @@ proc ::tk::console::TagProc w {
 # Calls:	::tk::console::Blink
  
 proc ::tk::console::MatchPair {w c1 c2 {lim 1.0}} {
-    if {!$::tk::console::magicKeys} { return }
-    if {[set ix [$w search -back $c1 insert $lim]] ne ""} {
+    if {!$::tk::console::magicKeys} {
+	return
+    }
+    if {{} ne [set ix [$w search -back $c1 insert $lim]]} {
 	while {
 	    [string match {\\} [$w get $ix-1c]] &&
-	    [set ix [$w search -back $c1 $ix-1c $lim]] ne ""
+	    [set ix [$w search -back $c1 $ix-1c $lim]] ne {}
 	} {}
 	set i1 insert-1c
-	while {$ix ne ""} {
+	while {$ix ne {}} {
 	    set i0 $ix
 	    set j 0
-	    while {[set i0 [$w search $c2 $i0 $i1]] ne ""} {
+	    while {[set i0 [$w search $c2 $i0 $i1]] ne {}} {
 		append i0 +1c
-		if {[string match {\\} [$w get $i0-2c]]} continue
+		if {[string match {\\} [$w get $i0-2c]]} {
+		    continue
+		}
 		incr j
 	    }
-	    if {!$j} break
+	    if {!$j} {
+		break
+	    }
 	    set i1 $ix
-	    while {$j && [set ix [$w search -back $c1 $ix $lim]] ne ""} {
-		if {[string match {\\} [$w get $ix-1c]]} continue
+	    while {$j && [set ix [$w search -back $c1 $ix $lim]] ne {}} {
+		if {[string match {\\} [$w get $ix-1c]]} {
+		    continue
+		}
 		incr j -1
 	    }
 	}
-	if {[string match {} $ix]} { set ix [$w index $lim] }
-    } else { set ix [$w index $lim] }
+	if {[string match {} $ix]} {
+	    set ix [$w index $lim]
+	}
+    } else {
+	set ix [$w index $lim]
+    }
     if {$::tk::console::blinkRange} {
 	Blink $w $ix [$w index insert]
     } else {
@@ -698,12 +770,18 @@ proc ::tk::console::MatchPair {w c1 c2 {lim 1.0}} {
 # Calls:	::tk::console::Blink
  
 proc ::tk::console::MatchQuote {w {lim 1.0}} {
-    if {!$::tk::console::magicKeys} { return }
+    if {!$::tk::console::magicKeys} {
+	return
+    }
     set i insert-1c
     set j 0
-    while {[set i [$w search -back \" $i $lim]] ne ""} {
-	if {[string match {\\} [$w get $i-1c]]} continue
-	if {!$j} {set i0 $i}
+    while {[set i [$w search -back \" $i $lim]] ne {}} {
+	if {[string match {\\} [$w get $i-1c]]} {
+	    continue
+	}
+	if {!$j} {
+	    set i0 $i
+	}
 	incr j
     }
     if {$j&1} {
@@ -771,17 +849,31 @@ proc ::tk::console::ConstrainBuffer {w size} {
 proc ::tk::console::Expand {w {type ""}} {
     set exp "\[^\\\\\]\[\[ \t\n\r\\\{\"\\\\\$\]"
     set tmp [$w search -backwards -regexp $exp insert-1c promptEnd-1c]
-    if {$tmp eq ""} {set tmp promptEnd} else {append tmp +2c}
-    if {[$w compare $tmp >= insert]} { return }
+    if {$tmp eq ""} {
+	set tmp promptEnd
+    } else {
+	append tmp +2c
+    }
+    if {[$w compare $tmp >= insert]} {
+	return
+    }
     set str [$w get $tmp insert]
     switch -glob $type {
-	path* { set res [ExpandPathname $str] }
-	proc* { set res [ExpandProcname $str] }
-	var*  { set res [ExpandVariable $str] }
+	path* {
+	    set res [ExpandPathname $str]
+	}
+	proc* {
+	    set res [ExpandProcname $str]
+	}
+	var* {
+	    set res [ExpandVariable $str]
+	}
 	default {
 	    set res {}
 	    foreach t {Pathname Procname Variable} {
-		if {![catch {Expand$t $str} res] && ($res ne "")} { break }
+		if {![catch {Expand$t $str} res] && ($res ne "")} {
+		    break
+		}
 	    }
 	}
     }
@@ -790,10 +882,12 @@ proc ::tk::console::Expand {w {type ""}} {
 	set repl [lindex $res 0]
 	$w delete $tmp insert
 	$w insert $tmp $repl {input stdin}
-	if {($len > 1) && $::tk::console::showMatches && $repl eq $str} {
+	if {($len > 1) && ($::tk::console::showMatches) && ($repl eq $str)} {
 	    puts stdout [lsort [lreplace $res 0 0]]
 	}
-    } else { bell }
+    } else {
+	bell
+    }
     return [incr len -1]
 }
 
@@ -818,7 +912,9 @@ proc ::tk::console::ExpandPathname str {
     set dir [file tail $str]
     ## Check to see if it was known to be a directory and keep the trailing
     ## slash if so (file tail cuts it off)
-    if {[string match */ $str]} { append dir / }
+    if {[string match */ $str]} {
+	append dir /
+    }
     if {[catch {lsort [EvalAttached [list glob $dir*]]} m]} {
 	set match {}
     } else {
@@ -845,7 +941,9 @@ proc ::tk::console::ExpandPathname str {
 	} else {
 	    ## This may look goofy, but it handles spaces in path names
 	    eval append match $m
-	    if {[file isdir $match]} {append match /}
+	    if {[file isdir $match]} {
+		append match /
+	    }
 	    if {[string match ?*/* $str]} {
 		set match [file dirname $str]/$match
 	    } elseif {[string match /* $str]} {
@@ -905,12 +1003,14 @@ proc ::tk::console::ExpandProcname str {
 #		possible further matches
 
 proc ::tk::console::ExpandVariable str {
-    if {[regexp {([^\(]*)\((.*)} $str junk ary str]} {
+    if {[regexp {([^\(]*)\((.*)} $str -> ary str]} {
 	## Looks like they're trying to expand an array.
 	set match [EvalAttached [list array names $ary $str*]]
 	if {[llength $match] > 1} {
 	    set vars $ary\([ExpandBestMatch $match $str]
-	    foreach var $match {lappend vars $ary\($var\)}
+	    foreach var $match {
+		lappend vars $ary\($var\)
+	    }
 	    return $vars
 	} elseif {[llength $match] == 1} {
 	    set match $ary\($match\)
@@ -943,8 +1043,8 @@ proc ::tk::console::ExpandVariable str {
 proc ::tk::console::ExpandBestMatch {l {e {}}} {
     set ec [lindex $l 0]
     if {[llength $l]>1} {
-	set e  [string length $e]; incr e -1
-	set ei [string length $ec]; incr ei -1
+	set e [expr {[string length $e] - 1}]
+	set ei [expr {[string length $ec] - 1}]
 	foreach l $l {
 	    while {$ei>=$e && [string first $ec $l]} {
 		set ec [string range $ec 0 [incr ei -1]]
@@ -955,4 +1055,4 @@ proc ::tk::console::ExpandBestMatch {l {e {}}} {
 }
 
 # now initialize the console
-::tk::ConsoleInit 
+::tk::ConsoleInit

@@ -10,13 +10,10 @@
 # Contributions from Don Porter, NIST, 2002.  (not subject to US copyright)
 # All rights reserved.
 #
-# RCS: @(#) $Id: xmfbox.test,v 1.7 2002/07/13 20:28:36 dgp Exp $
+# RCS: @(#) $Id: xmfbox.test,v 1.10 2004/06/24 12:45:45 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 set testPWD [pwd]
@@ -62,14 +59,14 @@ proc cleanup {} {
     catch {destroy .foo}
 }
 
-test xmfbox-1.1 {tk::MotifFDialog_Create, -parent switch} {unixOnly} {
+test xmfbox-1.1 {tk::MotifFDialog_Create, -parent switch} unix {
     catch {unset foo}
     set x [tk::MotifFDialog_Create foo open {-parent .}]
     catch {destroy $x}
     set x
 } .foo
 
-test xmfbox-1.2 {tk::MotifFDialog_Create, -parent switch} {unixOnly} {
+test xmfbox-1.2 {tk::MotifFDialog_Create, -parent switch} unix {
     catch {unset foo}
     toplevel .bar
     wm geometry .bar +0+0
@@ -79,7 +76,7 @@ test xmfbox-1.2 {tk::MotifFDialog_Create, -parent switch} {unixOnly} {
     set x
 } .bar.foo
 
-test xmfbox-2.1 {tk::MotifFDialog_InterpFilter, ~ in dir names} {unixOnly} {
+test xmfbox-2.1 {tk::MotifFDialog_InterpFilter, ~ in dir names} unix {
     cleanup
     file mkdir ./~nosuchuser1
     set x [tk::MotifFDialog_Create foo open {}]
@@ -88,7 +85,7 @@ test xmfbox-2.1 {tk::MotifFDialog_InterpFilter, ~ in dir names} {unixOnly} {
     set kk [tk::MotifFDialog_InterpFilter $x]
 } [list $testPWD/~nosuchuser1 *]
 
-test xmfbox-2.2 {tk::MotifFDialog_InterpFilter, ~ in file names} {unixOnly} {
+test xmfbox-2.2 {tk::MotifFDialog_InterpFilter, ~ in file names} unix {
     cleanup
     close [open ./~nosuchuser1 {CREAT TRUNC WRONLY}]
     set x [tk::MotifFDialog_Create foo open {}]
@@ -97,7 +94,7 @@ test xmfbox-2.2 {tk::MotifFDialog_InterpFilter, ~ in file names} {unixOnly} {
     set kk [tk::MotifFDialog_InterpFilter $x]
 } [list $testPWD ./~nosuchuser1]
 
-test xmfbox-2.3 {tk::MotifFDialog_Update, ~ in file names} {unixOnly} {
+test xmfbox-2.3 {tk::MotifFDialog_Update, ~ in file names} unix {
     cleanup
     close [open ./~nosuchuser1 {CREAT TRUNC WRONLY}]
     set x [tk::MotifFDialog_Create foo open {}]
@@ -108,7 +105,7 @@ test xmfbox-2.3 {tk::MotifFDialog_Update, ~ in file names} {unixOnly} {
     $::tk::dialog::file::foo(fList) get end
 } ~nosuchuser1
 
-test xmfbox-2.4 {tk::MotifFDialog_LoadFile, ~ in file names} {unixOnly} {
+test xmfbox-2.4 {tk::MotifFDialog_LoadFile, ~ in file names} unix {
     cleanup
     close [open ./~nosuchuser1 {CREAT TRUNC WRONLY}]
     set x [tk::MotifFDialog_Create foo open {}]
@@ -116,7 +113,7 @@ test xmfbox-2.4 {tk::MotifFDialog_LoadFile, ~ in file names} {unixOnly} {
     expr {$i >= 0}
 } 1
 
-test xmfbox-2.5 {tk::MotifFDialog_BrowseFList, ~ in file names} {unixOnly} {
+test xmfbox-2.5 {tk::MotifFDialog_BrowseFList, ~ in file names} unix {
     cleanup
     close [open ./~nosuchuser1 {CREAT TRUNC WRONLY}]
     set x [tk::MotifFDialog_Create foo open {}]
@@ -127,7 +124,7 @@ test xmfbox-2.5 {tk::MotifFDialog_BrowseFList, ~ in file names} {unixOnly} {
     $::tk::dialog::file::foo(sEnt) get
 } $testPWD/~nosuchuser1
 
-test xmfbox-2.6 {tk::MotifFDialog_ActivateFList, ~ in file names} {unixOnly} {
+test xmfbox-2.6 {tk::MotifFDialog_ActivateFList, ~ in file names} unix {
     cleanup
     close [open ./~nosuchuser1 {CREAT TRUNC WRONLY}]
     set x [tk::MotifFDialog_Create foo open {}]
@@ -142,17 +139,5 @@ test xmfbox-2.6 {tk::MotifFDialog_ActivateFList, ~ in file names} {unixOnly} {
 
 # cleanup
 cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-

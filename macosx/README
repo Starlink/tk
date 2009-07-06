@@ -1,7 +1,7 @@
 Tcl/Tk Mac OS X README
 ----------------------
 
-RCS: @(#) $Id: README,v 1.6.2.15 2007/04/29 02:26:47 das Exp $
+RCS: @(#) $Id: README,v 1.27.2.1 2008/06/12 06:35:03 das Exp $
 
 This is the README file for the Mac OS X/Darwin version of Tcl/Tk.
 
@@ -112,9 +112,10 @@ control whether a line/shape is drawn antialiased. The antialiasing threshold is
 in your script before drawing, in which case lines (or shapes with outlines)
 thinner than <limit> pixels will not be antialiased.
 
-- Quickdraw text antialiasing is enabled by default when available (from 10.1.5
-onwards). Changing the global boolean variable '::tk::mac::antialiasedtext'
-allows to dis/enable antialiasing on the fly from Tcl (even for existing text).
+- ATSUI text antialiasing by default uses the standard OS antialising settings.
+Setting the global variable '::tk::mac::antialiasedtext' allows to control text
+antialiasing from Tcl: a value of 1 enables AA, 0 disables AA and -1 restores
+the default behaviour of respecting the OS settings.
 
 - Scrollbars: There are two scrollbar variants in Aqua, normal & small. The
 normal scrollbar has a small dimension of 15, the small variant 11. Access to
@@ -135,6 +136,11 @@ So, for instance this code will spin the spinner:
 	after 100 spinCursor [incr count]
     }
 This was added in Tk 8.4.2
+
+- If you want to use Remote Debugging with Xcode 1.5 or 2.2, you need to set the
+environment variable XCNOSTDIN to 1 in the Executable editor for Wish. That will
+cause us to force closing stdin & stdout.  Otherwise, given how Xcode launches
+Wish remotely, they will be left open and then Wish & gdb will fight for stdin.
 
 
 3. Building Tcl/Tk on Mac OS X
@@ -158,11 +164,69 @@ The Mac OS X specific configure flags are --enable-aqua, --enable-framework and
 select based notifier). Note that --enable-aqua is incompatible with
 --disable-corefoundation (for both Tcl and Tk configure).
 
-- It is also possible to build with Apple's IDE via the tk/macosx/Wish.pbproj
-project, this simply calls through to the tk/macosx/Makefile. It requires a
-build of the tcl/macosx/Tcl.pbproj project.
+- It is also possible to build with Apple's IDE via the projects in tk/macosx,
+take care to only use the project matching your DevTools and OS version:
+    * Wish.pbproj for Xcode or ProjectBuilder on 10.3 and earlier, this has a
+	'Tk' target that simply calls through to the tcl/macosx/GNUMakefile. It
+	requires a build of the 'Tcl' target of tcl/macosx/Tcl.pbproj.
+    * Wish.xcode Xcode 2.4 on 10.4 and Xcode 2.5 on 10.4 and later, which
+	additionally has native 'tktest' and 'tktest-X11' targets for
+	debugging, these targets' 'Debug' build configuration has ZeroLink and
+	Fix&Continue enabled, use the 'DebugNoFixZL' build configuration if you
+	need a debug build without these features. The following build
+	configurations are available:
+	'DebugUnthreaded': debug build with threading turned off.
+	'DebugNoCF': debug build with corefoundation turned off
+		(for 'tktest-X11' only).
+	'DebugNoCFUnthreaded': debug build with corefoundation turned off
+		(for 'tktest-X11' only) and with threading turned off.
+	'DebugMemCompile': debug build with memory and bytecode debugging on.
+	'DebugLeaks': debug build with PURIFY defined.
+	'DebugGCov': debug build with generation of gcov data files enabled.
+	'ReleaseUniversal': builds the targets as universal binaries for the
+		ppc and i386 architectures.
+	'ReleaseUniversal10.4uSDK': same as 'ReleaseUniversal' but builds
+		against the 10.4u SDK, required to build universal binaries on
+		PowerPC Tiger (where the system libraries are not universal).
+	'ReleasePPC10.3.9SDK': builds for PowerPC against the 10.3.9 SDK, useful
+		for verifying on Tiger that building on Panther would succeed.
+	'ReleasePPC10.2.8SDK': builds for PowerPC with gcc-3.3 against the
+		10.2.8 SDK, useful to verify on Tiger that building on Jaguar
+		would succeed.
+    * Wish.xcodeproj for Xcode 3.1 on 10.5 and later, which has the following
+	additional build configurations:
+	'ReleaseUniversal10.5SDK': same as 'ReleaseUniversal' but builds
+		against the 10.5 SDK on Leopard (with 10.5 deployment target).
+	'Debug gcc42':  same as 'Debug' but builds with gcc 4.2.
+	'Debug llvmgcc42': same as 'Debug' but builds with llvm-gcc 4.2.
+	'ReleaseUniversal gcc42': same as 'ReleaseUniversal' but builds with
+		gcc 4.2.
+	'ReleaseUniversal llvmgcc42': same as 'ReleaseUniversal' but builds
+		with llvm-gcc 4.2.
+	'Debug64bit': builds the 'tktest-X11' target as 64bit with debugging
+		 enabled (requires a 64bit capable processor).
+	Note that all non-SDK configurations have 10.5 deployment target and
+		that all Universal configurations build the 'tktest-X11' target
+		also for the ppc64 and x86_64 architectures.
 
-- To build universal binaries, set CFLAGS as follows:
+Notes about the native targets of the Xcode projects:
+    * the Xcode projects refer to the toplevel tcl and tk source dirs through
+	the TCL_SRCROOT and TK_SRCROOT user build settings, by default these are
+	set to the project-relative paths '../../tcl' and '../../tk', if your
+	source directories are named differently, e.g. '../../tcl8.5', you'll
+	need to manually change the TCL_SRCROOT and TK_SRCROOT settings by
+	editing your ${USER}.pbxuser file (located inside the Wish.xcodeproj
+	bundle directory) with a text editor.
+    * the native targets need a version of the unix configure scripts with config
+	headers enabled, this is automatically generated as tcl/macosx/configure
+	and tk/macosx/configure by the project but that requires 2.59 versions
+	of autoconf & autoheader. These are not available on Mac OS X 10.5 by
+	default and need to be installed manually. By default they are assumed
+	to be installed as /usr/local/bin/autoconf-2.59 and
+	/usr/local/bin/autoheader-2.59, set the AUTOCONF and AUTOHEADER build
+	settings in ${USER}.pbxuser to their true locations if necessary.
+
+- To build universal binaries outside of Wish.xcodeproj, set CFLAGS as follows:
     export CFLAGS="-arch ppc -arch i386 \
 	-isysroot /Developer/SDKs/MacOSX10.4u.sdk -mmacosx-version-min=10.4"
 This requires Mac OS X 10.4 and Xcode 2.2 (_not_ Xcode 2.1) and will work on any
@@ -185,6 +249,8 @@ to the minimal OS version (>= 10.2) the binaries should be able to run on, e.g:
 This requires Mac OS X 10.2 and gcc 3.1; if you have gcc 4 or later you can set
 CFLAGS instead:
     export CFLAGS="-mmacosx-version-min=10.2"
+The Wish.xcode project is setup to produce binaries that can run on 10.2 or
+later (except for the Universal and SDK configurations).
 Support for weak-linking was added to the code for 8.4.14/8.5a5.
 
 Detailed Instructions for building with macosx/GNUmakefile
@@ -223,26 +289,26 @@ instead by passing an INSTALL_ROOT argument to make:
 	make -C tcl${ver}/macosx install INSTALL_ROOT="${HOME}/"
 	make -C tk${ver}/macosx  install INSTALL_ROOT="${HOME}/"
 
-- The default Makefile targets will build _both_ debug and optimized versions of
-the Tcl and Tk frameworks with the standard convention of naming the debug
+- The default GNUmakefile targets will build _both_ debug and optimized versions
+of the Tcl and Tk frameworks with the standard convention of naming the debug
 library Tcl.framework/Tcl_debug resp. Tk.framework/Tk_debug.
 This allows switching to the debug libraries at runtime by setting
 	export DYLD_IMAGE_SUFFIX=_debug
 (c.f. man dyld for more details)
 
 If you only want to build and install the debug or optimized build, use the
-'develop' or 'deploy' target variants of the Makefiles, respectively.
+'develop' or 'deploy' target variants of the GNUmakefiles, respectively.
 For example, to build and install only the optimized versions:
 	make -C tcl${ver}/macosx deploy
 	make -C tk${ver}/macosx deploy
 	sudo make -C tcl${ver}/macosx install-deploy
 	sudo make -C tk${ver}/macosx  install-deploy
 
-- The Makefiles can also build a version of 'Wish' that has the Tcl and Tk
+- The GNUmakefiles can also build a version of 'Wish' that has the Tcl and Tk
 frameworks embedded in its application package. This allows for standalone
 deployment of the application with no installation required, e.g. from read-only
 media. To build & install in this manner, use the 'embedded' target variants of
-the Makefiles. For example, to build a standalone 'Wish.app'
+the GNUmakefiles. For example, to build a standalone 'Wish.app'
 in ./embedded/Applications/Utilities:
 	make -C tcl${ver}/macosx embedded
 	make -C tk${ver}/macosx embedded
@@ -262,7 +328,7 @@ still need a tcl sourcetree in the location specified in TCL_SRC_DIR in
 Tcl.framework/tclConfig.sh. Also, linking with Tcl.framework has to work exactly
 as indicated in TCL_LIB_SPEC in Tcl.framework/tclConfig.sh.
 If you used non-default install locations for Tcl.framework, specify them as
-make overrides to the tk/macosx Makefile, e.g.
+make overrides to the tk/macosx GNUmakefile, e.g.
 	make -C tk${ver}/macosx \
 	    TCL_FRAMEWORK_DIR=$HOME/Library/Frameworks TCLSH_DIR=$HOME/usr/bin
 	sudo make -C tk${ver}/macosx install \

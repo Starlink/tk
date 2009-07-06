@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXMenubutton.c,v 1.2.2.12 2007/11/09 06:26:56 das Exp $
+ * RCS: @(#) $Id: tkMacOSXMenubutton.c,v 1.18 2007/12/13 15:27:10 dgp Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -193,7 +193,7 @@ TkpDisplayMenuButton(
 	bzero(&params, sizeof(params));
 	ComputeMenuButtonControlParams(butPtr, &params);
 	if (
-#if 0
+#ifdef TK_REBUILD_TOPLEVEL
 	    (winPtr->flags & TK_REBUILD_TOPLEVEL) ||
 #endif
 	    bcmp(&params,&mbPtr->params,sizeof(params))) {

@@ -54,7 +54,7 @@
  *	software in accordance with the terms specified in this
  *	license.
  *
- * RCS: @(#) $Id: tkMacOSXMouseEvent.c,v 1.6.2.23 2007/12/18 18:21:30 das Exp $
+ * RCS: @(#) $Id: tkMacOSXMouseEvent.c,v 1.34 2007/12/13 15:27:10 dgp Exp $
  */
 
 #include "tkMacOSXPrivate.h"

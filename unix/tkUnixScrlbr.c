@@ -1,4 +1,4 @@
-/* 
+/*
  * tkUnixScrollbar.c --
  *
  *	This file implements the Unix specific portion of the scrollbar
@@ -6,17 +6,18 @@
  *
  * Copyright (c) 1996 by Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkUnixScrlbr.c,v 1.3 2000/11/22 01:49:38 ericm Exp $
+ * RCS: @(#) $Id: tkUnixScrlbr.c,v 1.6 2007/12/13 15:28:51 dgp Exp $
  */
 
+#include "tkInt.h"
 #include "tkScrollbar.h"
 
 /*
- * Minimum slider length, in pixels (designed to make sure that the slider
- * is always easy to grab with the mouse).
+ * Minimum slider length, in pixels (designed to make sure that the slider is
+ * always easy to grab with the mouse).
  */
 
 #define MIN_SLIDER_LENGTH	5
@@ -32,15 +33,14 @@ typedef struct UnixScrollbar {
 } UnixScrollbar;
 
 /*
- * The class procedure table for the scrollbar widget.  All fields except
- * size are left initialized to NULL, which should happen automatically
- * since the variable is declared at this scope.
+ * The class procedure table for the scrollbar widget. All fields except size
+ * are left initialized to NULL, which should happen automatically since the
+ * variable is declared at this scope.
  */
 
 Tk_ClassProcs tkpScrollbarProcs = {
     sizeof(Tk_ClassProcs)	/* size */
 };
-
 
 /*
  *----------------------------------------------------------------------
@@ -59,8 +59,8 @@ Tk_ClassProcs tkpScrollbarProcs = {
  */
 
 TkScrollbar *
-TkpCreateScrollbar(tkwin)
-    Tk_Window tkwin;
+TkpCreateScrollbar(
+    Tk_Window tkwin)
 {
     UnixScrollbar *scrollPtr = (UnixScrollbar *)ckalloc(sizeof(UnixScrollbar));
     scrollPtr->troughGC = None;
@@ -78,9 +78,9 @@ TkpCreateScrollbar(tkwin)
  *
  * TkpDisplayScrollbar --
  *
- *	This procedure redraws the contents of a scrollbar window.
- *	It is invoked as a do-when-idle handler, so it only runs
- *	when there's nothing else for the application to do.
+ *	This procedure redraws the contents of a scrollbar window. It is
+ *	invoked as a do-when-idle handler, so it only runs when there's
+ *	nothing else for the application to do.
  *
  * Results:
  *	None.
@@ -92,8 +92,8 @@ TkpCreateScrollbar(tkwin)
  */
 
 void
-TkpDisplayScrollbar(clientData)
-    ClientData clientData;	/* Information about window. */
+TkpDisplayScrollbar(
+    ClientData clientData)	/* Information about window. */
 {
     register TkScrollbar *scrollPtr = (TkScrollbar *) clientData;
     register Tk_Window tkwin = scrollPtr->tkwin;
@@ -117,10 +117,10 @@ TkpDisplayScrollbar(clientData)
     }
 
     /*
-     * In order to avoid screen flashes, this procedure redraws
-     * the scrollbar in a pixmap, then copies the pixmap to the
-     * screen in a single operation.  This means that there's no
-     * point in time where the on-sreen image has been cleared.
+     * In order to avoid screen flashes, this procedure redraws the scrollbar
+     * in a pixmap, then copies the pixmap to the screen in a single
+     * operation. This means that there's no point in time where the on-sreen
+     * image has been cleared.
      */
 
     pixmap = Tk_GetPixmap(scrollPtr->display, Tk_WindowId(tkwin),
@@ -148,11 +148,11 @@ TkpDisplayScrollbar(clientData)
 	    (unsigned) (Tk_Height(tkwin) - 2*scrollPtr->inset));
 
     /*
-     * Draw the top or left arrow.  The coordinates of the polygon
-     * points probably seem odd, but they were carefully chosen with
-     * respect to X's rules for filling polygons.  These point choices
-     * cause the arrows to just fill the narrow dimension of the
-     * scrollbar and be properly centered.
+     * Draw the top or left arrow. The coordinates of the polygon points
+     * probably seem odd, but they were carefully chosen with respect to X's
+     * rules for filling polygons. These point choices cause the arrows to
+     * just fill the narrow dimension of the scrollbar and be properly
+     * centered.
      */
 
     if (scrollPtr->activeField == TOP_ARROW) {
@@ -242,8 +242,8 @@ TkpDisplayScrollbar(clientData)
     }
 
     /*
-     * Copy the information from the off-screen pixmap onto the screen,
-     * then delete the pixmap.
+     * Copy the information from the off-screen pixmap onto the screen, then
+     * delete the pixmap.
      */
 
     XCopyArea(scrollPtr->display, pixmap, Tk_WindowId(tkwin),
@@ -251,7 +251,7 @@ TkpDisplayScrollbar(clientData)
 	    (unsigned) Tk_Width(tkwin), (unsigned) Tk_Height(tkwin), 0, 0);
     Tk_FreePixmap(scrollPtr->display, pixmap);
 
-    done:
+  done:
     scrollPtr->flags &= ~REDRAW_PENDING;
 }
 
@@ -260,9 +260,9 @@ TkpDisplayScrollbar(clientData)
  *
  * TkpComputeScrollbarGeometry --
  *
- *	After changes in a scrollbar's size or configuration, this
- *	procedure recomputes various geometry information used in
- *	displaying the scrollbar.
+ *	After changes in a scrollbar's size or configuration, this procedure
+ *	recomputes various geometry information used in displaying the
+ *	scrollbar.
  *
  * Results:
  *	None.
@@ -274,9 +274,10 @@ TkpDisplayScrollbar(clientData)
  */
 
 extern void
-TkpComputeScrollbarGeometry(scrollPtr)
-    register TkScrollbar *scrollPtr;	/* Scrollbar whose geometry may
-					 * have changed. */
+TkpComputeScrollbarGeometry(
+    register TkScrollbar *scrollPtr)
+				/* Scrollbar whose geometry may have
+				 * changed. */
 {
     int width, fieldLength;
 
@@ -297,9 +298,9 @@ TkpComputeScrollbarGeometry(scrollPtr)
     scrollPtr->sliderLast = fieldLength*scrollPtr->lastFraction;
 
     /*
-     * Adjust the slider so that some piece of it is always
-     * displayed in the scrollbar and so that it has at least
-     * a minimal width (so it can be grabbed with the mouse).
+     * Adjust the slider so that some piece of it is always displayed in the
+     * scrollbar and so that it has at least a minimal width (so it can be
+     * grabbed with the mouse).
      */
 
     if (scrollPtr->sliderFirst > (fieldLength - 2*scrollPtr->borderWidth)) {
@@ -319,10 +320,9 @@ TkpComputeScrollbarGeometry(scrollPtr)
     scrollPtr->sliderLast += scrollPtr->arrowLength + scrollPtr->inset;
 
     /*
-     * Register the desired geometry for the window (leave enough space
-     * for the two arrows plus a minimum-size slider, plus border around
-     * the whole window, if any).  Then arrange for the window to be
-     * redisplayed.
+     * Register the desired geometry for the window (leave enough space for
+     * the two arrows plus a minimum-size slider, plus border around the whole
+     * window, if any). Then arrange for the window to be redisplayed.
      */
 
     if (scrollPtr->vertical) {
@@ -355,8 +355,8 @@ TkpComputeScrollbarGeometry(scrollPtr)
  */
 
 void
-TkpDestroyScrollbar(scrollPtr)
-    TkScrollbar *scrollPtr;
+TkpDestroyScrollbar(
+    TkScrollbar *scrollPtr)
 {
     UnixScrollbar *unixScrollPtr = (UnixScrollbar *)scrollPtr;
 
@@ -374,8 +374,8 @@ TkpDestroyScrollbar(scrollPtr)
  * TkpConfigureScrollbar --
  *
  *	This procedure is called after the generic code has finished
- *	processing configuration options, in order to configure
- *	platform specific options.
+ *	processing configuration options, in order to configure platform
+ *	specific options.
  *
  * Results:
  *	None.
@@ -387,10 +387,10 @@ TkpDestroyScrollbar(scrollPtr)
  */
 
 void
-TkpConfigureScrollbar(scrollPtr)
-    register TkScrollbar *scrollPtr;	/* Information about widget;  may or
-					 * may not already have values for
-					 * some fields. */
+TkpConfigureScrollbar(
+    register TkScrollbar *scrollPtr)
+				/* Information about widget; may or may not
+				 * already have values for some fields. */
 {
     XGCValues gcValues;
     GC new;
@@ -416,14 +416,12 @@ TkpConfigureScrollbar(scrollPtr)
  *
  * TkpScrollbarPosition --
  *
- *	Determine the scrollbar element corresponding to a
- *	given position.
+ *	Determine the scrollbar element corresponding to a given position.
  *
  * Results:
- *	One of TOP_ARROW, TOP_GAP, etc., indicating which element
- *	of the scrollbar covers the position given by (x, y).  If
- *	(x,y) is outside the scrollbar entirely, then OUTSIDE is
- *	returned.
+ *	One of TOP_ARROW, TOP_GAP, etc., indicating which element of the
+ *	scrollbar covers the position given by (x, y). If (x,y) is outside the
+ *	scrollbar entirely, then OUTSIDE is returned.
  *
  * Side effects:
  *	None.
@@ -432,10 +430,10 @@ TkpConfigureScrollbar(scrollPtr)
  */
 
 int
-TkpScrollbarPosition(scrollPtr, x, y)
-    register TkScrollbar *scrollPtr;	/* Scrollbar widget record. */
-    int x, y;				/* Coordinates within scrollPtr's
-					 * window. */
+TkpScrollbarPosition(
+    register TkScrollbar *scrollPtr,
+				/* Scrollbar widget record. */
+    int x, int y)		/* Coordinates within scrollPtr's window. */
 {
     int length, width, tmp;
 
@@ -457,7 +455,7 @@ TkpScrollbarPosition(scrollPtr, x, y)
 
     /*
      * All of the calculations in this procedure mirror those in
-     * TkpDisplayScrollbar.  Be sure to keep the two consistent.
+     * TkpDisplayScrollbar. Be sure to keep the two consistent.
      */
 
     if (y < (scrollPtr->inset + scrollPtr->arrowLength)) {
@@ -474,3 +472,11 @@ TkpScrollbarPosition(scrollPtr, x, y)
     }
     return BOTTOM_GAP;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

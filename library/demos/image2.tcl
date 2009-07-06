@@ -3,11 +3,13 @@
 # This demonstration script creates a simple collection of widgets
 # that allow you to select and view images in a Tk label.
 #
-# RCS: @(#) $Id: image2.tcl,v 1.6 2002/08/12 13:38:48 dkf Exp $
+# RCS: @(#) $Id: image2.tcl,v 1.11 2007/12/13 15:27:07 dgp Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 # loadDir --
 # This procedure reloads the directory listbox from the directory
@@ -20,7 +22,7 @@ proc loadDir w {
     global dirName
 
     $w.f.list delete 0 end
-    foreach i [lsort [glob -directory $dirName *]] {
+    foreach i [lsort [glob -type f -directory $dirName *]] {
 	$w.f.list insert end [file tail $i]
     }
 }
@@ -55,7 +57,12 @@ proc loadImage {w x y} {
     global dirName
 
     set file [file join $dirName [$w.f.list get @$x,$y]]
-    image2a configure -file $file
+    if {[catch {
+	image2a configure -file $file
+    }]} then {
+	# Mark the file as not loadable
+	$w.f.list itemconfigure @$x,$y -bg \#c00000 -selectbackground \#ff0000
+    }
 }
 
 set w .image2
@@ -68,17 +75,16 @@ positionWindow $w
 label $w.msg -font $font -wraplength 4i -justify left -text "This demonstration allows you to view images using a Tk \"photo\" image.  First type a directory name in the listbox, then type Return to load the directory into the listbox.  Then double-click on a file name in the listbox to see that image."
 pack $w.msg -side top
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 frame $w.mid
 pack $w.mid -fill both -expand 1
 
 labelframe $w.dir -text "Directory:"
-set dirName [file join $tk_library demos images]
+# Main widget program sets variable tk_demoDirectory
+set dirName [file join $tk_demoDirectory images]
 entry $w.dir.e -width 30 -textvariable dirName
 button $w.dir.b -pady 0 -padx 2m -text "Select Dir." \
 	-command "selectAndLoadDir $w"

@@ -5,13 +5,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: menuDraw.test,v 1.5 2002/07/13 20:28:35 dgp Exp $
+# RCS: @(#) $Id: menuDraw.test,v 1.10 2007/05/09 12:52:44 das Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 test menuDraw-1.1 {TkMenuInitializeDrawingFields} {
@@ -166,7 +163,7 @@ test menuDraw-7.2 {TkEventuallyRecomputeMenu - update pending} {
 } {{} {}}
 
 
-test menuDraw-8.1 {TkRecomputeMenu} {pcOnly userInteraction} {
+test menuDraw-8.1 {TkRecomputeMenu} {win userInteraction} {
     catch {destroy .m1}
     menu .m1
     .m1 configure -postcommand [.m1 add command -label foo]
@@ -257,7 +254,7 @@ test menuDraw-11.3 {TkMenuSelectImageProc - entry not selected} testImageType {
 } {{} {} {}}
 
 #Don't know how to test missing tkwin in DisplayMenu
-test menuDraw-12.1 {DisplayMenu - menubar background} {unixOnly} {
+test menuDraw-12.1 {DisplayMenu - menubar background} unix {
     catch {destroy .m1}
     menu .m1
     .m1 add cascade -label foo -menu .m2
@@ -315,7 +312,7 @@ test menuDraw.12.7 {DisplayMenu - three columns} {
     set tearoff [tk::TearOffMenu .m1 40 40]
     list [update] [destroy .m1]
 } {{} {}}
-test menuDraw-12.6 {Display menu - testing for extra space and menubars} {unixOnly} {
+test menuDraw-12.6 {Display menu - testing for extra space and menubars} unix {
     catch {destroy .m1}
     menu .m1
     .m1 add cascade -label foo
@@ -349,14 +346,6 @@ test menuDraw-13.2 {TkMenuEventProc - ConfigureNotify} {
     set tearoff [tk::TearOffMenu .m1 40 40]
     list [wm geometry $tearoff 200x100] [update] [destroy .m1]
 } {{} {} {}}
-test menuDraw-13.3 {TkMenuEventProc - ActivateNotify} {macOnly} {
-    catch {destroy .t2}
-    toplevel .t2 -menu .t2.m1
-    menu .t2.m1
-    .t2.m1 add command -label foo
-    tk::TearOffMenu .t2.m1 40 40
-    list [catch {update} msg] $msg [destroy .t2]
-} {0 {} {}}
 # Testing deletes is hard, and I am going to do my best. Don't know how
 # to test the case where we have already cleared the tkwin field in the
 # menuPtr.
@@ -433,7 +422,7 @@ test menuDraw-15.6 {TkPostTearoffMenu - tearoff off right} {
 } {0 {}}
 
 
-test menuDraw-16.1 {TkPostSubmenu} {unixOnly} {
+test menuDraw-16.1 {TkPostSubmenu} nonUnixUserInteraction {
     catch {destroy .m1}
     catch {destroy .m2}
     menu .m1
@@ -444,7 +433,7 @@ test menuDraw-16.1 {TkPostSubmenu} {unixOnly} {
     $tearoff postcascade 0
     list [$tearoff postcascade 0] [destroy .m1] [destroy .m2]
 } {{} {} {}}
-test menuDraw-16.2 {TkPostSubMenu} {unixOnly} {
+test menuDraw-16.2 {TkPostSubMenu} nonUnixUserInteraction {
     catch {destroy .m1}
     catch {destroy .m2}
     catch {destroy .m3}
@@ -472,7 +461,7 @@ test menuDraw-16.4 {TkPostSubMenu} {
     set tearoff [tk::TearOffMenu .m1 40 40]
     list [$tearoff postcascade 0] [destroy .m1]
 } {{} {}}
-test menuDraw-16.5 {TkPostSubMenu} {unixOnly} {
+test menuDraw-16.5 {TkPostSubMenu} unix {
     catch {destroy .m1}
     catch {destroy .m2}
     menu .m1
@@ -481,7 +470,7 @@ test menuDraw-16.5 {TkPostSubMenu} {unixOnly} {
     set tearoff [tk::TearOffMenu .m1 40 40]
     list [catch {$tearoff postcascade test} msg] $msg [destroy .m1] [destroy .m2]
 } {1 {invalid command name "glorp"} {} {}}
-test menuDraw-16.6 {TkPostSubMenu} {pcOnly userInteraction} {
+test menuDraw-16.6 {TkPostSubMenu} {win userInteraction} {
     catch {destroy .m1}
     catch {destroy .m2}
     menu .m1
@@ -492,7 +481,7 @@ test menuDraw-16.6 {TkPostSubMenu} {pcOnly userInteraction} {
     list [$tearoff postcascade 0] [destroy .m1] [destroy .m2]
 } {{} {} {}}
 
-test menuDraw-17.1 {AdjustMenuCoords - menubar} {unixOnly} {
+test menuDraw-17.1 {AdjustMenuCoords - menubar} unix {
     catch {destroy .m1}
     catch {destroy .m2}
     menu .m1 -tearoff 0
@@ -507,7 +496,7 @@ test menuDraw-17.1 {AdjustMenuCoords - menubar} {unixOnly} {
     }
     list [$w postcascade 0] [. configure -menu ""] [destroy .m1] [destroy .m2]
 } {{} {} {} {}}
-test menuDraw-17.2 {AdjustMenuCoords - menu} {pcOnly userInteraction} {
+test menuDraw-17.2 {AdjustMenuCoords - menu} {win userInteraction} {
     catch {destroy .m1}
     catch {destroy .m2}
     menu .m1
@@ -520,18 +509,5 @@ test menuDraw-17.2 {AdjustMenuCoords - menu} {pcOnly userInteraction} {
 
 # cleanup
 deleteWindows
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

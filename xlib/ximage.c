@@ -1,18 +1,17 @@
-/* 
+/*
  * ximage.c --
  *
  *	X bitmap and image routines.
  *
  * Copyright (c) 1995 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: ximage.c,v 1.4.8.3 2007/06/29 03:20:58 das Exp $
+ * RCS: @(#) $Id: ximage.c,v 1.9 2007/12/13 15:29:45 dgp Exp $
  */
 
 #include "tkInt.h"
-
 
 /*
  *----------------------------------------------------------------------
@@ -21,10 +20,10 @@
  *
  *	Construct a single plane pixmap from bitmap data.
  *
- *	NOTE: This procedure has the correct behavior on Windows and
- *	the Macintosh, but not on UNIX.  This is probably because the
- *	emulation for XPutImage on those platforms compensates for whatever
- *	is wrong here :-)
+ *	NOTE: This procedure has the correct behavior on Windows and the
+ *	Macintosh, but not on UNIX. This is probably because the emulation for
+ *	XPutImage on those platforms compensates for whatever is wrong here
+ *	:-)
  *
  * Results:
  *	Returns a new Pixmap.
@@ -36,12 +35,12 @@
  */
 
 Pixmap
-XCreateBitmapFromData(display, d, data, width, height)
-    Display* display;
-    Drawable d;
-    _Xconst char* data;
-    unsigned int width;
-    unsigned int height;
+XCreateBitmapFromData(
+    Display *display,
+    Drawable d,
+    _Xconst char *data,
+    unsigned int width,
+    unsigned int height)
 {
     XImage *ximage;
     GC gc;
@@ -62,3 +61,11 @@ XCreateBitmapFromData(display, d, data, width, height)
     XFreeGC(display, gc);
     return pix;
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

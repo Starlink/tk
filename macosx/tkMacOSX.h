@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSX.h,v 1.2.2.3 2007/04/29 02:26:47 das Exp $
+ * RCS: @(#) $Id: tkMacOSX.h,v 1.5 2007/04/23 21:24:32 das Exp $
  */
 
 #ifndef _TKMAC

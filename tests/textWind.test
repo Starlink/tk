@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: textWind.test,v 1.5.2.1 2005/11/30 23:42:49 hobbs Exp $
+# RCS: @(#) $Id: textWind.test,v 1.22 2006/10/17 10:21:50 patthoyts Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 # Create entries in the option database to be sure that geometry options
@@ -22,17 +19,26 @@ option add *Text.borderWidth 2
 option add *Text.highlightThickness 2
 option add *Text.font {Courier -12}
 
+set fixedFont {Courier -12}
+# 15 on XP, 13 on Solaris 8
+set fixedHeight [font metrics $fixedFont -linespace]
+# 7 on all platforms
+set fixedWidth [font measure $fixedFont m]
+# 12 on XP
+set fixedAscent [font metrics $fixedFont -ascent]
+set fixedDiff [expr {$fixedHeight - 13}] ;# 2 on XP
+
+catch {destroy .f}
+catch {destroy .t}
+catch {destroy .t2}
+
 text .t -width 30 -height 6 -bd 2 -highlightthickness 2
 pack append . .t {top expand fill}
 update
 .t debug on
 wm geometry . {}
-if {[winfo depth .t] > 1} {
-    set color green
-} else {
-    set color black
-}
-
+set color [expr {[winfo depth .t] > 1 ? "green" : "black"}]
+  
 # The statements below reset the main window;  it's needed if the window
 # manager is mwm to make mwm forget about a previous minimum size setting.
 
@@ -184,13 +190,14 @@ test textWind-2.18 {TkTextWindowCmd procedure} {
 } {1 {unknown option "-gorp"} 0 1.0 1}
 test textWind-2.19 {TkTextWindowCmd procedure} {
     .t delete 1.0 end
+    catch {destroy .f}
     frame .f -width 10 -height 6 -bg $color
     list [catch {.t window create 1.0 -gorp -window .f stupid} msg] $msg \
 	    [winfo exists .f] [.t index 1.end] [catch {.t index .f}]
 } {1 {unknown option "-gorp"} 1 1.0 1}
 test textWind-2.20 {TkTextWindowCmd procedure} {
     list [catch {.t window c} msg] $msg
-} {1 {bad window option "c": must be cget, configure, create, or names}}
+} {1 {ambiguous window option "c": must be cget, configure, create, or names}}
 destroy .f
 test textWind-2.21 {TkTextWindowCmd procedure, "names" option} {
     list [catch {.t window names foo} msg] $msg
@@ -307,7 +314,7 @@ test textWind-4.5 {AlignParseProc and AlignPrintProc procedures} {
     .t window configure 1.0 -align top
     list [catch {.t window configure 1.0 -align gorp} msg] $msg \
 	    [.t window configure 1.0 -align]
-} {1 {bad alignment "gorp": must be baseline, bottom, center, or top} {-align {} {} center top}}
+} {1 {bad align "gorp": must be baseline, bottom, center, or top} {-align {} {} center top}}
 
 test textWind-5.1 {EmbWinStructureProc procedure} {fonts} {
     .t delete 1.0 end
@@ -350,7 +357,7 @@ test textWind-6.1 {EmbWinRequestProc procedure} {fonts} {
     lappend result [.t bbox 1.2] [.t bbox 1.3]
 } {{19 5 10 20} {29 8 7 13} {19 5 25 30} {44 13 7 13}}
 
-test textWind-7.1 {EmbWinLostSlaveProc procedure} {fonts} {
+test textWind-7.1 {EmbWinLostSlaveProc procedure} {textfonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
     frame .f -width 10 -height 20 -bg $color
@@ -359,8 +366,8 @@ test textWind-7.1 {EmbWinLostSlaveProc procedure} {fonts} {
     place .f -in .t -x 100 -y 50
     update
     list [winfo geom .f] [.t bbox 1.2]
-} {10x20+104+54 {19 11 0 0}}
-test textWind-7.2 {EmbWinLostSlaveProc procedure} {fonts} {
+} [list 10x20+105+55 [list 19 [expr {11+$fixedDiff/2}] 0 0]]
+test textWind-7.2 {EmbWinLostSlaveProc procedure} {textfonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
     frame .t.f -width 10 -height 20 -bg $color
@@ -369,7 +376,7 @@ test textWind-7.2 {EmbWinLostSlaveProc procedure} {fonts} {
     place .t.f -x 100 -y 50
     update
     list [winfo geom .t.f] [.t bbox 1.2]
-} {10x20+104+54 {19 11 0 0}}
+} [list 10x20+105+55 [list 19 [expr {11+$fixedDiff/2}] 0 0]]
 catch {destroy .f}
 catch {destroy .t.f}
 
@@ -402,12 +409,13 @@ proc bgerror args {
 test textWind-10.1 {EmbWinLayoutProc procedure} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
+    destroy .f
     .t window create 1.5 -create {
 	frame .f -width 10 -height 20 -bg $color
     }
     update
-    list [winfo exists .f] [winfo geom .f] [.t index .f]
-} {1 10x20+40+5 1.5}
+    list [winfo exists .f] [winfo width .f] [winfo height .f] [.t index .f]
+} {1 10 20 1.5}
 test textWind-10.2 {EmbWinLayoutProc procedure, error in creating window} {fonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
@@ -428,40 +436,85 @@ test textWind-10.3 {EmbWinLayoutProc procedure, error in creating window} {fonts
     update
     list $msg [.t bbox 1.5]
 } {{{bad window path name "gorp"}} {40 11 0 0}}
-test textWind-10.4 {EmbWinLayoutProc procedure, error in creating window} {fonts} {
+proc bgerror args {
+    global msg
+    if {[lsearch -exact $msg $args] == -1} {
+	lappend msg $args
+    }
+}
+test textWind-10.4 {EmbWinLayoutProc procedure, error in creating window} {textfonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
+    catch {destroy .t.f}
+    set msg {}
+    after idle {
+        .t window create 1.5 -create {
+            frame .t.f
+            frame .t.f.f -width 10 -height 20 -bg $color
+        }
+    }
+    set count 0
+    while {([llength $msg] < 2) && ($count < 100)} {
+	update ; incr count; .t bbox 1.5 ; after 10
+    }
+    lappend msg [.t bbox 1.5] [winfo exists .t.f.f]
+} [list {{can't embed .t.f.f relative to .t}} {{window name "f" already exists in parent}} [list 40 [expr {11+$fixedDiff/2}] 0 0] 1]
+test textWind-10.4.1 {EmbWinLayoutProc procedure, error in creating window} {textfonts} {
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    catch {destroy .t.f}
     .t window create 1.5 -create {
 	frame .t.f
 	frame .t.f.f -width 10 -height 20 -bg $color
     }
-    set msg xyzzy
-    update
-    list $msg [.t bbox 1.5] [winfo exists .t.f.f]
-} {{{can't embed .t.f.f relative to .t}} {40 11 0 0} 1}
+    set msg {}
+    update idletasks
+    lappend msg [winfo exists .t.f.f]
+} [list {{can't embed .t.f.f relative to .t}} 1]
 catch {destroy .t.f}
-test textWind-10.5 {EmbWinLayoutProc procedure, error in creating window} {fonts} {
+test textWind-10.5 {EmbWinLayoutProc procedure, error in creating window} {textfonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
     .t window create 1.5 -create {
 	concat .t
     }
-    set msg xyzzy
+    set msg {}
     update
-    list $msg [.t bbox 1.5]
-} {{{can't embed .t relative to .t}} {40 11 0 0}}
-test textWind-10.6 {EmbWinLayoutProc procedure, error in creating window} {fonts} {
+    lappend msg [.t bbox 1.5]
+} [list {{can't embed .t relative to .t}} [list 40 [expr {11+$fixedDiff/2}] 0 0]]
+test textWind-10.6 {EmbWinLayoutProc procedure, error in creating window} {textfonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
+    catch {destroy .t2}
     .t window create 1.5 -create {
 	toplevel .t2 -width 100 -height 150
 	wm geom .t2 +0+0
 	concat .t2
     }
-    set msg xyzzy
+    set msg {}
     update
-    list $msg [.t bbox 1.5]
-} {{{can't embed .t2 relative to .t}} {40 11 0 0}}
+    lappend msg [.t bbox 1.5]
+} [list {{can't embed .t2 relative to .t}} {{window name "t2" already exists in parent}} [list 40 [expr {11+$fixedDiff/2}] 0 0]]
+test textWind-10.6.1 {EmbWinLayoutProc procedure, error in creating window} {
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    catch {destroy .t2}
+    .t window create 1.5 -create {
+	toplevel .t2 -width 100 -height 150
+	wm geom .t2 +0+0
+	concat .t2
+    }
+    set msg {}
+    update
+    set i 0
+    while {[llength $msg] == 1 && [incr i] < 200} { update }
+    set msg
+} {{{can't embed .t2 relative to .t}} {{window name "t2" already exists in parent}}}
+
+proc bgerror args {
+    global msg
+    set msg $args
+}
 test textWind-10.7 {EmbWinLayoutProc procedure, steal window from self} {
     .t delete 1.0 end
     .t insert 1.0 ABCDEFGHIJKLMNOP
@@ -629,7 +682,7 @@ test textWind-13.1 {EmbWinBboxProc procedure} {
     update
     list [winfo geom .f] [.t bbox .f]
 } {5x5+21+6 {21 6 5 5}}
-test textWind-13.2 {EmbWinBboxProc procedure} {
+test textWind-13.2 {EmbWinBboxProc procedure} {fonts} {
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
     frame .f -width 5 -height 5 -bg $color
@@ -685,7 +738,7 @@ test textWind-13.8 {EmbWinBboxProc procedure} {fonts} {
     update
     list [winfo geom .f] [.t bbox .f]
 } {5x11+21+6 {21 6 5 11}}
-test textWind-13.9 {EmbWinBboxProc procedure, spacing options} {
+test textWind-13.9 {EmbWinBboxProc procedure, spacing options} {fonts} {
     .t configure -spacing1 5 -spacing3 2
     .t delete 1.0 end
     .t insert 1.0 "Some sample text"
@@ -735,7 +788,7 @@ test textWind-14.3 {EmbWinDelayedUnmap procedure} {
     update
     .t yview 2.0
     set result [winfo ismapped .f]
-    update
+    update ; after 10
     list $result [winfo ismapped .f]
 } {1 0}
 test textWind-14.4 {EmbWinDelayedUnmap procedure} {
@@ -816,22 +869,165 @@ test textWind-16.4 {EmbWinTextStructureProc procedure} {
 } {1 {47 5 30 20}}
 pack .t
 
+test textWind-17.1 {peer widgets and embedded windows} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert end "Line 1"
+    frame .f -width 20 -height 10 -bg blue
+    .t window create 1.3 -window .f
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    update ; update
+    destroy .t .tt
+    winfo exists .f
+} {0}
+
+test textWind-17.2 {peer widgets and embedded windows} {
+    catch {destroy .t .f}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert end "Line 1\nLine 2"
+    frame .f -width 20 -height 10 -bg blue
+    .t window create 1.4 -window .f
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    update ; update
+    destroy .t
+    .tt.t insert 1.0 "foo"
+    update
+    destroy .tt
+} {}
+
+test textWind-17.3 {peer widget and -create} {
+    catch {destroy .t}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    update ; update
+    .t window create 1.2 -create {frame %W.f -width 10 -height 20 -bg blue}
+    update
+    destroy .t .tt
+} {}
+
+test textWind-17.4 {peer widget deleted one window shouldn't delete others} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -create {frame %W.f -width 10 -height 20 -bg blue}
+    update ; update
+    destroy .tt
+    set res {}
+    lappend res [.t get 1.2]
+    update
+    lappend res [.t get 1.2]
+} {{} {}}
+
+test textWind-17.5 {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -create {frame %W.f -width 10 -height 20 -bg blue}
+    update ; update
+    set res [list [.t window cget 1.2 -window] [.tt.t window cget 1.2 -window]]
+    destroy .tt .t
+    set res
+} {.t.f .tt.t.f}
+
+test textWind-17.6 {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -create {frame %W.f -width 10 -height 20 -bg blue}
+    update ; update
+    set res [list [.t window configure 1.2 -window] \
+      [.tt.t window configure 1.2 -window]]
+    destroy .tt .t
+    set res
+} {{-window {} {} {} .t.f} {-window {} {} {} .tt.t.f}}
+
+test textWind-17.7 {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -window [frame .t.f -width 10 -height 20 -bg blue]
+    update ; update
+    set res [list [.t window cget 1.2 -window] [.tt.t window cget 1.2 -window]]
+    destroy .tt .t
+    set res
+} {.t.f {}}
+
+test textWind-17.8 {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -window [frame .t.f -width 10 -height 20 -bg blue]
+    update ; update
+    set res [list [.t window configure 1.2 -window] \
+      [.tt.t window configure 1.2 -window]]
+    destroy .tt .t
+    set res
+} {{-window {} {} {} .t.f} {-window {} {} {} {}}}
+
+test textWind-17.8a {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -window [frame .t.f -width 10 -height 20 -bg blue]
+    update ; update
+    .tt.t window configure 1.2 -window [frame .tt.t.f -width 10 -height 20 -bg red]
+    set res [list [.t window configure 1.2 -window] \
+      [.tt.t window configure 1.2 -window]]
+    destroy .tt .t
+    set res
+} {{-window {} {} {} .t.f} {-window {} {} {} .tt.t.f}}
+
+test textWind-17.9 {peer widget window configuration} {
+    catch {destroy .t .tt}
+    pack [text .t]
+    .t delete 1.0 end
+    .t insert 1.0 "Some sample text"
+    toplevel .tt
+    pack [.t peer create .tt.t]
+    .t window create 1.2 -window [frame .t.f -width 10 -height 20 -bg blue]
+    .tt.t window create 1.2 -window [frame .tt.t.f -width 25 -height 20 -bg blue]
+    update ; update
+    .t window configure 1.2 -create \
+      {destroy %W.f ; frame %W.f -width 50 -height 7 -bg red}
+    .tt.t window configure 1.2 -window {}
+    .t window configure 1.2 -window {}
+    set res [list [.t window configure 1.2 -window] \
+      [.tt.t window configure 1.2 -window]]
+    update
+    lappend res [.t window configure 1.2 -window] \
+      [.tt.t window configure 1.2 -window]
+    destroy .tt .t
+    set res
+} {{-window {} {} {} {}} {-window {} {} {} {}} {-window {} {} {} .t.f} {-window {} {} {} .tt.t.f}}
+
 catch {destroy .t}
 option clear
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

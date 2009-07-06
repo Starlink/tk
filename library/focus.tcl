@@ -3,7 +3,7 @@
 # This file defines several procedures for managing the input
 # focus.
 #
-# RCS: @(#) $Id: focus.tcl,v 1.9.4.1 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: focus.tcl,v 1.11 2006/01/25 18:22:04 dgp Exp $
 #
 # Copyright (c) 1994-1995 Sun Microsystems, Inc.
 #
@@ -38,7 +38,7 @@ proc ::tk_focusNext w {
 	    incr i
 	    if {$i < [llength $children]} {
 		set cur [lindex $children $i]
-              if {[winfo toplevel $cur] eq $cur} {
+		if {[winfo toplevel $cur] eq $cur} {
 		    continue
 		} else {
 		    break
@@ -165,8 +165,7 @@ proc ::tk::FocusOK w {
 proc ::tk_focusFollowsMouse {} {
     set old [bind all <Enter>]
     set script {
-	if {"%d" eq "NotifyAncestor" \
-		|| "%d" eq "NotifyNonlinear" \
+	if {"%d" eq "NotifyAncestor" || "%d" eq "NotifyNonlinear" \
 		|| "%d" eq "NotifyInferior"} {
 	    if {[tk::FocusOK %W]} {
 		focus %W

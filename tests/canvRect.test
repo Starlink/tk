@@ -6,13 +6,10 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: canvRect.test,v 1.6 2003/02/09 07:48:22 hobbs Exp $
+# RCS: @(#) $Id: canvRect.test,v 1.8 2004/05/23 17:34:48 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
 canvas .c -width 400 -height 300 -bd 2 -relief sunken
@@ -25,22 +22,27 @@ update
 set i 1
 .c create rectangle 20 20 80 80 -tag test
 foreach test {
-    {-fill #ff0000 #ff0000 non-existent {unknown color name "non-existent"}}
-    {-outline #123456 #123456 bad_color {unknown color name "bad_color"}}
-    {-stipple gray50 gray50 bogus {bitmap "bogus" not defined}}
-    {-tags {test a b c} {test a b c} {} {}}
-    {-width 6.0 6.0 abc {bad screen distance "abc"}}
+    {-fill #ff0000 #ff0000
+	    non-existent {unknown color name "non-existent"}}
+    {-outline #123456 #123456
+	    bad_color {unknown color name "bad_color"}}
+    {-stipple gray50 gray50
+	    bogus {bitmap "bogus" not defined}}
+    {-tags {test a b c} {test a b c}
+	    {} {}}
+    {-width 6.0 6.0
+	    abc {bad screen distance "abc"}}
 } {
-    set name [lindex $test 0]
-    test canvRect-1.$i {configuration options} {
-	.c itemconfigure test $name [lindex $test 1]
+    lassign $test name goodValue goodResult badValue badResult
+    test canvRect-1.$i "configuration options: good value for $name" {
+	.c itemconfigure test $name $goodValue
 	list [lindex [.c itemconfigure test $name] 4] [.c itemcget test $name]
-    } [list [lindex $test 2] [lindex $test 2]]
+    } [list $goodResult $goodResult]
     incr i
-    if {[lindex $test 3] != ""} {
-	test canvRect-1.$i {configuration options} {
-	    list [catch {.c itemconfigure test $name [lindex $test 3]} msg] $msg
-	} [list 1 [lindex $test 4]]
+    if {$badValue ne ""} {
+	test canvRect-1.$i "configuration options: bad value for $name" -body {
+	    .c itemconfigure test $name $badValue
+	} -returnCodes error -result $badResult
     }
     incr i
 }
@@ -324,18 +326,5 @@ end
 }
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

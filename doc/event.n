@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: event.n,v 1.6.8.1 2004/10/28 10:19:29 dkf Exp $
+'\" RCS: @(#) $Id: event.n,v 1.19 2007/12/13 15:23:43 dgp Exp $
 '\" 
 .so man.macros
 .TH event n 8.3 Tk "Tk Built-In Commands"
@@ -16,7 +16,6 @@ event \- Miscellaneous event facilities: define virtual events and generate even
 .SH SYNOPSIS
 \fBevent\fI option \fR?\fIarg arg ...\fR?
 .BE
-
 .SH DESCRIPTION
 .PP
 The \fBevent\fR command provides several facilities for dealing with
@@ -51,10 +50,8 @@ trigger anymore.
 Generates a window event and arranges for it to be processed just as if
 it had come from the window system.
 \fIWindow\fR gives the path name of the window for which the event
-.VS 8.3
 will be generated; it may also be an identifier (such as returned by
 \fBwinfo id\fR) as long as it is for a window in the current application.
-.VE
 \fIEvent\fR provides a basic description of
 the event, such as \fB<Shift-Button-2>\fR or \fB<<Paste>>\fR.
 If \fIWindow\fR is empty the whole screen is meant, and coordinates
@@ -64,14 +61,14 @@ argument of the \fBbind\fR command except that it must consist
 of a single event pattern, not a sequence.
 \fIOption-value\fR pairs may be used to specify additional
 attributes of the event, such as the x and y mouse position;  see
-EVENT FIELDS below.  If the \fB\-when\fR option is not specified, the
+\fBEVENT FIELDS\fR below.  If the \fB\-when\fR option is not specified, the
 event is processed immediately:  all of the handlers for the event
 will complete before the \fBevent generate\fR command returns.
 If the \fB\-when\fR option is specified then it determines when the
 event is processed.  Certain events, such as key events, require
 that the window has focus to receive the event properly.
 .TP
-\fBevent info \fR?<<\fIvirtual\fB>>\fR?
+\fBevent info \fR?\fB<<\fIvirtual\fB>>\fR?
 Returns information about virtual events.
 If the \fB<<\fIvirtual\fB>>\fR argument is omitted, the return value
 is a list of all the virtual events that are currently defined.
@@ -79,11 +76,17 @@ If \fB<<\fIvirtual\fB>>\fR is specified then the return value is
 a list whose elements are the physical event sequences currently
 defined for the given virtual event;  if the virtual event is
 not defined then an empty string is returned.
+.RS
+.PP
+Note that virtual events that that are not bound to physical event
+sequences are \fInot\fR returned by \fBevent info\fR.
+.RE
 .SH "EVENT FIELDS"
 .PP
 The following options are supported for the \fBevent generate\fR
-command.  These correspond to the ``%'' expansions
-allowed in binding scripts for the \fBbind\fR command.
+command.  These correspond to the
+.QW %
+expansions allowed in binding scripts for the \fBbind\fR command.
 .TP
 \fB\-above\fI window\fR
 \fIWindow\fR specifies the \fIabove\fR field for the event,
@@ -107,6 +110,13 @@ Corresponds to the \fB%b\fR substitution for binding scripts.
 \fINumber\fR must be an integer;  it specifies the \fIcount\fR field
 for the event.  Valid for \fBExpose\fR events.
 Corresponds to the \fB%c\fR substitution for binding scripts.
+.VS 8.5
+.TP
+\fB\-data\fI string\fR
+\fIString\fR may be any value; it specifies the \fIuser_data\fR field
+for the event.  Only valid for virtual events.  Corresponds to the
+\fB%d\fR substitution for virtual events in binding scripts.
+.VE 8.5
 .TP
 \fB\-delta\fI number\fR
 \fINumber\fR must be an integer;  it specifies the \fIdelta\fR field
@@ -114,7 +124,7 @@ for the \fBMouseWheel\fR event.  The \fIdelta\fR refers to the
 direction and magnitude the mouse wheel was rotated.  Note the value
 is not a screen distance but are units of motion in the mouse wheel.
 Typically these values are multiples of 120.  For example, 120 should
-scroll the text widget up 4 lines and -240 would scroll the text
+scroll the text widget up 4 lines and \-240 would scroll the text
 widget down 8 lines.  Of course, other widgets may define different
 behaviors for mouse wheel motion.  This field corresponds to the
 \fB%D\fR substitution for binding scripts.
@@ -125,10 +135,10 @@ and must be one of the following:
 .RS
 .DS
 .ta 6c
-\fBNotifyAncestor	NotifyNonlinearVirtual
-NotifyDetailNone	NotifyPointer
-NotifyInferior	NotifyPointerRoot
-NotifyNonlinear	NotifyVirtual\fR
+\fBNotifyAncestor\fR	\fBNotifyNonlinearVirtual\fR
+\fBNotifyDetailNone\fR	\fBNotifyPointer\fR
+\fBNotifyInferior\fR	\fBNotifyPointerRoot\fR
+\fBNotifyNonlinear\fR	\fBNotifyVirtual\fR
 .DE
 Valid for \fBEnter\fR, \fBLeave\fR, \fBFocusIn\fR and
 \fBFocusOut\fR events.
@@ -299,6 +309,74 @@ for binding scripts.
 Any options that are not specified when generating an event are filled 
 with the value 0, except for \fIserial\fR, which is filled with the 
 next X event serial number.  
+.SH "PREDEFINED VIRTUAL EVENTS"
+Tk defines the following virtual events for the purposes of
+notification:
+.TP
+\fB<<AltUnderlined>>\fR
+This is sent to widget to notify it that the letter it has underlined
+(as an accelerator indicator) with the \fB\-underline\fR option has
+been pressed in combination with the Alt key. The usual response to
+this is to either focus into the widget (or some related widget) or to
+invoke the widget.
+.TP
+\fB<<ListboxSelect>>\fR
+This is sent to a listbox when the set of selected item(s) in the
+listbox is updated.
+.TP
+\fB<<MenuSelect>>\fR
+This is sent to a menu when the currently selected item in the menu
+changes. It is intended for use with context-sensitive help systems.
+.TP
+\fB<<Modified>>\fR
+This is sent to a text widget when the contents of the widget are
+changed.
+.TP
+\fB<<Selection>>\fR
+This is sent to a text widget when the selection in the widget is
+changed.
+.TP
+\fB<<TraverseIn>>\fR
+This is sent to a widget when the focus enters the widget because of a
+user-driven
+.QW "tab to widget"
+action.
+.TP
+\fB<<TraverseOut>>\fR
+This is sent to a widget when the focus leaves the widget because of a
+user-driven
+.QW "tab to widget"
+action.
+.PP
+Tk defines the following virtual events for the purposes of unifying
+bindings across multiple platforms. Users expect them to behave in the
+following way:
+.TP
+\fB<<Clear>>\fR
+Delete the currently selected widget contents.
+.TP
+\fB<<Copy>>\fR
+Copy the currently selected widget contents to the clipboard.
+.TP
+\fB<<Cut>>\fR
+Move the currently selected widget contents to the clipboard.
+.TP
+\fB<<Paste>>\fR
+Replace the currently selected widget contents with the contents of
+the clipboard.
+.TP
+\fB<<PasteSelection>>\fR
+Insert the contents of the selection at the mouse location. (This
+event has meaningful \fB%x\fR and \fB%y\fR substitutions).
+.TP
+\fB<<PrevWindow>>\fR
+Traverse to the previous window.
+.TP
+\fB<<Redo>>\fR
+Redo one undone action.
+.TP
+\fB<<Undo>>\fR
+Undo the last action.
 .SH "VIRTUAL EVENT EXAMPLES"
 .PP
 In order for a virtual event binding to trigger, two things must

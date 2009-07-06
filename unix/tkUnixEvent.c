@@ -1,24 +1,23 @@
-/* 
+/*
  * tkUnixEvent.c --
  *
- *	This file implements an event source for X displays for the
- *	UNIX version of Tk.
+ *	This file implements an event source for X displays for the UNIX
+ *	version of Tk.
  *
  * Copyright (c) 1995-1997 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkUnixEvent.c,v 1.11.2.7 2006/12/22 19:06:12 dkf Exp $
+ * RCS: @(#) $Id: tkUnixEvent.c,v 1.27 2008/03/26 19:04:10 jenglish Exp $
  */
 
-#include "tkInt.h"
 #include "tkUnixInt.h"
 #include <signal.h>
 
 /*
- * The following static indicates whether this module has been initialized
- * in the current thread.
+ * The following static indicates whether this module has been initialized in
+ * the current thread.
  */
 
 typedef struct ThreadSpecificData {
@@ -26,42 +25,26 @@ typedef struct ThreadSpecificData {
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
 
-#if defined(TK_USE_INPUT_METHODS) && defined(PEEK_XCLOSEIM)
 /*
- * Structure used to peek into internal XIM data structure.
- * This is only known to work with XFree86.
- */
-struct XIMPeek {
-    void *junk1, *junk2;
-    XIC  ic_chain;
-};
-#endif
-
-/*
- * Prototypes for procedures that are referenced only in this file:
+ * Prototypes for functions that are referenced only in this file:
  */
 
-static void		DisplayCheckProc _ANSI_ARGS_((ClientData clientData,
-			    int flags));
-static void		DisplayExitHandler _ANSI_ARGS_((
-			    ClientData clientData));
-static void		DisplayFileProc _ANSI_ARGS_((ClientData clientData,
-			    int flags));
-static void		DisplaySetupProc _ANSI_ARGS_((ClientData clientData,
-			    int flags));
-static void		TransferXEventsToTcl _ANSI_ARGS_((Display *display));
+static void		DisplayCheckProc(ClientData clientData, int flags);
+static void		DisplayExitHandler(ClientData clientData);
+static void		DisplayFileProc(ClientData clientData, int flags);
+static void		DisplaySetupProc(ClientData clientData, int flags);
+static void		TransferXEventsToTcl(Display *display);
 #ifdef TK_USE_INPUT_METHODS
-static void		OpenIM _ANSI_ARGS_((TkDisplay *dispPtr));
+static void		OpenIM(TkDisplay *dispPtr);
 #endif
-
 
 /*
  *----------------------------------------------------------------------
  *
  * TkCreateXEventSource --
  *
- *	This procedure is called during Tk initialization to create
- *	the event source for X Window events.
+ *	This function is called during Tk initialization to create the event
+ *	source for X Window events.
  *
  * Results:
  *	None.
@@ -73,10 +56,10 @@ static void		OpenIM _ANSI_ARGS_((TkDisplay *dispPtr));
  */
 
 void
-TkCreateXEventSource()
+TkCreateXEventSource(void)
 {
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
 	tsdPtr->initialized = 1;
@@ -90,8 +73,8 @@ TkCreateXEventSource()
  *
  * DisplayExitHandler --
  *
- *	This function is called during finalization to clean up the
- *	display module.
+ *	This function is called during finalization to clean up the display
+ *	module.
  *
  * Results:
  *	None.
@@ -103,11 +86,11 @@ TkCreateXEventSource()
  */
 
 static void
-DisplayExitHandler(clientData)
-    ClientData clientData;	/* Not used. */
+DisplayExitHandler(
+    ClientData clientData)	/* Not used. */
 {
-    ThreadSpecificData *tsdPtr = (ThreadSpecificData *) 
-            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     Tcl_DeleteEventSource(DisplaySetupProc, DisplayCheckProc, NULL);
     tsdPtr->initialized = 0;
@@ -118,8 +101,8 @@ DisplayExitHandler(clientData)
  *
  * TkpOpenDisplay --
  *
- *	Allocates a new TkDisplay, opens the X display, and establishes
- *	the file handler for the connection.
+ *	Allocates a new TkDisplay, opens the X display, and establishes the
+ *	file handler for the connection.
  *
  * Results:
  *	A pointer to a Tk display structure.
@@ -131,11 +114,11 @@ DisplayExitHandler(clientData)
  */
 
 TkDisplay *
-TkpOpenDisplay(display_name)
-    CONST char *display_name;
+TkpOpenDisplay(
+    CONST char *displayNameStr)
 {
     TkDisplay *dispPtr;
-    Display *display = XOpenDisplay(display_name);
+    Display *display = XOpenDisplay(displayNameStr);
 
     if (display == NULL) {
 	return NULL;
@@ -156,7 +139,7 @@ TkpOpenDisplay(display_name)
  *
  * TkpCloseDisplay --
  *
- *	Cancels notifier callbacks and closes a display.  
+ *	Cancels notifier callbacks and closes a display.
  *
  * Results:
  *	None.
@@ -168,8 +151,8 @@ TkpOpenDisplay(display_name)
  */
 
 void
-TkpCloseDisplay(dispPtr)
-    TkDisplay *dispPtr;
+TkpCloseDisplay(
+    TkDisplay *dispPtr)
 {
     TkSendCleanup(dispPtr);
 
@@ -178,55 +161,10 @@ TkpCloseDisplay(dispPtr)
     TkWmCleanup(dispPtr);
 
 #ifdef TK_USE_INPUT_METHODS
-#if TK_XIM_SPOT
     if (dispPtr->inputXfs) {
 	XFreeFontSet(dispPtr->display, dispPtr->inputXfs);
     }
-#endif
     if (dispPtr->inputMethod) {
-	/*
-	 * Calling XCloseIM with an input context that has not
-	 * been freed can cause a crash. This crash has been
-	 * reproduced under Linux systems with XFree86 3.3
-	 * and may have also been seen under Solaris 2.3.
-	 * The crash is caused by a double free of memory
-	 * inside the X library. Memory that was already
-	 * deallocated may be accessed again inside XCloseIM.
-	 * This bug can be avoided by making sure that a
-	 * call to XDestroyIC is made for each XCreateIC call.
-	 * This bug has been fixed in XFree86 4.2.99.2.
-	 * The internal layout of the XIM structure changed
-	 * in the XFree86 4.2 release so the test should
-	 * not be run for with these new releases.
-	 */
-
-#if defined(TK_USE_INPUT_METHODS) && defined(PEEK_XCLOSEIM)
-	int do_peek = 0;
-	struct XIMPeek *peek;
-
-	if (strstr(ServerVendor(dispPtr->display), "XFree86")) {
-	    int vendrel = VendorRelease(dispPtr->display);
-	    if (vendrel < 336) {
-	        /* 3.3.4 and 3.3.5 */
-	        do_peek = 1;
-	    } else if (vendrel < 3900) {
-	        /* Other 3.3.x versions */
-	        do_peek = 1;
-	    } else if (vendrel < 40000000) {
-	        /* 4.0.x versions */
-	        do_peek = 1;
-	    } else {
-	        /* Newer than 4.0 */
-	        do_peek = 0;
-	    }
-	}
-
-	if (do_peek) {
-	    peek = (struct XIMPeek *) dispPtr->inputMethod;
-	    if (peek->ic_chain != NULL)
-	        panic("input contexts not freed before XCloseIM");
-	}
-#endif
 	XCloseIM(dispPtr->inputMethod);
     }
 #endif
@@ -243,11 +181,10 @@ TkpCloseDisplay(dispPtr)
  *
  * TkClipCleanup --
  *
- *	This procedure is called to cleanup resources associated with
- *	claiming clipboard ownership and for receiving selection get
- *	results.  This function is called in tkWindow.c.  This has to be
- *	called by the display cleanup function because we still need the
- *	access display elements.
+ *	This function is called to cleanup resources associated with claiming
+ *	clipboard ownership and for receiving selection get results. This
+ *	function is called in tkWindow.c. This has to be called by the display
+ *	cleanup function because we still need the access display elements.
  *
  * Results:
  *	None.
@@ -259,8 +196,8 @@ TkpCloseDisplay(dispPtr)
  */
 
 void
-TkClipCleanup(dispPtr)
-    TkDisplay *dispPtr;	/* display associated with clipboard */
+TkClipCleanup(
+    TkDisplay *dispPtr)		/* Display associated with clipboard */
 {
     if (dispPtr->clipWindow != NULL) {
 	Tk_DeleteSelHandler(dispPtr->clipWindow, dispPtr->clipboardAtom,
@@ -279,25 +216,25 @@ TkClipCleanup(dispPtr)
  *
  * DisplaySetupProc --
  *
- *	This procedure implements the setup part of the UNIX X display
- *	event source.  It is invoked by Tcl_DoOneEvent before entering
- *	the notifier to check for events on all displays.
+ *	This function implements the setup part of the UNIX X display event
+ *	source. It is invoked by Tcl_DoOneEvent before entering the notifier
+ *	to check for events on all displays.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	If data is queued on a display inside Xlib, then the maximum
- *	block time will be set to 0 to ensure that the notifier returns
- *	control to Tcl even if there is no more data on the X connection.
+ *	If data is queued on a display inside Xlib, then the maximum block
+ *	time will be set to 0 to ensure that the notifier returns control to
+ *	Tcl even if there is no more data on the X connection.
  *
  *----------------------------------------------------------------------
  */
 
 static void
-DisplaySetupProc(clientData, flags)
-    ClientData clientData;	/* Not used. */
-    int flags;
+DisplaySetupProc(
+    ClientData clientData,	/* Not used. */
+    int flags)
 {
     TkDisplay *dispPtr;
     static Tcl_Time blockTime = { 0, 0 };
@@ -307,13 +244,11 @@ DisplaySetupProc(clientData, flags)
     }
 
     for (dispPtr = TkGetDisplayList(); dispPtr != NULL;
-	 dispPtr = dispPtr->nextPtr) {
-
+	    dispPtr = dispPtr->nextPtr) {
 	/*
-	 * Flush the display. If data is pending on the X queue, set
-	 * the block time to zero.  This ensures that we won't block
-	 * in the notifier if there is data in the X queue, but not on
-	 * the server socket.
+	 * Flush the display. If data is pending on the X queue, set the block
+	 * time to zero. This ensures that we won't block in the notifier if
+	 * there is data in the X queue, but not on the server socket.
 	 */
 
 	XFlush(dispPtr->display);
@@ -326,9 +261,9 @@ DisplaySetupProc(clientData, flags)
 /*
  *----------------------------------------------------------------------
  *
- *  TransferXEventsToTcl
+ * TransferXEventsToTcl --
  *
- *      Transfer events from the X event queue to the Tk event queue.
+ *	Transfer events from the X event queue to the Tk event queue.
  *
  * Results:
  *	None.
@@ -340,17 +275,18 @@ DisplaySetupProc(clientData, flags)
  */
 
 static void
-TransferXEventsToTcl(display)
-    Display *display;
+TransferXEventsToTcl(
+    Display *display)
 {
     XEvent event;
 
     /*
-     * Transfer events from the X event queue to the Tk event queue
-     * after XIM event filtering.  KeyPress and KeyRelease events
-     * are filtered in Tk_HandleEvent instead of here, so that Tk's
-     * focus management code can redirect them.
+     * Transfer events from the X event queue to the Tk event queue after XIM
+     * event filtering. KeyPress and KeyRelease events are filtered in
+     * Tk_HandleEvent instead of here, so that Tk's focus management code can
+     * redirect them.
      */
+
     while (QLength(display) > 0) {
 	XNextEvent(display, &event);
 	if (event.type != KeyPress && event.type != KeyRelease) {
@@ -367,8 +303,7 @@ TransferXEventsToTcl(display)
  *
  * DisplayCheckProc --
  *
- *	This procedure checks for events sitting in the X event
- *	queue.
+ *	This function checks for events sitting in the X event queue.
  *
  * Results:
  *	None.
@@ -380,9 +315,9 @@ TransferXEventsToTcl(display)
  */
 
 static void
-DisplayCheckProc(clientData, flags)
-    ClientData clientData;	/* Not used. */
-    int flags;
+DisplayCheckProc(
+    ClientData clientData,	/* Not used. */
+    int flags)
 {
     TkDisplay *dispPtr;
 
@@ -391,7 +326,7 @@ DisplayCheckProc(clientData, flags)
     }
 
     for (dispPtr = TkGetDisplayList(); dispPtr != NULL;
-	 dispPtr = dispPtr->nextPtr) {
+	    dispPtr = dispPtr->nextPtr) {
 	XFlush(dispPtr->display);
 	TransferXEventsToTcl(dispPtr->display);
     }
@@ -402,22 +337,22 @@ DisplayCheckProc(clientData, flags)
  *
  * DisplayFileProc --
  *
- *	This procedure implements the file handler for the X connection.
+ *	This function implements the file handler for the X connection.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	Makes entries on the Tcl event queue for all the events available
- *	from all the displays.
+ *	Makes entries on the Tcl event queue for all the events available from
+ *	all the displays.
  *
  *----------------------------------------------------------------------
  */
 
 static void
-DisplayFileProc(clientData, flags)
-    ClientData clientData;		/* The display pointer. */
-    int flags;				/* Should be TCL_READABLE. */
+DisplayFileProc(
+    ClientData clientData,	/* The display pointer. */
+    int flags)			/* Should be TCL_READABLE. */
 {
     TkDisplay *dispPtr = (TkDisplay *) clientData;
     Display *display = dispPtr->display;
@@ -426,38 +361,34 @@ DisplayFileProc(clientData, flags)
     XFlush(display);
     numFound = XEventsQueued(display, QueuedAfterReading);
     if (numFound == 0) {
-	
 	/*
-	 * Things are very tricky if there aren't any events readable
-	 * at this point (after all, there was supposedly data
-	 * available on the connection).  A couple of things could
-	 * have occurred:
-	 * 
-	 * One possibility is that there were only error events in the
-	 * input from the server.  If this happens, we should return
-	 * (we don't want to go to sleep in XNextEvent below, since
-	 * this would block out other sources of input to the
-	 * process).
+	 * Things are very tricky if there aren't any events readable at this
+	 * point (after all, there was supposedly data available on the
+	 * connection). A couple of things could have occurred:
 	 *
-	 * Another possibility is that our connection to the server
-	 * has been closed.  This will not necessarily be detected in
-	 * XEventsQueued (!!), so if we just return then there will be
-	 * an infinite loop.  To detect such an error, generate a NoOp
-	 * protocol request to exercise the connection to the server,
-	 * then return.  However, must disable SIGPIPE while sending
-	 * the request, or else the process will die from the signal
-	 * and won't invoke the X error function to print a nice (?!)
-	 * message.
+	 * One possibility is that there were only error events in the input
+	 * from the server. If this happens, we should return (we don't want
+	 * to go to sleep in XNextEvent below, since this would block out
+	 * other sources of input to the process).
+	 *
+	 * Another possibility is that our connection to the server has been
+	 * closed. This will not necessarily be detected in XEventsQueued (!!)
+	 * so if we just return then there will be an infinite loop. To detect
+	 * such an error, generate a NoOp protocol request to exercise the
+	 * connection to the server, then return. However, must disable
+	 * SIGPIPE while sending the request, or else the process will die
+	 * from the signal and won't invoke the X error function to print a
+	 * nice (?!) message.
 	 */
-	
+
 	void (*oldHandler)();
-	
+
 	oldHandler = (void (*)()) signal(SIGPIPE, SIG_IGN);
 	XNoOp(display);
 	XFlush(display);
 	(void) signal(SIGPIPE, oldHandler);
     }
-    
+
     TransferXEventsToTcl(display);
 }
 
@@ -483,8 +414,8 @@ DisplayFileProc(clientData, flags)
  */
 
 int
-TkUnixDoOneXEvent(timePtr)
-    Tcl_Time *timePtr;		/* Specifies the absolute time when the call
+TkUnixDoOneXEvent(
+    Tcl_Time *timePtr)		/* Specifies the absolute time when the call
 				 * should time out. */
 {
     TkDisplay *dispPtr;
@@ -492,10 +423,10 @@ TkUnixDoOneXEvent(timePtr)
     struct timeval blockTime, *timeoutPtr;
     Tcl_Time now;
     int fd, index, numFound, numFdBits = 0;
-    fd_mask bit;
+    fd_mask bit, *readMaskPtr = readMask;
 
     /*
-     * Look for queued events first. 
+     * Look for queued events first.
      */
 
     if (Tcl_ServiceEvent(TCL_WINDOW_EVENTS)) {
@@ -509,7 +440,7 @@ TkUnixDoOneXEvent(timePtr)
      */
 
     if (timePtr) {
-	TclpGetTime(&now);
+	Tcl_GetTime(&now);
 	blockTime.tv_sec = timePtr->sec;
 	blockTime.tv_usec = timePtr->usec - now.usec;
 	if (blockTime.tv_usec < 0) {
@@ -532,7 +463,7 @@ TkUnixDoOneXEvent(timePtr)
      * pending, then we want to poll instead of blocking.
      */
 
-    memset((VOID *) readMask, 0, MASK_SIZE*sizeof(fd_mask));
+    memset(readMask, 0, MASK_SIZE*sizeof(fd_mask));
     for (dispPtr = TkGetDisplayList(); dispPtr != NULL;
 	    dispPtr = dispPtr->nextPtr) {
 	XFlush(dispPtr->display);
@@ -541,11 +472,6 @@ TkUnixDoOneXEvent(timePtr)
 	    blockTime.tv_usec = 0;
 	}
 	fd = ConnectionNumber(dispPtr->display);
-
-	/*
-	 * Assume there are always at least 'fd' bits in the 'readMask' array.
-	 */
-
 	index = fd/(NBBY*sizeof(fd_mask));
 	bit = ((fd_mask)1) << (fd%(NBBY*sizeof(fd_mask)));
 	readMask[index] |= bit;
@@ -554,7 +480,7 @@ TkUnixDoOneXEvent(timePtr)
 	}
     }
 
-    numFound = select(numFdBits, (SELECT_MASK *) &readMask[0], NULL, NULL,
+    numFound = select(numFdBits, (SELECT_MASK *) readMaskPtr, NULL, NULL,
 	    timeoutPtr);
     if (numFound <= 0) {
 	/*
@@ -562,7 +488,7 @@ TkUnixDoOneXEvent(timePtr)
 	 * it here.
 	 */
 
-	memset((VOID *) readMask, 0, MASK_SIZE*sizeof(fd_mask));
+	memset(readMask, 0, MASK_SIZE*sizeof(fd_mask));
     }
 
     /*
@@ -587,7 +513,7 @@ TkUnixDoOneXEvent(timePtr)
      */
 
     if (timePtr) {
-	TclpGetTime(&now);
+	Tcl_GetTime(&now);
 	if ((now.sec > timePtr->sec) || ((now.sec == timePtr->sec)
 		&& (now.usec > timePtr->usec))) {
 	    return 0;
@@ -607,9 +533,9 @@ TkUnixDoOneXEvent(timePtr)
  *
  * TkpSync --
  *
- *	This routine ensures that all pending X requests have been
- *	seen by the server, and that any pending X events have been
- *	moved onto the Tk event queue.
+ *	This routine ensures that all pending X requests have been seen by the
+ *	server, and that any pending X events have been moved onto the Tk
+ *	event queue.
  *
  * Results:
  *	None.
@@ -621,30 +547,29 @@ TkUnixDoOneXEvent(timePtr)
  */
 
 void
-TkpSync(display)
-    Display *display;		/* Display to sync. */
+TkpSync(
+    Display *display)		/* Display to sync. */
 {
     XSync(display, False);
 
     /*
      * Transfer events from the X event queue to the Tk event queue.
      */
+
     TransferXEventsToTcl(display);
 }
 #ifdef TK_USE_INPUT_METHODS
 
-/* 
+/*
  *--------------------------------------------------------------
  *
  * OpenIM --
  *
- *	Tries to open an X input method, associated with the
- *	given display.  Right now we can only deal with a bare-bones
- *	input style:  no preedit, and no status.
+ *	Tries to open an X input method associated with the given display.
  *
  * Results:
- *	Stores the input method in dispPtr->inputMethod;  if there isn't
- *	a suitable input method, then NULL is stored in dispPtr->inputMethod.
+ *	Stores the input method in dispPtr->inputMethod; if there isn't a
+ *	suitable input method, then NULL is stored in dispPtr->inputMethod.
  *
  * Side effects:
  *	An input method gets opened.
@@ -653,14 +578,15 @@ TkpSync(display)
  */
 
 static void
-OpenIM(dispPtr)
-    TkDisplay *dispPtr;		/* Tk's structure for the display. */
+OpenIM(
+    TkDisplay *dispPtr)		/* Tk's structure for the display. */
 {
-    unsigned short i;
+    int i;
     XIMStyles *stylePtr;
+    XIMStyle bestStyle = 0;
 
     if (XSetLocaleModifiers("") == NULL) {
-	goto error;
+	return;
     }
 
     dispPtr->inputMethod = XOpenIM(dispPtr->display, NULL, NULL, NULL);
@@ -672,38 +598,56 @@ OpenIM(dispPtr)
 	    NULL) != NULL) || (stylePtr == NULL)) {
 	goto error;
     }
-#if TK_XIM_SPOT
+
     /*
-     * If we want to do over-the-spot XIM, we have to check that this
-     * mode is supported.  If not we will fall-through to the check below.
+     * Select the best input style supported by both the IM and Tk.
      */
     for (i = 0; i < stylePtr->count_styles; i++) {
-	if (stylePtr->supported_styles[i]
-		== (XIMPreeditPosition | XIMStatusNothing)) {
-	    dispPtr->flags |= TK_DISPLAY_XIM_SPOT;
-	    XFree(stylePtr);
-	    return;
-	}
-    }
-#endif
-    for (i = 0; i < stylePtr->count_styles; i++) {
-	if (stylePtr->supported_styles[i]
-		== (XIMPreeditNothing | XIMStatusNothing)) {
-	    XFree(stylePtr);
-	    return;
+	XIMStyle thisStyle = stylePtr->supported_styles[i];
+	if (thisStyle == (XIMPreeditPosition | XIMStatusNothing)) {
+	    bestStyle = thisStyle;
+	    break;
+	} else if (thisStyle == (XIMPreeditNothing | XIMStatusNothing)) {
+	    bestStyle = thisStyle;
 	}
     }
     XFree(stylePtr);
+    if (bestStyle == 0) {
+	goto error;
+    }
 
-    error:
+    dispPtr->inputStyle = bestStyle;
 
+    /*
+     * Create an XFontSet for preedit area.
+     */
+    if (dispPtr->inputStyle & XIMPreeditPosition) {
+	char **missing_list;
+	int missing_count;
+	char *def_string;
+
+	dispPtr->inputXfs = XCreateFontSet(dispPtr->display,
+		"-*-*-*-R-Normal--14-130-75-75-*-*",
+		&missing_list, &missing_count, &def_string);
+	if (missing_count > 0) {
+	    XFreeStringList(missing_list);
+	}
+    }
+
+    return;
+
+error:
     if (dispPtr->inputMethod) {
-	/*
-	 * This call should not suffer from any core dumping problems
-	 * since we have not allocated any input contexts.
-	 */
 	XCloseIM(dispPtr->inputMethod);
 	dispPtr->inputMethod = NULL;
     }
 }
 #endif /* TK_USE_INPUT_METHODS */
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

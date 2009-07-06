@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: menu.n,v 1.8.2.2 2007/11/05 17:21:59 dgp Exp $
+'\" RCS: @(#) $Id: menu.n,v 1.23.2.1 2008/09/08 13:37:40 tmh Exp $
 '\" 
 .so man.macros
 .TH menu n 4.1 Tk "Tk Built-In Commands"
@@ -18,14 +18,12 @@ menu, tk_menuSetFocus \- Create and manipulate menu widgets
 \fBmenu\fR \fIpathName \fR?\fIoptions\fR?
 \fBtk_menuSetFocus\fR \fIpathName\fR
 .SO
-\-activebackground	\-borderwidth		\-foreground
-\-activeborderwidth	\-cursor		\-relief
+\-activebackground	\-borderwidth	\-foreground
+\-activeborderwidth	\-cursor	\-relief
 \-activeforeground	\-disabledforeground	\-takefocus
 \-background	\-font
-
 .SE
 .SH "WIDGET-SPECIFIC OPTIONS"
-.VS
 .OP \-postcommand postCommand Command
 If this option is specified then it provides a Tcl command to execute
 each time the menu is posted.  The command is invoked by the \fBpost\fR
@@ -33,7 +31,6 @@ widget command before posting the menu. Note that in Tk 8.0 on Macintosh
 and Windows, all post-commands in a system of menus are executed before any
 of those menus are posted.
 This is due to the limitations in the individual platforms' menu managers.
-.VE
 .OP \-selectcolor selectColor Background
 For menu entries that are check buttons or radio buttons, this option
 specifies the color to display in the indicator when the check button
@@ -51,10 +48,12 @@ to invoke whenever the menu is torn off.  The actual command will
 consist of the value of this option, followed by a space, followed
 by the name of the menu window, followed by a space, followed by
 the name of the name of the torn off menu window.  For example, if
-the option's is ``\fBa b\fR'' and menu \fB.x.y\fR is torn off to
+the option's is
+.QW "\fBa b\fR"
+and menu \fB.x.y\fR is torn off to
 create a new menu \fB.x.tearoff1\fR, then the command
-``\fBa b .x.y .x.tearoff1\fR'' will be invoked.
-.VS
+.QW "\fBa b .x.y .x.tearoff1\fR"
+will be invoked.
 .OP \-title title Title
 The string will be used to title the window created when this menu is
 torn off. If the title is NULL, then the window will have the title
@@ -67,9 +66,7 @@ returned by the configuration database will change if this option is
 changed, this does not affect the menu widget's behavior. This is used
 by the cloning mechanism and is not normally set outside of the Tk
 library.
-.VE
 .BE
-
 .SH INTRODUCTION
 .PP
 The \fBmenu\fR command creates a new top-level window (given
@@ -83,14 +80,12 @@ The \fBmenu\fR command returns its
 there must not exist a window named \fIpathName\fR, but
 \fIpathName\fR's parent must exist.
 .PP
-.VS
 A menu is a widget that displays a collection of one-line entries arranged
 in one or more columns.  There exist several different types of entries,
 each with different properties.  Entries of different types may be
 combined in a single menu.  Menu entries are not the same as
 entry widgets.  In fact, menu entries are not even distinct widgets;
 the entire menu is one widget.
-.VE
 .PP
 Menu entries are displayed with up to three separate fields.
 The main field is a label in the form of a text string,
@@ -119,28 +114,24 @@ The default menu bindings will not allow
 a disabled entry to be activated or invoked.
 Disabled entries may be re-enabled, at which point it becomes
 possible to activate and invoke them again.
-.VS
 .PP
 Whenever a menu's active entry is changed, a <<MenuSelect>> virtual
 event is send to the menu. The active item can then be queried from
 the menu, and an action can be taken, such as setting
 context-sensitive help text for the entry.
-.VE
-
-.SH "COMMAND ENTRIES"
+.SH "TYPES OF ENTRIES"
+.SS "COMMAND ENTRIES"
 .PP
 The most common kind of menu entry is a command entry, which
 behaves much like a button widget.  When a command entry is
 invoked, a Tcl command is executed.  The Tcl
 command is specified with the \fB\-command\fR option.
-
-.SH "SEPARATOR ENTRIES"
+.SS "SEPARATOR ENTRIES"
 .PP
 A separator is an entry that is displayed as a horizontal dividing
 line.  A separator may not be activated or invoked, and it has
 no behavior other than its display appearance.
-
-.SH "CHECKBUTTON ENTRIES"
+.SS "CHECKBUTTON ENTRIES"
 .PP
 A checkbutton menu entry behaves much like a checkbutton widget.
 When it is invoked it toggles back and forth between the selected
@@ -157,8 +148,7 @@ the menu.  If a \fB\-command\fR option is specified for a checkbutton
 entry, then its value is evaluated as a Tcl command each time the entry
 is invoked;  this happens after toggling the entry's
 selected state.
-
-.SH "RADIOBUTTON ENTRIES"
+.SS "RADIOBUTTON ENTRIES"
 .PP
 A radiobutton menu entry behaves much like a radiobutton widget.
 Radiobutton entries are organized in groups of which only one
@@ -181,8 +171,7 @@ otherwise the indicator's center is displayed in the background color for
 the menu.  If a \fB\-command\fR option is specified for a radiobutton
 entry, then its value is evaluated as a Tcl command each time the entry
 is invoked;  this happens after selecting the entry.
-
-.SH "CASCADE ENTRIES"
+.SS "CASCADE ENTRIES"
 .PP
 A cascade entry is one with an associated menu (determined
 by the \fB\-menu\fR option).  Cascade entries allow the construction
@@ -201,7 +190,6 @@ Tcl command of the form
 where \fImenu\fR is the path name of the associated menu, and \fIx\fR
 and \fIy\fR are the root-window coordinates of the upper-right
 corner of the cascade entry.
-.VS
 On Unix, the lower-level menu is unposted by executing a Tcl command with
 the form
 .CS
@@ -210,15 +198,11 @@ the form
 where \fImenu\fR is the name of the associated menu.
 On other platforms, the platform's native code takes care of unposting the
 menu.
-.VE
 .PP
-.VS
 If a \fB\-command\fR option is specified for a cascade entry then it is
 evaluated as a Tcl command whenever the entry is invoked. This is not
 supported on Windows.
-.VE
-
-.SH "TEAR-OFF ENTRIES"
+.SS "TEAR-OFF ENTRIES"
 .PP
 A tear-off entry appears at the top of the menu if enabled with the
 \fBtearOff\fR option.  It is not like other menu entries in that
@@ -228,8 +212,6 @@ When a tear-off entry is created it appears as a dashed line at
 the top of the menu.  Under the default bindings, invoking the
 tear-off entry causes a torn-off copy to be made of the menu and
 all of its submenus.
-
-.VS
 .SH "MENUBARS"
 .PP
 Any menu can be set as a menubar for a toplevel window (see
@@ -246,13 +228,10 @@ example of this concerns the handling of checkbuttons and radiobuttons
 within the menu.  While it is permitted to put these menu elements on
 menubars, they may not be drawn with indicators on some platforms, due
 to system restrictions.
-.VE
-
-.VS
-.SH "SPECIAL MENUS IN MENUBARS"
+.SS "SPECIAL MENUS IN MENUBARS"
 .PP
 Certain menus in a menubar will be treated specially.  On the Macintosh,
-access to the special Apple and Help menus is provided. On Windows,
+access to the special Application and Help menus is provided. On Windows,
 access to the Windows System menu in each window is provided. On X Windows,
 a special right-justified help menu is provided. In all cases, these
 menus must be created with the command name of the menubar menu concatenated
@@ -261,24 +240,16 @@ the special menus would be .menubar.apple and .menubar.help; on Windows,
 the special menu would be .menubar.system; on X Windows, the help
 menu would be .menubar.help.
 .PP
-When Tk sees an Apple menu on the Macintosh, that menu's contents make
-up the first items of the Apple menu on the screen whenever the window
-containing the menubar is in front. The menu is the
-first one that the user sees and has a title which is an Apple logo.
+When Tk sees a .menubar.apple menu on the Macintosh, that menu's contents
+make up the first items of the Application menu whenever the window
+containing the menubar is in front.
 After all of the Tk-defined items, the menu will have a separator,
-followed by all of the items in the user's Apple Menu Items folder.
-Since the System uses a different menu definition procedure for
-the Apple menu than Tk uses for its menus, and the system APIs do
-not fully support everything Tk tries to do, the menu item will only
-have its text displayed. No font attributes, images, bitmaps, or colors
-will be displayed. In addition, a menu with a tearoff item will have
-the tearoff item displayed as "(TearOff)".
+followed by all standard Application menu items.
 .PP
-When Tk see a Help menu on the Macintosh, the menu's contents are
-appended to the standard help menu on the right of the user's menubar
-whenever the user's menubar is in front. The first items in the menu
-are provided by Apple. Similar to the Apple Menu, customization in this
-menu is limited to what the system provides.
+When Tk sees a Help menu on the Macintosh, the menu's contents are
+appended to the standard Help menu on the right of the user's menubar
+whenever the window's menubar is in front. The first items in the menu
+are provided by Mac OS X.
 .PP
 When Tk sees a System menu on Windows, its items are appended to the 
 system menu that the menubar is attached to. This menu has an icon
@@ -289,9 +260,6 @@ system menu.
 .PP
 When Tk see a Help menu on X Windows, the menu is moved to be last in
 the menubar and is right justified.
-.VE
-
-.VS
 .SH "CLONES"
 .PP
 When a menu is set as a menubar for a toplevel window, or when a menu
@@ -302,8 +270,6 @@ clone. Additionally, any cascades that are pointed to are also cloned
 so that menu traversal will work right. Clones are destroyed when
 either the tearoff or menubar goes away, or when the original menu is
 destroyed. 
-.VE
-
 .SH "WIDGET COMMAND"
 .PP
 The \fBmenu\fR command creates a new Tcl command whose
@@ -340,7 +306,9 @@ This form may not be abbreviated.
 Same as \fBend\fR.
 .TP 12
 \fBnone\fR
-Indicates ``no entry at all'';  this is used most commonly with
+Indicates
+.QW "no entry at all" ;
+this is used most commonly with
 the \fBactivate\fR option to deactivate all the entries in the
 menu.  In most cases the specification of \fBnone\fR causes
 nothing to happen in the widget command.
@@ -349,11 +317,12 @@ This form may not be abbreviated.
 \fB@\fInumber\fR
 In this form, \fInumber\fR is treated as a y-coordinate in the
 menu's window;  the entry closest to that y-coordinate is used.
-For example, ``\fB@0\fR'' indicates the top-most entry in the
-window.
+For example,
+.QW \fB@0\fR
+indicates the top-most entry in the window.
 .TP 12
 \fIpattern\fR
-If the index doesn't satisfy one of the above forms then this
+If the index does not satisfy one of the above forms then this
 form is used.  \fIPattern\fR is pattern-matched against the label of
 each entry in the menu, in order from the top down, until a
 matching entry is found.  The rules of \fBTcl_StringMatch\fR
@@ -419,16 +388,13 @@ If a \fB\-image\fR option has been specified, it overrides
 This option is not available for separator or tear-off entries.
 .TP
 \fB\-columnbreak \fIvalue\fR
-.VS 8.0
 When this option is zero, the entry appears below the previous entry. When
 this option is one, the entry appears at the top of a new column in the
 menu.
-.VE 8.0
 .TP
 \fB\-command \fIvalue\fR
 Specifies a Tcl command to execute when the menu entry is invoked.
 Not available for separator or tear-off entries.
-.VS 8.4
 .TP
 \fB\-compound \fIvalue\fR
 Specifies whether the menu entry should display both an image and text,
@@ -438,7 +404,6 @@ Valid values for this option are \fBbottom\fR, \fBcenter\fR,
 is \fBnone\fR, meaning that the button will display either an image or
 text, depending on the values of the \fB\-image\fR and \fB\-bitmap\fR
 options.
-.VE
 .TP
 \fB\-font \fIvalue\fR
 Specifies the font to use when drawing the label or accelerator
@@ -453,14 +418,12 @@ is in the normal state (neither active nor disabled).
 If this option is specified as an empty string (the default), then the
 \fBforeground\fR option for the overall menu is used.
 This option is not available for separator or tear-off entries.
-.VS
 .TP
 \fB\-hidemargin \fIvalue\fR
 Specifies whether the standard margins should be drawn for this menu
 entry. This is useful when creating palette with images in them, i.e.,
 color palettes, pattern palettes, etc. 1 indicates that the margin for
 the entry is hidden; 0 means that the margin is used.
-.VE
 .TP
 \fB\-image \fIvalue\fR
 Specifies an image to display in the menu instead of a text string
@@ -558,16 +521,14 @@ Returns the current value of the configuration option given
 by \fIoption\fR.
 \fIOption\fR may have any of the values accepted by the \fBmenu\fR
 command.
-.VS
 .TP
 \fIpathName\fR \fBclone\fR \fInewPathname ?cloneType?\fR
 Makes a clone of the current menu named \fInewPathName\fR. This clone
 is a menu in its own right, but any changes to the clone are
-propogated to the original menu and vice versa. \fIcloneType\fR can be
+propagated to the original menu and vice versa. \fIcloneType\fR can be
 \fBnormal\fR, \fBmenubar\fR, or \fBtearoff\fR. Should not normally be
 called outside of the Tk library. See the \fBCLONES\fR section for
 more information.
-.VE
 .TP
 \fIpathName \fBconfigure\fR ?\fIoption\fR? ?\fIvalue option value ...\fR?
 Query or modify the configuration options of the widget.
@@ -646,8 +607,8 @@ returned without posting the menu.
 \fIpathName \fBpostcascade \fIindex\fR
 Posts the submenu associated with the cascade entry given by
 \fIindex\fR, and unposts any previously posted submenu.
-If \fIindex\fR doesn't correspond to a cascade entry,
-or if \fIpathName\fR isn't posted,
+If \fIindex\fR does not correspond to a cascade entry,
+or if \fIpathName\fR is not posted,
 the command has no effect except to unpost any currently posted
 submenu.
 .TP
@@ -658,30 +619,31 @@ command when the entry was created, such as \fBcommand\fR
 or \fBseparator\fR, or \fBtearoff\fR for a tear-off entry.
 .TP
 \fIpathName \fBunpost\fR
-.VS
 Unmap the window so that it is no longer displayed.  If a
 lower-level cascaded menu is posted, unpost that menu.  Returns an
 empty string. This subcommand does not work on Windows and the
 Macintosh, as those platforms have their own way of unposting menus.
-.VE
+.TP
+\fIpathName \fBxposition \fIindex\fR
+.VS 8.5
+Returns a decimal string giving the x-coordinate within the menu
+window of the leftmost pixel in the entry specified by \fIindex\fR.
+.VE 8.5
 .TP
 \fIpathName \fByposition \fIindex\fR
 Returns a decimal string giving the y-coordinate within the menu
 window of the topmost pixel in the entry specified by \fIindex\fR.
-
 .SH "MENU CONFIGURATIONS"
 .PP
 The default bindings support four different ways of using menus:
-.VS
 .TP
 \fBPulldown Menus in Menubar\fR
-This is the most command case. You create a menu widget that will become the
+This is the most common case. You create a menu widget that will become the
 menu bar. You then add cascade entries to this menu, specifying the
 pull down menus you wish to use in your menu bar. You then create all
 of the pulldowns. Once you have done this, specify the menu using the
 \fB\-menu\fR option of the toplevel's widget command. See the
 \fBtoplevel\fR manual entry for details.
-.VE
 .TP
 \fBPulldown Menus in Menu Buttons\fR
 This is the compatible way to do menu bars.  You create one menubutton
@@ -713,7 +675,6 @@ the top of an existing menu.  The default bindings will create a new menu
 that is a copy of the original menu and leave it permanently
 posted as a top-level window.  The torn-off menu behaves just
 the same as the original menu.
-
 .SH "DEFAULT BINDINGS"
 .PP
 Tk automatically creates class bindings for menus that give them
@@ -765,23 +726,21 @@ Otherwise, if the current menu was posted from a
 menubutton, then the current menubutton is unposted and the
 next menubutton to the right is posted.
 .PP
-Disabled menu entries are non-responsive:  they don't activate and
+Disabled menu entries are non-responsive:  they do not activate and
 they ignore mouse button presses and releases.
 .PP
-.VS 8.4
 Several of the bindings make use of the command \fBtk_menuSetFocus\fR.
 It saves the current focus and sets the focus to its \fIpathName\fR
 argument, which is a menu widget.
-.VE
 .PP
 The behavior of menus can be changed by defining new bindings for
 individual widgets or by redefining the class bindings.
-
 .SH BUGS
 .PP
-At present it isn't possible to use the
+At present it is not possible to use the
 option database to specify values for the options to individual
 entries.
-
+.SH "SEE ALSO"
+bind(n), menubutton(n), ttk::menubutton(n), toplevel(n)
 .SH KEYWORDS
 menu, widget

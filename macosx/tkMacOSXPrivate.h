@@ -8,7 +8,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXPrivate.h,v 1.1.2.5 2007/12/18 18:20:34 das Exp $
+ * RCS: @(#) $Id: tkMacOSXPrivate.h,v 1.6.2.2 2008/09/02 16:14:18 das Exp $
  */
 
 #ifndef _TKMACPRIV
@@ -36,6 +36,7 @@
     #define kThemeBackgroundMetal 6
     #define kThemeIncDecButtonSmall 21
     #define kThemeIncDecButtonMini 22
+    #define kThemeComboBox 16
     #define kThemeMiniSystemFont 109
     #define kAppearancePartUpButton 20
     #define kAppearancePartDownButton 21
@@ -63,7 +64,7 @@
     #else
     #define kCGBitmapByteOrder32Host (2 << 12)
     #endif
-    #endif
+#endif
 /* Define constants only available on Mac OS X 10.5 or later */
 #if MAC_OS_X_VERSION_MAX_ALLOWED < 1050
     #define kWindowUnifiedTitleAndToolbarAttribute (1L << 7)
@@ -334,5 +335,6 @@ MODULE_SCOPE void TkMacOSXBringWindowForward(WindowRef wRef);
 MODULE_SCOPE WindowRef TkMacOSXDrawableWindow(Drawable drawable);
 MODULE_SCOPE void TkMacOSXWinCGBounds(TkWindow *winPtr, CGRect *bounds);
 MODULE_SCOPE HIShapeRef TkMacOSXGetClipRgn(Drawable drawable);
+MODULE_SCOPE Tcl_Obj* TkMacOSXGetStringObjFromCFString(CFStringRef str);
 
 #endif /* _TKMACPRIV */

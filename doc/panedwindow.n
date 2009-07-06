@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: panedwindow.n,v 1.2.2.3 2004/12/20 10:03:17 dkf Exp $
+'\" RCS: @(#) $Id: panedwindow.n,v 1.14 2008/01/31 16:29:34 dkf Exp $
 '\" 
 .so man.macros
 .TH panedwindow n 8.4 Tk "Tk Built-In Commands"
@@ -16,9 +16,8 @@ panedwindow \- Create and manipulate panedwindow widgets
 .SH SYNOPSIS
 \fBpanedwindow\fR \fIpathName \fR?\fIoptions\fR?
 .SO
-\-background	\-height	\-width
-\-borderwidth	\-orient
-\-cursor	\-relief
+\-background	\-borderwidth	\-cursor
+\-orient	\-relief
 .SE
 .SH "WIDGET-SPECIFIC OPTIONS"
 .OP \-handlepad handlePad HandlePad
@@ -28,6 +27,10 @@ which to draw the handle.  May be any value accepted by \fBTk_GetPixels\fR.
 .OP \-handlesize handleSize HandleSize
 Specifies the side length of a sash handle.  Handles are always
 drawn as squares.  May be any value accepted by \fBTk_GetPixels\fR.
+.OP \-height height Height
+Specifies a desired height for the overall panedwindow widget. May be any
+value accepted by \fBTk_GetPixels\fR. If an empty string, the widget will be
+made high enough to allow all contained widgets to have their natural height.
 .OP \-opaqueresize opaqueResize OpaqueResize
 Specifies whether panes should be resized as a sash is moved (true),
 or if resizing should be deferred until the sash is placed (false).
@@ -47,8 +50,11 @@ Specifies the width of each sash.  May be any value accepted by
 .OP \-showhandle showHandle ShowHandle
 Specifies whether sash handles should be shown.  May be any valid Tcl
 boolean value.
+.OP \-width width Width
+Specifies a desired width for the overall panedwindow widget. May be any
+value accepted by \fBTk_GetPixels\fR. If an empty string, the widget will be
+made wide enough to allow all contained widgets to have their natural width.
 .BE
-
 .SH DESCRIPTION
 .PP
 The \fBpanedwindow\fR command creates a new window (given by the
@@ -190,10 +196,17 @@ height requested internally by the window will be used initially; the
 height may later be adjusted by the movement of sashes in the
 panedwindow.  \fISize\fR may be any value accepted by \fBTk_GetPixels\fR.
 .TP
+\fB\-hide \fIboolean\fR
+.VS 8.5
+Controls the visibility of a pane.  When the \fIboolean\fR is true
+(according to \fBTcl_GetBoolean\fR) the pane will not be visible, but
+it will still be maintained in the list of panes.
+.VE 8.5
+.TP
 \fB\-minsize \fIn\fR
 Specifies that the size of the window cannot be made less than
 \fIn\fR.  This constraint only affects the size of the widget in the
-paned dimension -- the x dimension for horizontal panedwindows, the y
+paned dimension \(em the x dimension for horizontal panedwindows, the y
 dimension for vertical panedwindows.  May be any value accepted by
 \fBTk_GetPixels\fR.
 .TP
@@ -211,12 +224,45 @@ have any of the forms accepted by \fBTk_GetPixels\fR.
 If a window's pane is larger than the requested dimensions of the
 window, this option may be used to position (or stretch) the window
 within its pane.  \fIStyle\fR  is a string that contains zero or more
-of the characters \fBn\fP, \fBs\fP, \fBe\fP or \fBw\fP.  The string
+of the characters \fBn\fR, \fBs\fR, \fBe\fR or \fBw\fR.  The string
 can optionally contains spaces or commas, but they are ignored.  Each
 letter refers to a side (north, south, east, or west) that the window
-will "stick" to.  If both \fBn\fP and \fBs\fP (or \fBe\fP and \fBw\fP)
+will
+.QW stick
+to.  If both \fBn\fR and \fBs\fR (or \fBe\fR and \fBw\fR)
 are specified, the window will be stretched to fill the entire height
 (or width) of its cavity.
+.TP
+\fB\-stretch \fIwhen\fR
+.VS 8.5
+Controls how extra space is allocated to each of the panes.
+\fIWhen\fR is one of \fBalways\fR, \fBfirst\fR, \fBlast\fR,
+\fBmiddle\fR, and \fBnever\fR.
+The panedwindow will calculate the required size of all its panes. Any
+remaining (or deficit) space will be distributed to those panes marked
+for stretching. The space will be distributed based on each panes
+current ratio of the whole.  The \fIwhen\fR values have the following
+definition:
+.RS
+.TP
+\fBalways\fR
+This pane will always stretch.
+.TP
+\fBfirst\fR
+Only if this pane is the first pane (left-most or top-most) will it 
+stretch.
+.TP
+\fBlast\fR
+Only if this pane is the last pane (right-most or bottom-most) will it 
+stretch.  This is the default value.
+.TP
+\fBmiddle\fR
+Only if this pane is not the first or last pane will it stretch.
+.TP
+\fBnever\fR
+This pane will never stretch.
+.RE
+.VE 8.5
 .TP
 \fB\-width \fIsize\fR
 Specify a width for the window.  The width will be the outer
@@ -239,6 +285,7 @@ adjusted.
 When a pane is resized from outside (e.g. it is packed to expand and
 fill, and the containing toplevel is resized), space is added to the final
 (rightmost or bottommost) pane in the window.
-
+.SH "SEE ALSO"
+ttk::panedwindow(n)
 .SH KEYWORDS
 panedwindow, widget, geometry management

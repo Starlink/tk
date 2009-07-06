@@ -4,7 +4,7 @@
 # checkbutton, and radiobutton widgets and provides procedures
 # that help in implementing those bindings.
 #
-# RCS: @(#) $Id: button.tcl,v 1.17.2.1 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: button.tcl,v 1.19 2005/07/25 09:06:01 dkf Exp $
 #
 # Copyright (c) 1992-1994 The Regents of the University of California.
 # Copyright (c) 1994-1996 Sun Microsystems, Inc.
@@ -18,7 +18,7 @@
 # The code below creates the default class bindings for buttons.
 #-------------------------------------------------------------------------
 
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
+if {[tk windowingsystem] eq "aqua"} {
     bind Radiobutton <Enter> {
 	tk::ButtonEnter %W
     }
@@ -444,7 +444,7 @@ proc ::tk::ButtonUp w {
 
 }
 
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
+if {[tk windowingsystem] eq "aqua"} {
 
 ####################
 # Mac implementation

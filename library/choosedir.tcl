@@ -5,7 +5,7 @@
 # Copyright (c) 1998-2000 by Scriptics Corporation.
 # All rights reserved.
 # 
-# RCS: @(#) $Id: choosedir.tcl,v 1.15.2.2 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: choosedir.tcl,v 1.23 2007/12/13 15:26:27 dgp Exp $
 
 # Make sure the tk::dialog namespace, in which all dialogs should live, exists
 namespace eval ::tk::dialog {}
@@ -27,7 +27,7 @@ proc ::tk::dialog::file::chooseDir:: {args} {
     variable ::tk::Priv
     set dataName __tk_choosedir
     upvar ::tk::dialog::file::$dataName data
-    ::tk::dialog::file::chooseDir::Config $dataName $args
+    Config $dataName $args
 
     if {$data(-parent) eq "."} {
         set w .$dataName
@@ -43,14 +43,14 @@ proc ::tk::dialog::file::chooseDir:: {args} {
 	destroy $w
 	::tk::dialog::file::Create $w TkChooseDir
     } else {
-	set data(dirMenuBtn) $w.f1.menu
-	set data(dirMenu) $w.f1.menu.menu
-	set data(upBtn) $w.f1.up
-	set data(icons) $w.icons
-	set data(ent) $w.f2.ent
-	set data(okBtn) $w.f2.ok
-	set data(cancelBtn) $w.f2.cancel
-	set data(hiddenBtn) $w.f2.hidden
+	set data(dirMenuBtn) $w.contents.f1.menu
+	set data(dirMenu) $w.contents.f1.menu.menu
+	set data(upBtn) $w.contents.f1.up
+	set data(icons) $w.contents.icons
+	set data(ent) $w.contents.f2.ent
+	set data(okBtn) $w.contents.f2.ok
+	set data(cancelBtn) $w.contents.f2.cancel
+	set data(hiddenBtn) $w.contents.f2.hidden
     }
     if {$::tk::dialog::file::showHiddenBtn} {
 	$data(hiddenBtn) configure -state normal
@@ -58,6 +58,15 @@ proc ::tk::dialog::file::chooseDir:: {args} {
     } else {
 	$data(hiddenBtn) configure -state disabled
 	grid remove $data(hiddenBtn)
+    }
+
+    # When using -mustexist, manage the OK button state for validity
+    $data(okBtn) configure -state normal
+    if {$data(-mustexist)} {
+	$data(ent) configure -validate key \
+	    -validatecommand [list ::tk::dialog::file::chooseDir::IsOK? $w %P]
+    } else {
+	$data(ent) configure -validate none
     }
 
     # Dialog boxes should be transient with respect to their parent,
@@ -71,7 +80,8 @@ proc ::tk::dialog::file::chooseDir:: {args} {
 	wm transient $w $data(-parent)
     }
 
-    trace add variable data(selectPath) write [list ::tk::dialog::file::SetPath $w]
+    trace add variable data(selectPath) write \
+	    [list ::tk::dialog::file::SetPath $w]
     $data(dirMenuBtn) configure \
 	    -textvariable ::tk::dialog::file::${dataName}(selectPath)
 
@@ -201,25 +211,25 @@ proc ::tk::dialog::file::chooseDir::OkCmd {w} {
     # 4b.   If the value is different from the current directory, change to
     #       that directory.
 
-    set selection [tk::IconList_Curselection $data(icons)]
-    if { [llength $selection] != 0 } {
+    set selection [tk::IconList_CurSelection $data(icons)]
+    if {[llength $selection] != 0} {
 	set iconText [tk::IconList_Get $data(icons) [lindex $selection 0]]
 	set iconText [file join $data(selectPath) $iconText]
-	::tk::dialog::file::chooseDir::Done $w $iconText
+	Done $w $iconText
     } else {
 	set text [$data(ent) get]
-	if { $text eq "" } {
+	if {$text eq ""} {
 	    return
 	}
-	set text [eval file join [file split [string trim $text]]]
-	if { ![file exists $text] || ![file isdirectory $text] } {
+	set text [file join {*}[file split [string trim $text]]]
+	if {![file exists $text] || ![file isdirectory $text]} {
 	    # Entry contains an invalid directory.  If it's the same as the
 	    # last time they came through here, reset the saved value and end
 	    # the dialog.  Otherwise, save the value (so we can do this test
 	    # next time).
-	    if { $text eq $data(previousEntryText) } {
+	    if {$text eq $data(previousEntryText)} {
 		set data(previousEntryText) ""
-		::tk::dialog::file::chooseDir::Done $w $text
+		Done $w $text
 	    } else {
 		set data(previousEntryText) $text
 	    }
@@ -227,8 +237,8 @@ proc ::tk::dialog::file::chooseDir::OkCmd {w} {
 	    # Entry contains a valid directory.  If it is the same as the
 	    # current directory, end the dialog.  Otherwise, change to that
 	    # directory.
-	    if { $text eq $data(selectPath) } {
-		::tk::dialog::file::chooseDir::Done $w $text
+	    if {$text eq $data(selectPath)} {
+		Done $w $text
 	    } else {
 		set data(selectPath) $text
 	    }
@@ -237,10 +247,22 @@ proc ::tk::dialog::file::chooseDir::OkCmd {w} {
     return
 }
 
+# Change state of OK button to match -mustexist correctness of entry
+#
+proc ::tk::dialog::file::chooseDir::IsOK? {w text} {
+    upvar ::tk::dialog::file::[winfo name $w] data
+
+    set ok [file isdirectory $text]
+    $data(okBtn) configure -state [expr {$ok ? "normal" : "disabled"}]
+
+    # always return 1
+    return 1
+}
+
 proc ::tk::dialog::file::chooseDir::DblClick {w} {
     upvar ::tk::dialog::file::[winfo name $w] data
-    set selection [tk::IconList_Curselection $data(icons)]
-    if { [llength $selection] != 0 } {
+    set selection [tk::IconList_CurSelection $data(icons)]
+    if {[llength $selection] != 0} {
 	set filenameFragment \
 		[tk::IconList_Get $data(icons) [lindex $selection 0]]
 	set file $data(selectPath)
@@ -249,7 +271,7 @@ proc ::tk::dialog::file::chooseDir::DblClick {w} {
 	    return
 	}
     }
-}    
+}
 
 # Gets called when user browses the IconList widget (dragging mouse, arrow
 # keys, etc)
@@ -281,11 +303,8 @@ proc ::tk::dialog::file::chooseDir::Done {w {selectFilePath ""}} {
     if {$selectFilePath eq ""} {
 	set selectFilePath $data(selectPath)
     }
-    if { $data(-mustexist) } {
-	if { ![file exists $selectFilePath] || \
-		![file isdir $selectFilePath] } {
-	    return
-	}
+    if {$data(-mustexist) && ![file isdirectory $selectFilePath]} {
+	return
     }
     set Priv(selectFilePath) $selectFilePath
 }

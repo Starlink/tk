@@ -3,15 +3,20 @@
 # generate the file "configure", which is run during Tk installation
 # to configure the system for the local environment.
 #
-# RCS: @(#) $Id: configure.in,v 1.49.2.24 2008/04/07 19:17:58 dgp Exp $
+# RCS: @(#) $Id: configure.in,v 1.77.2.9 2008/12/21 21:02:58 dgp Exp $
 
 AC_INIT(../generic/tk.h)
-AC_PREREQ(2.13)
+AC_PREREQ(2.59)
 
-TK_VERSION=8.4
+# The following define is needed when building with Cygwin since newer
+# versions of autoconf incorrectly set SHELL to /bin/bash instead of
+# /bin/sh. The bash shell seems to suffer from some strange failures.
+SHELL=/bin/sh
+
+TK_VERSION=8.5
 TK_MAJOR_VERSION=8
-TK_MINOR_VERSION=4
-TK_PATCH_LEVEL=".19"
+TK_MINOR_VERSION=5
+TK_PATCH_LEVEL=".6"
 VER=$TK_MAJOR_VERSION$TK_MINOR_VERSION
 
 #------------------------------------------------------------------------
@@ -72,10 +77,30 @@ fi
 AC_PROG_MAKE_SET
 
 #--------------------------------------------------------------------
-# These two macros perform additinal compiler test.
+# Perform additinal compiler tests.
 #--------------------------------------------------------------------
 
-AC_CYGWIN
+dnl Currently AC_CYGWIN is disabled since it invokes AC_CANONICAL_HOST
+dnl under autoconf 2.5X.
+dnl
+dnl AC_CYGWIN
+
+AC_CACHE_CHECK(for Cygwin version of gcc,
+    ac_cv_cygwin,
+AC_TRY_COMPILE([
+#ifdef __CYGWIN__
+#error cygwin
+#endif
+],
+[],
+        ac_cv_cygwin=no,
+        ac_cv_cygwin=yes)
+)
+if test "$ac_cv_cygwin" = "yes" ; then
+    AC_MSG_ERROR([Compiling under Cygwin is not currently supported.
+A maintainer for the Cygwin port of Tcl/Tk is needed. See the README
+file for information about building with Mingw.])
+fi
 
 #--------------------------------------------------------------------
 # Determines the correct binary file extension (.o, .obj, .exe etc.)
@@ -113,6 +138,14 @@ AC_CHECK_HEADER(errno.h, , MAN2TCLFLAGS="-DNO_ERRNO_H")
 AC_SUBST(MAN2TCLFLAGS)
 
 #--------------------------------------------------------------------
+# Windows XP theme engine header for Ttk
+#--------------------------------------------------------------------
+
+AC_CHECK_HEADER([uxtheme.h], [AC_DEFINE(HAVE_UXTHEME_H)],
+	[AC_MSG_NOTICE([xpnative theme will be unavailable])],
+	[#include <windows.h>])
+
+#--------------------------------------------------------------------
 # Set the default compiler switches based on the --enable-symbols 
 # option.  This macro depends on C flags, and should be called
 # after SC_CONFIG_CFLAGS macro is called.
@@ -146,7 +179,7 @@ TK_SHARED_LIB_SUFFIX="\${NODOT_VERSION}${DLLSUFFIX}"
 TK_UNSHARED_LIB_SUFFIX="\${NODOT_VERSION}${LIBSUFFIX}"
 TK_EXPORT_FILE_SUFFIX="\${NODOT_VERSION}${LIBSUFFIX}"
 
-eval "TK_SRC_DIR=`cd $srcdir/..; pwd`"
+eval "TK_SRC_DIR=\"`cd $srcdir/..; pwd`\""
 
 eval "TK_DLL_FILE=tk$VER${DLLSUFFIX}"
 eval "TK_LIB_FILE=${LIBPREFIX}tk$VER${LIBSUFFIX}"
@@ -197,12 +230,14 @@ else
 fi
 
 # The wish.exe.manifest requires these
-# TK_WIN_VERSION is the 4 dotted pair Windows version format
+# TK_WIN_VERSION is the 4 dotted pair Windows version format which needs
+# the release level, and must account for interim release versioning
 case "$TK_PATCH_LEVEL" in
-     a*) TK_WIN_VERSION="$TK_VERSION.0.`echo $TK_PATCH_LEVEL | tr -d a`" ;;
-     b*) TK_WIN_VERSION="$TK_VERSION.1.`echo $TK_PATCH_LEVEL | tr -d b`" ;;
-     .*) TK_WIN_VERSION="$TK_VERSION.2$TK_PATCH_LEVEL" ;;
+     *a*) TK_RELEASE_LEVEL=0 ;;
+     *b*) TK_RELEASE_LEVEL=1 ;;
+     *)   TK_RELEASE_LEVEL=2 ;;
 esac
+TK_WIN_VERSION="$TK_VERSION.$TK_RELEASE_LEVEL.`echo $TK_PATCH_LEVEL | tr -d ab.`"
 AC_SUBST(TK_WIN_VERSION)
 # X86|AMD64|IA64 for manifest
 AC_SUBST(MACHINE)
@@ -224,11 +259,6 @@ AC_SUBST(TCL_VERSION)
 AC_SUBST(TCL_MAJOR_VERSION)
 AC_SUBST(TCL_MINOR_VERSION)
 AC_SUBST(TCL_PATCH_LEVEL)
-AC_SUBST(TCL_LIB_FILE)
-AC_SUBST(TCL_DLL_FILE)
-AC_SUBST(TCL_STUB_LIB_FILE)
-AC_SUBST(TCL_STUB_LIB_FLAG)
-AC_SUBST(TCL_BUILD_STUB_LIB_SPEC)
 AC_SUBST(TCL_SRC_DIR)
 AC_SUBST(TCL_BIN_DIR)
 AC_SUBST(TCL_DBGX)

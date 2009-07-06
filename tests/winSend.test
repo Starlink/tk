@@ -7,16 +7,11 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: winSend.test,v 1.4 2002/07/13 20:28:36 dgp Exp $
+# RCS: @(#) $Id: winSend.test,v 1.7 2004/12/04 00:04:43 dkf Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
-
-namespace import -force tcltest::interpreter
 
 # Compute a script that will load Tk into a child interpreter.
 
@@ -41,27 +36,32 @@ proc newApp {name {safe {}}} {
 }
 
 set currentInterps [winfo interps]
-if {[testConstraint win] && [llength [info commands send]]} {
+if {
+    [testConstraint win] &&
+    [llength [info commands send]] &&
+    [catch {exec [interpreter] &}] == 0
+} then {
+    # Wait until the child application has launched.
+    while {[llength [winfo interps]] == [llength $currentInterps]} {}
 
-    if {[catch {exec [interpreter] &}] == 0} {
-
-	# Wait until the child application has launched.
-	while {[llength [winfo interps]] == [llength $currentInterps]} {}
-
-	# Now find an interp to send to
-	set newInterps [winfo interps]
-	foreach interp $newInterps {
-	    if {[lsearch -exact $currentInterps $interp] < 0} {
-		break
-	    }
+    # Now find an interp to send to
+    set newInterps [winfo interps]
+    foreach interp $newInterps {
+	if {[lsearch -exact $currentInterps $interp] < 0} {
+	    break
 	}
-
-	# Now we have found our interpreter we are going to send to.
-	# Make sure that it works first.
-	testConstraint winSend	[expr {[catch {
-					send $interp {console hide; update}
-				}] == 0}]
     }
+
+    # Now we have found our interpreter we are going to send to.
+    # Make sure that it works first.
+    testConstraint winSend [expr {![catch {
+	send $interp {
+	    console hide
+	    update
+	}
+    }]}]
+} else {
+    testConstraint winSend 0
 }
 
 # setting up dde server is done when the first interp is created and
@@ -70,9 +70,7 @@ test winSend-1.1 {Tk_SetAppName - changing name of interp} winSend {
     newApp testApp
     list [testApp eval tk appname testApp2] [interp delete testApp]
 } {testApp2 {}}
-test winSend-1.2 {Tk_SetAppName - changing name - not front of linked list} {
-	winSend
-} {
+test winSend-1.2 {Tk_SetAppName - changing name - not front of linked list} winSend {
     newApp testApp
     newApp testApp2
     list [testApp eval tk appname testApp3] [interp delete testApp] [interp delete testApp2]
@@ -101,16 +99,16 @@ test winSend-1.6 {Tk_SetAppName - safe interps} winSend {
 test winSend-2.1 {Tk_SendObjCmd - # of args} winSend {
     list [catch {send tktest} msg] $msg
 } {1 {wrong # args: should be "send ?options? interpName arg ?arg ...?"}}
-test winSend-2.1 {Tk_SendObjCmd: arguments} winSend {
+test winSend-2.1a {Tk_SendObjCmd: arguments} winSend {
     list [catch {send -bogus tktest} msg] $msg
 } {1 {bad option "-bogus": must be -async, -displayof, or --}}
-test winSend-2.1 {Tk_SendObjCmd: arguments} winSend {
+test winSend-2.1b {Tk_SendObjCmd: arguments} winSend {
     list [catch {send -async bogus foo} msg] $msg
 } {1 {no registered server named "bogus"}}
-test winSend-2.1 {Tk_SendObjCmd: arguments} winSend {
+test winSend-2.1c {Tk_SendObjCmd: arguments} winSend {
     list [catch {send -displayof . bogus foo} msg] $msg
 } {1 {no registered server named "bogus"}}
-test winSend-2.1 {Tk_SendObjCmd: arguments} winSend {
+test winSend-2.1d {Tk_SendObjCmd: arguments} winSend {
     list [catch {send -- -bogus foo} msg] $msg
 } {1 {no registered server named "-bogus"}}
 test winSend-2.2 {Tk_SendObjCmd - sending to ourselves} winSend {
@@ -407,6 +405,5 @@ while {[llength $newInterps] != [llength $currentInterps]} {
 }
 
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return
-

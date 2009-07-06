@@ -2,7 +2,7 @@
 #
 # Support procs to use Tk in safe interpreters.
 #
-# RCS: @(#) $Id: safetk.tcl,v 1.8.8.1 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: safetk.tcl,v 1.12 2008/03/27 21:05:09 hobbs Exp $
 #
 # Copyright (c) 1997 Sun Microsystems, Inc.
 #
@@ -27,57 +27,51 @@ package require opt 0.4.1;
 namespace eval ::safe {
 
     # counter for safe toplevels
-    variable tkSafeId 0;
+    variable tkSafeId 0
+}
 
-    #
-    # tkInterpInit : prepare the slave interpreter for tk loading
-    #                most of the real job is done by loadTk
-    # returns the slave name (tkInterpInit does)
-    #
-    proc ::safe::tkInterpInit {slave argv} {
-	global env tk_library
+#
+# tkInterpInit : prepare the slave interpreter for tk loading
+#                most of the real job is done by loadTk
+# returns the slave name (tkInterpInit does)
+#
+proc ::safe::tkInterpInit {slave argv} {
+    global env tk_library
 
-	# We have to make sure that the tk_library variable uses a file
-	# pathname that works better in Tk (of the style returned by
-	# [file join], ie C:/path/to/tk/lib, not C:\path\to\tk\lib
-	set tk_library [file join $tk_library]
+    # We have to make sure that the tk_library variable is normalized.
+    set tk_library [file normalize $tk_library]
 
-	# Clear Tk's access for that interp (path).
-	allowTk $slave $argv
+    # Clear Tk's access for that interp (path).
+    allowTk $slave $argv
 
-	# there seems to be an obscure case where the tk_library
-	# variable value is changed to point to a sym link destination
-	# dir instead of the sym link itself, and thus where the $tk_library
-	# would then not be anymore one of the auto_path dir, so we use
-	# the addToAccessPath which adds if it's not already in instead
-	# of the more conventional findInAccessPath.
-	# Might be usefull for masters without Tk really loaded too.
-	::interp eval $slave [list set tk_library [::safe::interpAddToAccessPath $slave $tk_library]]
-	return $slave
+    # Ensure tk_library and subdirs (eg, ttk) are on the access path
+    ::interp eval $slave [list set tk_library [::safe::interpAddToAccessPath $slave $tk_library]]
+    foreach subdir [::safe::AddSubDirs [list $tk_library]] {
+	::safe::interpAddToAccessPath $slave $subdir
     }
+    return $slave
+}
 
 
-# tkInterpLoadTk : 
-# Do additional configuration as needed (calling tkInterpInit) 
+# tkInterpLoadTk:
+# Do additional configuration as needed (calling tkInterpInit)
 # and actually load Tk into the slave.
-# 
+#
 # Either contained in the specified windowId (-use) or
 # creating a decorated toplevel for it.
 
 # empty definition for auto_mkIndex
 proc ::safe::loadTk {} {}
-   
-::tcl::OptProc loadTk {
+
+::tcl::OptProc ::safe::loadTk {
     {slave -interp "name of the slave interpreter"}
     {-use  -windowId {} "window Id to use (new toplevel otherwise)"}
     {-display -displayName {} "display name to use (current one otherwise)"}
 } {
     set displayGiven [::tcl::OptProcArgGiven "-display"]
     if {!$displayGiven} {
-	
 	# Try to get the current display from "."
 	# (which might not exist if the master is tk-less)
-	
 	if {[catch {set display [winfo screen .]}]} {
 	    if {[info exists ::env(DISPLAY)]} {
 		set display $::env(DISPLAY)
@@ -88,9 +82,7 @@ proc ::safe::loadTk {} {}
 	}
     }
     if {![::tcl::OptProcArgGiven "-use"]} {
-	
 	# create a decorated toplevel
-	
 	::tcl::Lassign [tkTopLevel $slave $display] w use
 
 	# set our delete hook (slave arg is added by interpDelete)
@@ -101,28 +93,22 @@ proc ::safe::loadTk {} {}
 
 	# set our delete hook (slave arg is added by interpDelete)
 	# to clean up tkInit(slave)
-	    
 	Set [DeleteHookName $slave] [list disallowTk]
 
 	# Let's be nice and also accept tk window names instead of ids
-	
 	if {[string match ".*" $use]} {
 	    set windowName $use
 	    set use [winfo id $windowName]
 	    set nDisplay [winfo screen $windowName]
 	} else {
-
 	    # Check for a better -display value
 	    # (works only for multi screens on single host, but not
 	    #  cross hosts, for that a tk window name would be better
 	    #  but embeding is also usefull for non tk names)
-	    
 	    if {![catch {winfo pathname $use} name]} {
 		set nDisplay [winfo screen $name]
 	    } else {
-
 		# Can't have a better one
-		
 		set nDisplay $display
 	    }
 	}
@@ -137,9 +123,8 @@ proc ::safe::loadTk {} {}
     }
 
     # Prepares the slave for tk with those parameters
-    
     tkInterpInit $slave [list "-use" $use "-display" $display]
-    
+
     load {} Tk $slave
 
     return $slave
@@ -223,7 +208,7 @@ proc ::safe::tkDelete {W window slave} {
 	Log $slave "Destroy toplevel $window" NOTICE
 	destroy $window
     }
-    
+
     # clean up tkInit(slave)
     disallowTk $slave
     return
@@ -242,36 +227,36 @@ proc ::safe::tkTopLevel {slave display} {
     set msg "Untrusted Tcl applet ($slave)"
     wm title $w $msg
 
-    # Control frame
+    # Control frame (we must create a style for it)
+    ttk::style layout TWarningFrame {WarningFrame.border -sticky nswe}
+    ttk::style configure TWarningFrame -background red
+
     set wc $w.fc
-    frame $wc -bg red -borderwidth 3 -relief ridge
+    ttk::frame $wc -relief ridge -borderwidth 4 -style TWarningFrame
 
     # We will destroy the interp when the window is destroyed
     bindtags $wc [concat Safe$wc [bindtags $wc]]
     bind Safe$wc <Destroy> [list ::safe::tkDelete %W $w $slave]
 
-    label $wc.l -text $msg -padx 2 -pady 0 -anchor w
+    ttk::label $wc.l -text $msg -anchor w
 
     # We want the button to be the last visible item
     # (so be packed first) and at the right and not resizing horizontally
 
     # frame the button so it does not expand horizontally
     # but still have the default background instead of red one from the parent
-    frame  $wc.fb -bd 0
-    button $wc.fb.b -text "Delete" \
-	    -bd 1  -padx 2 -pady 0 -highlightthickness 0 \
+    ttk::frame  $wc.fb -borderwidth 0
+    ttk::button $wc.fb.b -text "Delete" \
 	    -command [list ::safe::tkDelete $w $w $slave]
     pack $wc.fb.b -side right -fill both
     pack $wc.fb -side right -fill both -expand 1
-    pack $wc.l -side left  -fill both -expand 1
+    pack $wc.l -side left -fill both -expand 1 -ipady 2
     pack $wc -side bottom -fill x
 
     # Container frame
     frame $w.c -container 1
     pack $w.c -fill both -expand 1
-    
+
     # return both the toplevel window name and the id to use for embedding
     list $w [winfo id $w.c]
-}
-
 }

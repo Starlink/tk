@@ -54,7 +54,7 @@
  *	software in accordance with the terms specified in this
  *	license.
  *
- * RCS: @(#) $Id: tkMacOSXKeyEvent.c,v 1.6.2.15 2007/06/29 03:22:02 das Exp $
+ * RCS: @(#) $Id: tkMacOSXKeyEvent.c,v 1.24.2.1 2008/09/02 16:14:18 das Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -1076,6 +1076,7 @@ XUngrabKeyboard(
  * Side effects:
  *	None.
  *
+ *----------------------------------------------------------------------
  */
 
 Tk_Window

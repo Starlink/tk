@@ -4,7 +4,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: TextLayout.3,v 1.5 1999/04/21 21:53:22 rjohnson Exp $
+'\" RCS: @(#) $Id: TextLayout.3,v 1.10 2007/12/13 15:23:43 dgp Exp $
 '\" 
 .so man.macros
 .TH Tk_ComputeTextLayout 3 8.1 Tk "Tk Library Procedures"
@@ -55,10 +55,8 @@ lifetime of the text layout.
 .AP int numChars in
 The number of characters to consider from \fIstring\fR.  If
 \fInumChars\fR is less than 0, then assumes \fIstring\fR is null
-.VS 8.1
 terminated and uses \fBTcl_NumUtfChars\fR to determine the length of
 \fIstring\fR.
-.VE
 .AP int wrapLength in
 Longest permissible line length, in pixels.  Lines in \fIstring\fR will
 automatically be broken at word boundaries and wrapped when they reach
@@ -69,15 +67,17 @@ wrapping; lines will get as long as they need to be and only wrap if a
 newline/return character is encountered.
 .AP Tk_Justify justify in
 How to justify the lines in a multi-line text layout.  Possible values
-are TK_JUSTIFY_LEFT, TK_JUSTIFY_CENTER, or TK_JUSTIFY_RIGHT.  If the text
-layout only occupies a single line, then \fIjustify\fR is irrelevant.  
+are \fBTK_JUSTIFY_LEFT\fR, \fBTK_JUSTIFY_CENTER\fR, or
+\fBTK_JUSTIFY_RIGHT\fR. If the text layout only occupies a single
+line, then \fIjustify\fR is irrelevant.
 .AP int flags in
-Various flag bits OR-ed together.  TK_IGNORE_TABS means that tab characters
-should not be expanded to the next tab stop.  TK_IGNORE_NEWLINES means that
-newline/return characters should not cause a line break.  If either tabs or
-newlines/returns are ignored, then they will be treated as regular
-characters, being measured and displayed in a platform-dependent manner as
-described in \fBTk_MeasureChars\fR, and will not have any special behaviors.
+Various flag bits OR-ed together. \fBTK_IGNORE_TABS\fR means that tab
+characters should not be expanded to the next tab stop.
+\fBTK_IGNORE_NEWLINES\fR means that newline/return characters should
+not cause a line break.  If either tabs or newlines/returns are
+ignored, then they will be treated as regular characters, being
+measured and displayed in a platform-dependent manner as described in
+\fBTk_MeasureChars\fR, and will not have any special behaviors.
 .AP int *widthPtr out
 If non-NULL, filled with either the width, in pixels, of the widest
 line in the text layout, or the width, in pixels, of the bounding box for the 
@@ -137,13 +137,11 @@ strings, refer to the documentation for \fBTk_MeasureChars\fR.  There is
 no programming interface in the core of Tk that supports multi-font,
 multi-line text; support for that behavior must be built on top of
 simpler layers.  
-.VS 8.1
 Note that unlike the lower level text display routines, the functions
 described here all operate on character-oriented lengths and indices
 rather than byte-oriented values.  See the description of
 \fBTcl_UtfAtIndex\fR for more details on converting between character
 and byte offsets.
-.VE 8.1
 .PP
 The routines described here are built on top of the programming interface
 described in the \fBTk_MeasureChars\fR documentation.  Tab characters and
@@ -218,7 +216,7 @@ the given point (\fIx, y\fR) to the characters in \fIlayout\fR.
 Newline/return characters and non-displaying space characters that occur at
 the end of individual lines in the text layout are ignored for hit detection
 purposes, but tab characters are not.  The return value is 0 if the point
-actually hits the \fIlayout\fR.  If the point didn't hit the \fIlayout\fR
+actually hits the \fIlayout\fR.  If the point did not hit the \fIlayout\fR
 then the return value is the distance in pixels from the point to the
 \fIlayout\fR.
 .PP
@@ -236,8 +234,7 @@ is the responsibility of the caller to take the Postscript array of
 strings and add some Postscript function operate on the array to render
 each of the lines.  The code that represents the Postscript array of
 strings is appended to \fIinterp->result\fR.
-.PP
-.SH DISPLAY MODEL
+.SH "DISPLAY MODEL"
 When measuring a text layout, space characters that occur at the end of a
 line are ignored.  The space characters still exist and the insertion point
 can be positioned amongst them, but their additional width is ignored when

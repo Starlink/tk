@@ -23,10 +23,25 @@ package require tcltest 2.1
 
 namespace eval tk {
     namespace eval test {
+
+	namespace export loadTkCommand
+	proc loadTkCommand {} {
+	    set tklib {}
+	    foreach pair [info loaded {}] {
+		foreach {lib pfx} $pair break
+		if {$pfx eq "Tk"} {
+		    set tklib $lib
+		    break
+		}
+	    }
+	    return [list load $tklib Tk]
+	}
+
 	namespace eval bg {
 	    # Manage a background process.  
 	    # Replace with slave interp or thread?
 	    namespace import ::tcltest::interpreter
+	    namespace import ::tk::test::loadTkCommand
 	    namespace export setup cleanup do
 
 	    proc cleanup {} {
@@ -52,6 +67,8 @@ namespace eval tk {
 		    error "unexpected output from\
 			    background process: \"$data\""
 		}
+		puts $fd [loadTkCommand]
+		flush $fd
 		fileevent $fd readable [namespace code Ready]
 	    }
 	    proc Ready {} {
@@ -129,16 +146,40 @@ namespace import -force tk::test::*
 namespace import -force tcltest::testConstraint
 testConstraint notAqua [expr {[tk windowingsystem] ne "aqua"}]
 testConstraint aqua [expr {[tk windowingsystem] eq "aqua"}]
+testConstraint nonwin [expr {[tk windowingsystem] ne "win32"}]
 testConstraint userInteraction 0
-testConstraint nonUnixUserInteraction [expr {[testConstraint userInteraction]
-                                                || [testConstraint unix]}]
-testConstraint altDisplay [info exists env(TK_ALT_DISPLAY)]
-testConstraint noExceed [expr {![testConstraint unix]
-			|| [catch {font actual "\{xyz"}]}]
+testConstraint nonUnixUserInteraction [expr {
+    [testConstraint userInteraction] || 
+    ([testConstraint unix] && [testConstraint notAqua])
+}]
+testConstraint haveDISPLAY [info exists env(DISPLAY)]
+testConstraint altDisplay  [info exists env(TK_ALT_DISPLAY)]
+testConstraint noExceed [expr {
+    ![testConstraint unix] || [catch {font actual "\{xyz"}]
+}]
+
+# constraints for testing facilities defined in the tktest executable...
 testConstraint testImageType [expr {[lsearch [image types] test] >= 0}]
-testConstraint testembed [llength [info commands testembed]]
-testConstraint testwrapper [llength [info commands testwrapper]]
-testConstraint testfont [llength [info commands testfont]]
+testConstraint testOldImageType [expr {[lsearch [image types] oldtest] >= 0}]
+testConstraint testbitmap    [llength [info commands testbitmap]]
+testConstraint testborder    [llength [info commands testborder]]
+testConstraint testcbind     [llength [info commands testcbind]]
+testConstraint testclipboard [llength [info commands testclipboard]]
+testConstraint testcolor     [llength [info commands testcolor]]
+testConstraint testcursor    [llength [info commands testcursor]]
+testConstraint testembed     [llength [info commands testembed]]
+testConstraint testfont      [llength [info commands testfont]]
+testConstraint testmakeexist [llength [info commands testmakeexist]]
+testConstraint testmenubar   [llength [info commands testmenubar]]
+testConstraint testmenubar   [llength [info commands testmenubar]]
+testConstraint testmetrics   [llength [info commands testmetrics]]
+testConstraint testobjconfig [llength [info commands testobjconfig]]
+testConstraint testsend      [llength [info commands testsend]]
+testConstraint testtext      [llength [info commands testtext]]
+testConstraint testwinevent  [llength [info commands testwinevent]]
+testConstraint testwrapper   [llength [info commands testwrapper]]
+
+# constraint to see what sort of fonts are available
 testConstraint fonts 1
 destroy .e
 entry .e -width 0 -font {Helvetica -12} -bd 1
@@ -157,11 +198,28 @@ destroy .t
 if {![string match {{22 3 6 15} {31 18 [34] 15}} $x]} {
     testConstraint fonts 0
 }
-testConstraint pseudocolor8 [expr {([catch {
-                        toplevel .t -visual {pseudocolor 8} -colormap new
-                        }] == 0) && ([winfo depth .t] == 8)}]
+testConstraint textfonts [expr {
+    [testConstraint fonts] || $tcl_platform(platform) eq "windows"
+}]
+
+# constraints for the visuals available..
+testConstraint pseudocolor8 [expr {
+    ([catch {
+	toplevel .t -visual {pseudocolor 8} -colormap new
+    }] == 0) && ([winfo depth .t] == 8)
+}]
 destroy .t
-testConstraint haveTruecolor24 [expr {[lsearch [winfo visualsavailable .] {truecolor 24}] != -1}]
+testConstraint haveTruecolor24 [expr {
+    [lsearch -exact [winfo visualsavailable .] {truecolor 24}] >= 0
+}]
+testConstraint haveGrayscale8 [expr {
+    [lsearch -exact [winfo visualsavailable .] {grayscale 8}] >= 0
+}]
+testConstraint defaultPseudocolor8 [expr {
+    ([winfo visual .] eq "pseudocolor") && ([winfo depth .] == 8)
+}]
+
+# constraint based on whether our display is secure
 setupbg
 set app [dobg {tk appname}]
 testConstraint secureserver 0
@@ -177,6 +235,14 @@ cleanupbg
 
 eval tcltest::configure $argv
 namespace import -force tcltest::test
+namespace import -force tcltest::makeFile
+namespace import -force tcltest::removeFile
+namespace import -force tcltest::makeDirectory
+namespace import -force tcltest::removeDirectory
+namespace import -force tcltest::interpreter
+namespace import -force tcltest::testsDirectory
+namespace import -force tcltest::cleanupTests
+namespace import -force tcltest::bytestring
 
 deleteWindows
 wm geometry . {}

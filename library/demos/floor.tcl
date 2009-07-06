@@ -3,11 +3,13 @@
 # This demonstration script creates a canvas widet that displays the
 # floorplan for DEC's Western Research Laboratory.
 #
-# RCS: @(#) $Id: floor.tcl,v 1.3 2001/06/14 10:56:58 dkf Exp $
+# RCS: @(#) $Id: floor.tcl,v 1.8 2007/12/13 15:27:07 dgp Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 # floorDisplay --
 # Recreate the floorplan display in the canvas given by "w".  The
@@ -1290,7 +1292,7 @@ proc fg3 {w color} {
 # Below is the "main program" that creates the floorplan demonstration.
 
 set w .floor
-global c tk_library currentRoom colors activeFloor
+global c currentRoom colors activeFloor
 catch {destroy $w}
 toplevel $w
 wm title $w "Floorplan Canvas Demonstration"
@@ -1301,36 +1303,32 @@ wm minsize $w 100 100
 label $w.msg -font $font -wraplength 8i -justify left  -text "This window contains a canvas widget showing the floorplan of Digital Equipment Corporation's Western Research Laboratory.  It has three levels.  At any given time one of the levels is active, meaning that you can see its room structure.  To activate a level, click the left mouse button anywhere on it.  As the mouse moves over the active level, the room under the mouse lights up and its room number appears in the \"Room:\" entry.  You can also type a room number in the entry and the room will light up."
 pack $w.msg -side top
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 set f [frame $w.frame]
 pack $f -side top -fill both -expand yes
-set h [scrollbar $f.hscroll -highlightthickness 0 -orient horizontal]
-set v [scrollbar $f.vscroll -highlightthickness 0 -orient vertical]
-set f1 [frame $f.f1 -bd 2 -relief sunken]
-set c [canvas $f1.c -width 900 -height 500 -borderwidth 0 \
-    -highlightthickness 0 -xscrollcommand "$h set" -yscrollcommand "$v set"]
+set h [scrollbar $f.hscroll -orient horizontal]
+set v [scrollbar $f.vscroll -orient vertical]
+set f1 [frame $f.f1 -borderwidth 2 -relief sunken]
+set c [canvas $f1.c -width 900 -height 500 -highlightthickness 0 \
+	   -xscrollcommand [list $h set] \
+	   -yscrollcommand [list $v set]]
 pack $c -expand yes -fill both
-grid $f1 -padx 1 -pady 1 \
-    -row 0 -column 0 -rowspan 1 -columnspan 1 -sticky news
-grid $v -padx 1 -pady 1 \
-    -row 0 -column 1 -rowspan 1 -columnspan 1 -sticky news
-grid $h -padx 1 -pady 1 \
-    -row 1 -column 0 -rowspan 1 -columnspan 1 -sticky news
+grid $f1 -padx 1 -pady 1 -row 0 -column 0 -rowspan 1 -columnspan 1 -sticky news
+grid $v -padx 1 -pady 1 -row 0 -column 1 -rowspan 1 -columnspan 1 -sticky news
+grid $h -padx 1 -pady 1 -row 1 -column 0 -rowspan 1 -columnspan 1 -sticky news
 grid rowconfig    $f 0 -weight 1 -minsize 0
 grid columnconfig $f 0 -weight 1 -minsize 0
 pack $f -expand yes -fill both -padx 1 -pady 1
 
-$v config -command "$c yview"
-$h config -command "$c xview"
+$v configure -command [list $c yview]
+$h configure -command [list $c xview]
 
 # Create an entry for displaying and typing in current room.
 
-entry $c.entry -width 10 -relief sunken -bd 2 -textvariable currentRoom
+entry $c.entry -width 10 -textvariable currentRoom
 
 # Choose colors, then fill in the floorplan.
 

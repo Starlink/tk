@@ -3,7 +3,7 @@
 # This file contains procedures that change the color palette used
 # by Tk.
 #
-# RCS: @(#) $Id: palette.tcl,v 1.8.2.3 2007/05/09 12:56:32 das Exp $
+# RCS: @(#) $Id: palette.tcl,v 1.12 2007/05/09 12:51:55 das Exp $
 #
 # Copyright (c) 1995-1997 Sun Microsystems, Inc.
 #
@@ -52,13 +52,11 @@ proc ::tk_setPalette {args} {
 	    set new(foreground) white
 	}
     }
-
-    # To avoir too many lindex...
-    foreach {fg_r fg_g fg_b} [winfo rgb . $new(foreground)] {break}
-    foreach {bg_r bg_g bg_b} $bg {break}
-
+    lassign [winfo rgb . $new(foreground)] fg_r fg_g fg_b
+    lassign $bg bg_r bg_g bg_b
     set darkerBg [format #%02x%02x%02x [expr {(9*$bg_r)/2560}] \
 	    [expr {(9*$bg_g)/2560}] [expr {(9*$bg_b)/2560}]]
+
     foreach i {activeForeground insertBackground selectForeground \
 	    highlightColor} {
 	if {![info exists new($i)]} {
@@ -80,7 +78,7 @@ proc ::tk_setPalette {args} {
 	# up by 15% or 1/3 of the way to full white, whichever is
 	# greater.
 
-	foreach i {0 1 2} color "$bg_r $bg_g $bg_b" {
+	foreach i {0 1 2} color $bg {
 	    set light($i) [expr {$color/256}]
 	    set inc1 [expr {($light($i)*15)/100}]
 	    set inc2 [expr {(255-$light($i))/3}]
@@ -178,16 +176,16 @@ proc ::tk::RecolorTree {w colors} {
 	    # dbOption, then use it, otherwise use the defaults
 	    # for the widget.
 	    set defaultcolor [option get $w $dbOption $class]
-	    if {[string match {} $defaultcolor] || \
+	    if {$defaultcolor eq "" || \
 		    ([info exists prototype] && \
 		    [$prototype cget $option] ne "$defaultcolor")} {
 		set defaultcolor [lindex $value 3]
 	    }
-	    if {![string match {} $defaultcolor]} {
+	    if {$defaultcolor ne ""} {
 		set defaultcolor [winfo rgb . $defaultcolor]
 	    }
 	    set chosencolor [lindex $value 4]
-	    if {![string match {} $chosencolor]} {
+	    if {$chosencolor ne ""} {
 		set chosencolor [winfo rgb . $chosencolor]
 	    }
 	    if {[string match $defaultcolor $chosencolor]} {

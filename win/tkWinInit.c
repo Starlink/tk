@@ -1,4 +1,4 @@
-/* 
+/*
  * tkWinInit.c --
  *
  *	This file contains Windows-specific interpreter initialization
@@ -9,16 +9,10 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinInit.c,v 1.11 2003/02/18 19:18:33 hobbs Exp $
+ * RCS: @(#) $Id: tkWinInit.c,v 1.14 2007/12/13 15:28:55 dgp Exp $
  */
 
 #include "tkWinInt.h"
-
-/*
- * The Init script (common to Windows and Unix platforms) is
- * defined in tkInitScript.h
- */
-#include "tkInitScript.h"
 
 
 /*
@@ -30,8 +24,8 @@
  *      tk_library variable.
  *
  * Results:
- *	A standard Tcl completion code (TCL_OK or TCL_ERROR).  Also
- *	leaves information in the interp's result.
+ *	A standard Tcl completion code (TCL_OK or TCL_ERROR). Also leaves
+ *	information in the interp's result.
  *
  * Side effects:
  *	Sets "tk_library" Tcl variable, runs "tk.tcl" script.
@@ -40,15 +34,16 @@
  */
 
 int
-TkpInit(interp)
-    Tcl_Interp *interp;
+TkpInit(
+    Tcl_Interp *interp)
 {
     /*
      * This is necessary for static initialization, and is ok otherwise
      * because TkWinXInit flips a static bit to do its work just once.
      */
+
     TkWinXInit(Tk_GetHINSTANCE());
-    return Tcl_Eval(interp, initScript);
+    return TCL_OK;
 }
 
 /*
@@ -56,9 +51,9 @@ TkpInit(interp)
  *
  * TkpGetAppName --
  *
- *	Retrieves the name of the current application from a platform
- *	specific location.  For Windows, the application name is the
- *	root of the tail of the path contained in the tcl variable argv0.
+ *	Retrieves the name of the current application from a platform specific
+ *	location. For Windows, the application name is the root of the tail of
+ *	the path contained in the tcl variable argv0.
  *
  * Results:
  *	Returns the application name in the given Tcl_DString.
@@ -70,9 +65,9 @@ TkpInit(interp)
  */
 
 void
-TkpGetAppName(interp, namePtr)
-    Tcl_Interp *interp;
-    Tcl_DString *namePtr;	/* A previously initialized Tcl_DString. */
+TkpGetAppName(
+    Tcl_Interp *interp,
+    Tcl_DString *namePtr)	/* A previously initialized Tcl_DString. */
 {
     int argc, namelength;
     CONST char **argv = NULL, *name, *p;
@@ -106,8 +101,8 @@ TkpGetAppName(interp, namePtr)
  *
  * TkpDisplayWarning --
  *
- *	This routines is called from Tk_Main to display warning
- *	messages that occur during startup.
+ *	This routines is called from Tk_Main to display warning messages that
+ *	occur during startup.
  *
  * Results:
  *	None.
@@ -119,17 +114,18 @@ TkpGetAppName(interp, namePtr)
  */
 
 void
-TkpDisplayWarning(msg, title)
-    CONST char *msg;		/* Message to be displayed. */
-    CONST char *title;		/* Title of warning. */
+TkpDisplayWarning(
+    CONST char *msg,		/* Message to be displayed. */
+    CONST char *title)		/* Title of warning. */
 {
     Tcl_DString msgString, titleString;
     Tcl_Encoding unicodeEncoding = TkWinGetUnicodeEncoding();
 
     /*
-     * Truncate MessageBox string if it is too long to not overflow
-     * the screen and cause possible oversized window error.
+     * Truncate MessageBox string if it is too long to not overflow the screen
+     * and cause possible oversized window error.
      */
+
 #define TK_MAX_WARN_LEN (1024 * sizeof(WCHAR))
     Tcl_UtfToExternalDString(unicodeEncoding, msg, -1, &msgString);
     Tcl_UtfToExternalDString(unicodeEncoding, title, -1, &titleString);
@@ -144,3 +140,11 @@ TkpDisplayWarning(msg, title)
     Tcl_DStringFree(&msgString);
     Tcl_DStringFree(&titleString);
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

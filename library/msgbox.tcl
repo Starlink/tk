@@ -3,13 +3,15 @@
 #	Implements messageboxes for platforms that do not have native
 #	messagebox support.
 #
-# RCS: @(#) $Id: msgbox.tcl,v 1.24.2.4 2007/05/30 06:37:03 das Exp $
+# RCS: @(#) $Id: msgbox.tcl,v 1.36 2008/01/31 23:33:42 hobbs Exp $
 #
 # Copyright (c) 1994-1997 Sun Microsystems, Inc.
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 #
+
+package require Ttk
 
 # Ensure existence of ::tk::dialog namespace
 #
@@ -145,6 +147,7 @@ proc ::tk::MessageBox {args} {
     #
     set specs {
 	{-default "" "" ""}
+	{-detail "" "" ""}
         {-icon "" "" "info"}
         {-message "" "" ""}
         {-parent "" "" .}
@@ -157,10 +160,8 @@ proc ::tk::MessageBox {args} {
     if {[lsearch -exact {info warning error question} $data(-icon)] == -1} {
 	error "bad -icon value \"$data(-icon)\": must be error, info, question, or warning"
     }
-
-    # Store tk windowingsystem to avoid too many calls
     set windowingsystem [tk windowingsystem]
-    if {$windowingsystem eq "classic" || $windowingsystem eq "aqua"} {
+    if {$windowingsystem eq "aqua"} {
 	switch -- $data(-icon) {
 	    "error"     {set data(-icon) "stop"}
 	    "warning"   {set data(-icon) "caution"}
@@ -179,26 +180,32 @@ proc ::tk::MessageBox {args} {
 	abortretryignore { 
 	    set names [list abort retry ignore]
 	    set labels [list &Abort &Retry &Ignore]
+	    set cancel abort
 	}
 	ok {
 	    set names [list ok]
 	    set labels {&OK}
+	    set cancel ok
 	}
 	okcancel {
 	    set names [list ok cancel]
 	    set labels [list &OK &Cancel]
+	    set cancel cancel
 	}
 	retrycancel {
 	    set names [list retry cancel]
 	    set labels [list &Retry &Cancel]
+	    set cancel cancel
 	}
 	yesno {
 	    set names [list yes no]
 	    set labels [list &Yes &No]
+	    set cancel no
 	}
 	yesnocancel {
 	    set names [list yes no cancel]
 	    set labels [list &Yes &No &Cancel]
+	    set cancel cancel
 	}
 	default {
 	    error "bad -type value \"$data(-type)\": must be\
@@ -239,16 +246,17 @@ proc ::tk::MessageBox {args} {
 	set w .__tk__messagebox
     }
 
+    # There is only one background colour for the whole dialog
+    set bg [ttk::style lookup . -background]
+
     # 3. Create the top-level window and divide it into top
     # and bottom parts.
 
-    destroy $w
-    toplevel $w -class Dialog
+    catch {destroy $w}
+    toplevel $w -class Dialog -bg $bg
     wm title $w $data(-title)
     wm iconname $w Dialog
     wm protocol $w WM_DELETE_WINDOW { }
-    # There is only one background colour for the whole dialog
-    set bg [$w cget -background]
 
     # Message boxes should be transient with respect to their parent so that
     # they always stay on top of the parent window.  But some window managers
@@ -259,37 +267,41 @@ proc ::tk::MessageBox {args} {
     #
     if {[winfo viewable [winfo toplevel $data(-parent)]] } {
 	wm transient $w $data(-parent)
-    }    
+    }
 
-    if {$windowingsystem eq "classic" || $windowingsystem eq "aqua"} {
+    if {$windowingsystem eq "aqua"} {
 	::tk::unsupported::MacWindowStyle style $w moveableModal {}
     }
 
-    frame $w.bot -background $bg
+    ttk::frame $w.bot;# -background $bg
+    grid anchor $w.bot center
     pack $w.bot -side bottom -fill both
-    frame $w.top -background $bg
+    ttk::frame $w.top;# -background $bg
     pack $w.top -side top -fill both -expand 1
-    if {$windowingsystem ne "classic" && $windowingsystem ne "aqua"} {
-	$w.bot configure -relief raised -bd 1
-	$w.top configure -relief raised -bd 1
+    if {$windowingsystem ne "aqua"} {
+	#$w.bot configure -relief raised -bd 1
+	#$w.top configure -relief raised -bd 1
     }
 
-    # 4. Fill the top part with bitmap and message (use the option
-    # database for -wraplength and -font so that they can be
+    # 4. Fill the top part with bitmap, message and detail (use the
+    # option database for -wraplength and -font so that they can be
     # overridden by the caller).
 
     option add *Dialog.msg.wrapLength 3i widgetDefault
-    if {$windowingsystem eq "classic" || $windowingsystem eq "aqua"} {
-	option add *Dialog.msg.font system widgetDefault
-    } else {
-	option add *Dialog.msg.font {Times 14} widgetDefault
-    }
+    option add *Dialog.dtl.wrapLength 3i widgetDefault
+    option add *Dialog.msg.font TkCaptionFont widgetDefault
+    option add *Dialog.dtl.font TkDefaultFont widgetDefault
 
-    label $w.msg -anchor nw -justify left -text $data(-message) \
-	    -background $bg
+    ttk::label $w.msg -anchor nw -justify left -text $data(-message)
+    #-background $bg
+    if {$data(-detail) ne ""} {
+	ttk::label $w.dtl -anchor nw -justify left -text $data(-detail)
+	#-background $bg
+    }
     if {$data(-icon) ne ""} {
-	if {($windowingsystem eq "classic" || $windowingsystem eq "aqua")
+	if {$windowingsystem eq "aqua"
 		|| ([winfo depth $w] < 4) || $tk_strictMotif} {
+	    # ttk::label has no -bitmap option
 	    label $w.bitmap -bitmap $data(-icon) -background $bg
 	} else {
 	    canvas $w.bitmap -width 32 -height 32 -highlightthickness 0 \
@@ -329,7 +341,12 @@ proc ::tk::MessageBox {args} {
     }
     grid $w.bitmap $w.msg -in $w.top -sticky news -padx 2m -pady 2m
     grid columnconfigure $w.top 1 -weight 1
-    grid rowconfigure $w.top 0 -weight 1
+    if {$data(-detail) ne ""} {
+	grid ^ $w.dtl -in $w.top -sticky news -padx 2m -pady {0 2m}
+	grid rowconfigure $w.top 1 -weight 1
+    } else {
+	grid rowconfigure $w.top 0 -weight 1
+    }
 
     # 5. Create a row of buttons at the bottom of the dialog.
 
@@ -343,8 +360,9 @@ proc ::tk::MessageBox {args} {
 	    set opts [list -text $capName]
 	}
 
-	eval [list tk::AmpWidget button $w.$name -padx 3m] $opts \
+	eval [list tk::AmpWidget ttk::button $w.$name] $opts \
 		[list -command [list set tk::Priv(button) $name]]
+	# -padx 3m
 
 	if {$name eq $data(-default)} {
 	    $w.$name configure -default active
@@ -354,7 +372,7 @@ proc ::tk::MessageBox {args} {
 	grid $w.$name -in $w.bot -row 0 -column $i -padx 3m -pady 2m -sticky ew
 	grid columnconfigure $w.bot $i -uniform buttons
 	# We boost the size of some Mac buttons for l&f
-	if {$windowingsystem eq "classic" || $windowingsystem eq "aqua"} {
+	if {$windowingsystem eq "aqua"} {
 	    set tmp [string tolower $name]
 	    if {$tmp eq "ok" || $tmp eq "cancel" || $tmp eq "yes" ||
 		    $tmp eq "no" || $tmp eq "abort" || $tmp eq "retry" ||
@@ -378,24 +396,30 @@ proc ::tk::MessageBox {args} {
 
     if {$data(-default) ne ""} {
 	bind $w <FocusIn> {
-	    if {"Button" eq [winfo class %W]} {
+	    if {[winfo class %W] eq "Button"} {
 		%W configure -default active
 	    }
 	}
 	bind $w <FocusOut> {
-	    if {"Button" eq [winfo class %W]} {
+	    if {[winfo class %W] eq "Button"} {
 		%W configure -default normal
 	    }
 	}
     }
 
-    # 6. Create a binding for <Return> on the dialog
+    # 6. Create bindings for <Return>, <Escape> and <Destroy> on the dialog
 
     bind $w <Return> {
-	if {"Button" eq [winfo class %W]} {
-	    tk::ButtonInvoke %W
+	if {[winfo class %W] eq "Button"} {
+	    %W invoke
 	}
     }
+
+    # Invoke the designated cancelling operation
+    bind $w <Escape> [list $w.$cancel invoke]
+
+    # At <Destroy> the buttons have vanished, so must do this directly.
+    bind $w.msg <Destroy> [list set tk::Priv(button) $cancel]
 
     # 7. Withdraw the window, then update all the geometry information
     # so we know how big it wants to be, then center the window in the
@@ -419,8 +443,11 @@ proc ::tk::MessageBox {args} {
     # restore any grab that was in effect.
 
     vwait ::tk::Priv(button)
+    # Copy the result now so any <Destroy> that happens won't cause
+    # trouble
+    set result $Priv(button)
 
     ::tk::RestoreFocusGrab $w $focus
 
-    return $Priv(button)
+    return $result
 }

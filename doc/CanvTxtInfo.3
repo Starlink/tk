@@ -4,7 +4,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: CanvTxtInfo.3,v 1.2 1998/09/14 18:22:46 stanton Exp $
+'\" RCS: @(#) $Id: CanvTxtInfo.3,v 1.5 2007/12/13 15:23:42 dgp Exp $
 '\" 
 .so man.macros
 .TH Tk_CanvasTextInfo 3 4.0 Tk "Tk Library Procedures"
@@ -35,20 +35,20 @@ text.
 The structure has the following form:
 .CS
 typedef struct Tk_CanvasTextInfo {
-	Tk_3DBorder \fIselBorder\fR;
-	int \fIselBorderWidth\fR;
-	XColor *\fIselFgColorPtr\fR;
-	Tk_Item *\fIselItemPtr\fR;
-	int \fIselectFirst\fR;
-	int \fIselectLast\fR;
-	Tk_Item *\fIanchorItemPtr\fR;
-	int \fIselectAnchor\fR;
-	Tk_3DBorder \fIinsertBorder\fR;
-	int \fIinsertWidth\fR;
-	int \fIinsertBorderWidth\fR;
-	Tk_Item *\fIfocusItemPtr\fR;
-	int \fIgotFocus\fR;
-	int \fIcursorOn\fR;
+    Tk_3DBorder \fIselBorder\fR;
+    int \fIselBorderWidth\fR;
+    XColor *\fIselFgColorPtr\fR;
+    Tk_Item *\fIselItemPtr\fR;
+    int \fIselectFirst\fR;
+    int \fIselectLast\fR;
+    Tk_Item *\fIanchorItemPtr\fR;
+    int \fIselectAnchor\fR;
+    Tk_3DBorder \fIinsertBorder\fR;
+    int \fIinsertWidth\fR;
+    int \fIinsertBorderWidth\fR;
+    Tk_Item *\fIfocusItemPtr\fR;
+    int \fIgotFocus\fR;
+    int \fIcursorOn\fR;
 } Tk_CanvasTextInfo;
 .CE
 The \fBselBorder\fR field identifies a Tk_3DBorder that should be
@@ -58,7 +58,7 @@ selected text, in pixels.
 \fIselFgColorPtr\fR points to an XColor that describes the foreground
 color to be used when drawing selected text.
 \fIselItemPtr\fR points to the item that is currently selected, or
-NULL if there is no item selected or if the canvas doesn't have the
+NULL if there is no item selected or if the canvas does not have the
 selection.
 \fIselectFirst\fR and \fIselectLast\fR give the indices of the first
 and last selected characters in \fIselItemPtr\fR, as returned by the

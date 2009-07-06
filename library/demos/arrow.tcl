@@ -3,11 +3,13 @@
 # This demonstration script creates a canvas widget that displays a
 # large line with an arrowhead whose shape can be edited interactively.
 #
-# RCS: @(#) $Id: arrow.tcl,v 1.3 2001/06/14 10:56:58 dkf Exp $
+# RCS: @(#) $Id: arrow.tcl,v 1.6 2004/12/21 11:56:35 dkf Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 # arrowSetup --
 # This procedure regenerates all the text and graphics in the canvas
@@ -107,7 +109,6 @@ proc arrowSetup c {
 }
 
 set w .arrow
-global tk_library
 catch {destroy $w}
 toplevel $w
 wm title $w "Arrowhead Editor Demonstration"
@@ -118,11 +119,9 @@ set c $w.c
 label $w.msg -font $font -wraplength 5i -justify left -text "This widget allows you to experiment with different widths and arrowhead shapes for lines in canvases.  To change the line width or the shape of the arrowhead, drag any of the three boxes attached to the oversized arrow.  The arrows on the right give examples at normal scale.  The text at the bottom shows the configuration options as you'd enter them for a canvas line item."
 pack $w.msg -side top
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 canvas $c -width 500 -height 350 -relief sunken -borderwidth 2
 pack $c -expand yes -fill both
@@ -142,8 +141,9 @@ if {[winfo depth $c] > 1} {
     set demo_arrowInfo(boxStyle) "-fill {} -outline black -width 1"
     set demo_arrowInfo(activeStyle) "-fill red -outline black -width 1"
 } else {
+    # Main widget program sets variable tk_demoDirectory
     set demo_arrowInfo(bigLineStyle) "-fill black \
-	-stipple @[file join $tk_library demos images grey.25]"
+	-stipple @[file join $tk_demoDirectory images grey.25]"
     set demo_arrowInfo(boxStyle) "-fill {} -outline black -width 1"
     set demo_arrowInfo(activeStyle) "-fill black -outline black -width 1"
 }

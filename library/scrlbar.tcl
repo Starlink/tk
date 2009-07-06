@@ -3,7 +3,7 @@
 # This file defines the default bindings for Tk scrollbar widgets.
 # It also provides procedures that help in implementing the bindings.
 #
-# RCS: @(#) $Id: scrlbar.tcl,v 1.10.2.3 2006/03/17 10:50:11 patthoyts Exp $
+# RCS: @(#) $Id: scrlbar.tcl,v 1.13 2006/03/17 11:13:15 patthoyts Exp $
 #
 # Copyright (c) 1994 The Regents of the University of California.
 # Copyright (c) 1994-1996 Sun Microsystems, Inc.
@@ -130,7 +130,7 @@ bind Scrollbar <End> {
     tk::ScrollToPos %W 1
 }
 }
-if {[tk windowingsystem] eq "classic" || [tk windowingsystem] eq "aqua"} {
+if {[tk windowingsystem] eq "aqua"} {
     bind Scrollbar <MouseWheel> {
         tk::ScrollByUnits %W v [expr {- (%D)}]
     }
@@ -316,7 +316,8 @@ proc ::tk::ScrollEndDrag {w x y} {
 
 proc ::tk::ScrollByUnits {w orient amount} {
     set cmd [$w cget -command]
-    if {$cmd eq "" || ([string first [string index [$w cget -orient] 0] $orient] < 0)} {
+    if {$cmd eq "" || ([string first \
+	    [string index [$w cget -orient] 0] $orient] < 0)} {
 	return
     }
     set info [$w get]
@@ -340,7 +341,8 @@ proc ::tk::ScrollByUnits {w orient amount} {
 
 proc ::tk::ScrollByPages {w orient amount} {
     set cmd [$w cget -command]
-    if {$cmd eq "" || ([string first [string index [$w cget -orient] 0] $orient] < 0)} {
+    if {$cmd eq "" || ([string first \
+	    [string index [$w cget -orient] 0] $orient] < 0)} {
 	return
     }
     set info [$w get]

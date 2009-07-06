@@ -1,4 +1,4 @@
-/* 
+/*
  * tkCanvArc.c --
  *
  *	This file implements arc items for canvas widgets.
@@ -6,16 +6,16 @@
  * Copyright (c) 1992-1994 The Regents of the University of California.
  * Copyright (c) 1994-1997 Sun Microsystems, Inc.
  *
- * See the file "license.terms" for information on usage and redistribution
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+ * See the file "license.terms" for information on usage and redistribution of
+ * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkCanvArc.c,v 1.11 2003/02/09 07:48:22 hobbs Exp $
+ * RCS: @(#) $Id: tkCanvArc.c,v 1.16 2007/12/13 15:24:13 dgp Exp $
  */
 
 #include <stdio.h>
-#include "tkPort.h"
 #include "tkInt.h"
 #include "tkCanvas.h"
+
 /*
  * The structure below defines the record for each arc item.
  */
@@ -24,41 +24,42 @@ typedef enum {
     PIESLICE_STYLE, CHORD_STYLE, ARC_STYLE
 } Style;
 
-typedef struct ArcItem  {
+typedef struct ArcItem {
     Tk_Item header;		/* Generic stuff that's the same for all
-				 * types.  MUST BE FIRST IN STRUCTURE. */
+				 * types. MUST BE FIRST IN STRUCTURE. */
     Tk_Outline outline;		/* Outline structure */
     double bbox[4];		/* Coordinates (x1, y1, x2, y2) of bounding
 				 * box for oval of which arc is a piece. */
     double start;		/* Angle at which arc begins, in degrees
 				 * between 0 and 360. */
-    double extent;		/* Extent of arc (angular distance from
-				 * start to end of arc) in degrees between
-				 * -360 and 360. */
-    double *outlinePtr;		/* Points to (x,y) coordinates for points
-				 * that define one or two closed polygons
+    double extent;		/* Extent of arc (angular distance from start
+				 * to end of arc) in degrees between -360 and
+				 * 360. */
+    double *outlinePtr;		/* Points to (x,y) coordinates for points that
+				 * define one or two closed polygons
 				 * representing the portion of the outline
-				 * that isn't part of the arc (the V-shape
-				 * for a pie slice or a line-like segment
-				 * for a chord).  Malloc'ed. */
-    int numOutlinePoints;	/* Number of points at outlinePtr.  Zero
-				 * means no space allocated. */
+				 * that isn't part of the arc (the V-shape for
+				 * a pie slice or a line-like segment for a
+				 * chord). Malloc'ed. */
+    int numOutlinePoints;	/* Number of points at outlinePtr. Zero means
+				 * no space allocated. */
     Tk_TSOffset tsoffset;
     XColor *fillColor;		/* Color for filling arc (used for drawing
-				 * outline too when style is "arc").  NULL
+				 * outline too when style is "arc"). NULL
 				 * means don't fill arc. */
     XColor *activeFillColor;	/* Color for filling arc (used for drawing
 				 * outline too when style is "arc" and state
-				 * is "active").  NULL means use fillColor. */
+				 * is "active"). NULL means use fillColor. */
     XColor *disabledFillColor;	/* Color for filling arc (used for drawing
 				 * outline too when style is "arc" and state
 				 * is "disabled". NULL means use fillColor */
     Pixmap fillStipple;		/* Stipple bitmap for filling item. */
-    Pixmap activeFillStipple;	/* Stipple bitmap for filling item if state
-				 * is active. */
-    Pixmap disabledFillStipple;	/* Stipple bitmap for filling item if state
-				 * is disabled. */
-    Style style;		/* How to draw arc: arc, chord, or pieslice. */
+    Pixmap activeFillStipple;	/* Stipple bitmap for filling item if state is
+				 * active. */
+    Pixmap disabledFillStipple;	/* Stipple bitmap for filling item if state is
+				 * disabled. */
+    Style style;		/* How to draw arc: arc, chord, or
+				 * pieslice. */
     GC fillGC;			/* Graphics context for filling item. */
     double center1[2];		/* Coordinates of center of arc outline at
 				 * start (see ComputeArcOutline). */
@@ -67,8 +68,8 @@ typedef struct ArcItem  {
 } ArcItem;
 
 /*
- * The definitions below define the sizes of the polygons used to
- * display outline information for various styles of arcs:
+ * The definitions below define the sizes of the polygons used to display
+ * outline information for various styles of arcs:
  */
 
 #define CHORD_OUTLINE_PTS	7
@@ -79,14 +80,11 @@ typedef struct ArcItem  {
  * Information used for parsing configuration specs:
  */
 
-static int	StyleParseProc _ANSI_ARGS_((
-		    ClientData clientData, Tcl_Interp *interp,
+static int	StyleParseProc(ClientData clientData, Tcl_Interp *interp,
 		    Tk_Window tkwin, CONST char *value,
-		    char *widgRec, int offset));
-static char *	StylePrintProc _ANSI_ARGS_((
-		    ClientData clientData, Tk_Window tkwin,
-		    char *widgRec, int offset,
-		    Tcl_FreeProc **freeProcPtr));
+		    char *widgRec, int offset);
+static char *	StylePrintProc(ClientData clientData, Tk_Window tkwin,
+		    char *widgRec, int offset, Tcl_FreeProc **freeProcPtr);
 
 static Tk_CustomOption stateOption = {
     (Tk_OptionParseProc *) TkStateParseProc,
@@ -114,169 +112,152 @@ static Tk_CustomOption pixelOption = {
 };
 
 static Tk_ConfigSpec configSpecs[] = {
-    {TK_CONFIG_CUSTOM, "-activedash", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.activeDash),
+    {TK_CONFIG_CUSTOM, "-activedash", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.activeDash),
 	TK_CONFIG_NULL_OK, &dashOption},
-    {TK_CONFIG_COLOR, "-activefill", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, activeFillColor),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_COLOR, "-activeoutline", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.activeColor),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_BITMAP, "-activeoutlinestipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.activeStipple),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_BITMAP, "-activestipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, activeFillStipple),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_CUSTOM, "-activewidth", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_COLOR, "-activefill", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, activeFillColor), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_COLOR, "-activeoutline", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.activeColor), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_BITMAP, "-activeoutlinestipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.activeStipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_BITMAP, "-activestipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, activeFillStipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_CUSTOM, "-activewidth", NULL, NULL,
 	"0.0", Tk_Offset(ArcItem, outline.activeWidth),
 	TK_CONFIG_DONT_SET_DEFAULT, &pixelOption},
-    {TK_CONFIG_CUSTOM, "-dash", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.dash),
+    {TK_CONFIG_CUSTOM, "-dash", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.dash),
 	TK_CONFIG_NULL_OK, &dashOption},
-    {TK_CONFIG_PIXELS, "-dashoffset", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_PIXELS, "-dashoffset", NULL, NULL,
 	"0", Tk_Offset(ArcItem, outline.offset), TK_CONFIG_DONT_SET_DEFAULT},
-    {TK_CONFIG_CUSTOM, "-disableddash", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.disabledDash),
+    {TK_CONFIG_CUSTOM, "-disableddash", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.disabledDash),
 	TK_CONFIG_NULL_OK, &dashOption},
-    {TK_CONFIG_COLOR, "-disabledfill", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, disabledFillColor),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_COLOR, "-disabledoutline", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.disabledColor),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_BITMAP, "-disabledoutlinestipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.disabledStipple),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_BITMAP, "-disabledstipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, disabledFillStipple),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_CUSTOM, "-disabledwidth", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_COLOR, "-disabledfill", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, disabledFillColor), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_COLOR, "-disabledoutline", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.disabledColor), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_BITMAP, "-disabledoutlinestipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.disabledStipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_BITMAP, "-disabledstipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, disabledFillStipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_CUSTOM, "-disabledwidth", NULL, NULL,
 	"0.0", Tk_Offset(ArcItem, outline.disabledWidth),
 	TK_CONFIG_DONT_SET_DEFAULT, &pixelOption},
-    {TK_CONFIG_DOUBLE, "-extent", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_DOUBLE, "-extent", NULL, NULL,
 	"90", Tk_Offset(ArcItem, extent), TK_CONFIG_DONT_SET_DEFAULT},
-    {TK_CONFIG_COLOR, "-fill", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, fillColor), TK_CONFIG_NULL_OK},
-    {TK_CONFIG_CUSTOM, "-offset", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_COLOR, "-fill", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, fillColor), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_CUSTOM, "-offset", NULL, NULL,
 	"0,0", Tk_Offset(ArcItem, tsoffset),
 	TK_CONFIG_DONT_SET_DEFAULT, &offsetOption},
-    {TK_CONFIG_COLOR, "-outline", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_COLOR, "-outline", NULL, NULL,
 	"black", Tk_Offset(ArcItem, outline.color), TK_CONFIG_NULL_OK},
-    {TK_CONFIG_CUSTOM, "-outlineoffset", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_CUSTOM, "-outlineoffset", NULL, NULL,
 	"0,0", Tk_Offset(ArcItem, outline.tsoffset),
 	TK_CONFIG_DONT_SET_DEFAULT, &offsetOption},
-    {TK_CONFIG_BITMAP, "-outlinestipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, outline.stipple),
-	TK_CONFIG_NULL_OK},
-    {TK_CONFIG_DOUBLE, "-start", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_BITMAP, "-outlinestipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, outline.stipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_DOUBLE, "-start", NULL, NULL,
 	"0", Tk_Offset(ArcItem, start), TK_CONFIG_DONT_SET_DEFAULT},
-    {TK_CONFIG_CUSTOM, "-state", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(Tk_Item, state), TK_CONFIG_NULL_OK,
-	&stateOption},
-    {TK_CONFIG_BITMAP, "-stipple", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, fillStipple), TK_CONFIG_NULL_OK},
-    {TK_CONFIG_CUSTOM, "-style", (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(ArcItem, style), TK_CONFIG_DONT_SET_DEFAULT,
+    {TK_CONFIG_CUSTOM, "-state", NULL, NULL,
+	NULL, Tk_Offset(Tk_Item, state), TK_CONFIG_NULL_OK, &stateOption},
+    {TK_CONFIG_BITMAP, "-stipple", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, fillStipple), TK_CONFIG_NULL_OK},
+    {TK_CONFIG_CUSTOM, "-style", NULL, NULL,
+	NULL, Tk_Offset(ArcItem, style), TK_CONFIG_DONT_SET_DEFAULT,
 	&styleOption},
-    {TK_CONFIG_CUSTOM, "-tags", (char *) NULL, (char *) NULL,
-	(char *) NULL, 0, TK_CONFIG_NULL_OK, &tagsOption},
-    {TK_CONFIG_CUSTOM, "-width", (char *) NULL, (char *) NULL,
+    {TK_CONFIG_CUSTOM, "-tags", NULL, NULL,
+	NULL, 0, TK_CONFIG_NULL_OK, &tagsOption},
+    {TK_CONFIG_CUSTOM, "-width", NULL, NULL,
 	"1.0", Tk_Offset(ArcItem, outline.width), TK_CONFIG_DONT_SET_DEFAULT,
 	&pixelOption},
-    {TK_CONFIG_END, (char *) NULL, (char *) NULL, (char *) NULL,
-	(char *) NULL, 0, 0}
+    {TK_CONFIG_END, NULL, NULL, NULL, NULL, 0, 0}
 };
 
 /*
- * Prototypes for procedures defined in this file:
+ * Prototypes for functions defined in this file:
  */
 
-static void		ComputeArcBbox _ANSI_ARGS_((Tk_Canvas canvas,
-			    ArcItem *arcPtr));
-static int		ConfigureArc _ANSI_ARGS_((Tcl_Interp *interp,
+static void		ComputeArcBbox(Tk_Canvas canvas, ArcItem *arcPtr);
+static int		ConfigureArc(Tcl_Interp *interp,
 			    Tk_Canvas canvas, Tk_Item *itemPtr, int objc,
-			    Tcl_Obj *CONST objv[], int flags));
-static int		CreateArc _ANSI_ARGS_((Tcl_Interp *interp,
+			    Tcl_Obj *CONST objv[], int flags);
+static int		CreateArc(Tcl_Interp *interp,
 			    Tk_Canvas canvas, struct Tk_Item *itemPtr,
-			    int objc, Tcl_Obj *CONST objv[]));
-static void		DeleteArc _ANSI_ARGS_((Tk_Canvas canvas,
-			    Tk_Item *itemPtr, Display *display));
-static void		DisplayArc _ANSI_ARGS_((Tk_Canvas canvas,
+			    int objc, Tcl_Obj *CONST objv[]);
+static void		DeleteArc(Tk_Canvas canvas,
+			    Tk_Item *itemPtr, Display *display);
+static void		DisplayArc(Tk_Canvas canvas,
 			    Tk_Item *itemPtr, Display *display, Drawable dst,
-			    int x, int y, int width, int height));
-static int		ArcCoords _ANSI_ARGS_((Tcl_Interp *interp,
-			    Tk_Canvas canvas, Tk_Item *itemPtr, int objc,
-			    Tcl_Obj *CONST objv[]));
-static int		ArcToArea _ANSI_ARGS_((Tk_Canvas canvas,
-			    Tk_Item *itemPtr, double *rectPtr));
-static double		ArcToPoint _ANSI_ARGS_((Tk_Canvas canvas,
-			    Tk_Item *itemPtr, double *coordPtr));
-static int		ArcToPostscript _ANSI_ARGS_((Tcl_Interp *interp,
-			    Tk_Canvas canvas, Tk_Item *itemPtr, int prepass));
-static void		ScaleArc _ANSI_ARGS_((Tk_Canvas canvas,
+			    int x, int y, int width, int height);
+static int		ArcCoords(Tcl_Interp *interp, Tk_Canvas canvas,
+			    Tk_Item *itemPtr, int objc, Tcl_Obj *CONST objv[]);
+static int		ArcToArea(Tk_Canvas canvas,
+			    Tk_Item *itemPtr, double *rectPtr);
+static double		ArcToPoint(Tk_Canvas canvas,
+			    Tk_Item *itemPtr, double *coordPtr);
+static int		ArcToPostscript(Tcl_Interp *interp,
+			    Tk_Canvas canvas, Tk_Item *itemPtr, int prepass);
+static void		ScaleArc(Tk_Canvas canvas,
 			    Tk_Item *itemPtr, double originX, double originY,
-			    double scaleX, double scaleY));
-static void		TranslateArc _ANSI_ARGS_((Tk_Canvas canvas,
-			    Tk_Item *itemPtr, double deltaX, double deltaY));
-static int		AngleInRange _ANSI_ARGS_((double x, double y,
-			    double start, double extent));
-static void		ComputeArcOutline _ANSI_ARGS_((Tk_Canvas canvas,
-			    ArcItem *arcPtr));
-static int		HorizLineToArc _ANSI_ARGS_((double x1, double x2,
+			    double scaleX, double scaleY);
+static void		TranslateArc(Tk_Canvas canvas,
+			    Tk_Item *itemPtr, double deltaX, double deltaY);
+static int		AngleInRange(double x, double y,
+			    double start, double extent);
+static void		ComputeArcOutline(Tk_Canvas canvas, ArcItem *arcPtr);
+static int		HorizLineToArc(double x1, double x2,
 			    double y, double rx, double ry,
-			    double start, double extent));
-static int		VertLineToArc _ANSI_ARGS_((double x, double y1,
+			    double start, double extent);
+static int		VertLineToArc(double x, double y1,
 			    double y2, double rx, double ry,
-			    double start, double extent));
+			    double start, double extent);
 
 /*
- * The structures below defines the arc item types by means of procedures
- * that can be invoked by generic item code.
+ * The structures below defines the arc item types by means of functions that
+ * can be invoked by generic item code.
  */
 
 Tk_ItemType tkArcType = {
-    "arc",				/* name */
-    sizeof(ArcItem),			/* itemSize */
-    CreateArc,				/* createProc */
-    configSpecs,			/* configSpecs */
-    ConfigureArc,			/* configureProc */
-    ArcCoords,				/* coordProc */
-    DeleteArc,				/* deleteProc */
-    DisplayArc,				/* displayProc */
-    TK_CONFIG_OBJS,			/* flags */
-    ArcToPoint,				/* pointProc */
-    ArcToArea,				/* areaProc */
-    ArcToPostscript,			/* postscriptProc */
-    ScaleArc,				/* scaleProc */
-    TranslateArc,			/* translateProc */
-    (Tk_ItemIndexProc *) NULL,		/* indexProc */
-    (Tk_ItemCursorProc *) NULL,		/* icursorProc */
-    (Tk_ItemSelectionProc *) NULL,	/* selectionProc */
-    (Tk_ItemInsertProc *) NULL,		/* insertProc */
-    (Tk_ItemDCharsProc *) NULL,		/* dTextProc */
-    (Tk_ItemType *) NULL,		/* nextPtr */
+    "arc",			/* name */
+    sizeof(ArcItem),		/* itemSize */
+    CreateArc,			/* createProc */
+    configSpecs,		/* configSpecs */
+    ConfigureArc,		/* configureProc */
+    ArcCoords,			/* coordProc */
+    DeleteArc,			/* deleteProc */
+    DisplayArc,			/* displayProc */
+    TK_CONFIG_OBJS,		/* flags */
+    ArcToPoint,			/* pointProc */
+    ArcToArea,			/* areaProc */
+    ArcToPostscript,		/* postscriptProc */
+    ScaleArc,			/* scaleProc */
+    TranslateArc,		/* translateProc */
+    NULL,			/* indexProc */
+    NULL,			/* icursorProc */
+    NULL,			/* selectionProc */
+    NULL,			/* insertProc */
+    NULL,			/* dTextProc */
+    NULL,			/* nextPtr */
 };
 
 #ifndef PI
-#    define PI 3.14159265358979323846
+#define PI	3.14159265358979323846
 #endif
-
 
 /*
  *--------------------------------------------------------------
  *
  * CreateArc --
  *
- *	This procedure is invoked to create a new arc item in
- *	a canvas.
+ *	This function is invoked to create a new arc item in a canvas.
  *
  * Results:
- *	A standard Tcl return value.  If an error occurred in
- *	creating the item, then an error message is left in
- *	the interp's result;  in this case itemPtr is
- *	left uninitialized, so it can be safely freed by the
+ *	A standard Tcl return value. If an error occurred in creating the
+ *	item, then an error message is left in the interp's result; in this
+ *	case itemPtr is left uninitialized, so it can be safely freed by the
  *	caller.
  *
  * Side effects:
@@ -286,24 +267,24 @@ Tk_ItemType tkArcType = {
  */
 
 static int
-CreateArc(interp, canvas, itemPtr, objc, objv)
-    Tcl_Interp *interp;			/* Interpreter for error reporting. */
-    Tk_Canvas canvas;			/* Canvas to hold new item. */
-    Tk_Item *itemPtr;			/* Record to hold new item;  header
-					 * has been initialized by caller. */
-    int objc;				/* Number of arguments in objv. */
-    Tcl_Obj *CONST objv[];		/* Arguments describing arc. */
+CreateArc(
+    Tcl_Interp *interp,		/* Interpreter for error reporting. */
+    Tk_Canvas canvas,		/* Canvas to hold new item. */
+    Tk_Item *itemPtr,		/* Record to hold new item; header has been
+				 * initialized by caller. */
+    int objc,			/* Number of arguments in objv. */
+    Tcl_Obj *CONST objv[])	/* Arguments describing arc. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
     int i;
 
     if (objc == 0) {
-	panic("canvas did not pass any coords\n");
+	Tcl_Panic("canvas did not pass any coords\n");
     }
 
     /*
-     * Carry out initialization that is needed in order to clean
-     * up after errors during the the remainder of this procedure.
+     * Carry out initialization that is needed in order to clean up after
+     * errors during the the remainder of this function.
      */
 
     Tk_CreateOutline(&(arcPtr->outline));
@@ -329,6 +310,7 @@ CreateArc(interp, canvas, itemPtr, objc, objv)
 
     for (i = 1; i < objc; i++) {
 	char *arg = Tcl_GetString(objv[i]);
+
 	if ((arg[0] == '-') && (arg[1] >= 'a') && (arg[1] <= 'z')) {
 	    break;
 	}
@@ -339,7 +321,8 @@ CreateArc(interp, canvas, itemPtr, objc, objv)
     if (ConfigureArc(interp, canvas, itemPtr, objc-i, objv+i, 0) == TCL_OK) {
 	return TCL_OK;
     }
-    error:
+
+  error:
     DeleteArc(canvas, itemPtr, Tk_Display(Tk_CanvasTkwin(canvas)));
     return TCL_ERROR;
 }
@@ -349,9 +332,8 @@ CreateArc(interp, canvas, itemPtr, objc, objv)
  *
  * ArcCoords --
  *
- *	This procedure is invoked to process the "coords" widget
- *	command on arcs.  See the user documentation for details
- *	on what it does.
+ *	This function is invoked to process the "coords" widget command on
+ *	arcs. See the user documentation for details on what it does.
  *
  * Results:
  *	Returns TCL_OK or TCL_ERROR, and sets the interp's result.
@@ -363,21 +345,20 @@ CreateArc(interp, canvas, itemPtr, objc, objv)
  */
 
 static int
-ArcCoords(interp, canvas, itemPtr, objc, objv)
-    Tcl_Interp *interp;			/* Used for error reporting. */
-    Tk_Canvas canvas;			/* Canvas containing item. */
-    Tk_Item *itemPtr;			/* Item whose coordinates are to be
-					 * read or modified. */
-    int objc;				/* Number of coordinates supplied in
-					 * objv. */
-    Tcl_Obj *CONST objv[];		/* Array of coordinates: x1, y1,
-					 * x2, y2, ... */
+ArcCoords(
+    Tcl_Interp *interp,		/* Used for error reporting. */
+    Tk_Canvas canvas,		/* Canvas containing item. */
+    Tk_Item *itemPtr,		/* Item whose coordinates are to be read or
+				 * modified. */
+    int objc,			/* Number of coordinates supplied in objv. */
+    Tcl_Obj *CONST objv[])	/* Array of coordinates: x1, y1, x2, y2, ... */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
 
     if (objc == 0) {
 	Tcl_Obj *obj = Tcl_NewObj();
 	Tcl_Obj *subobj = Tcl_NewDoubleObj(arcPtr->bbox[0]);
+
 	Tcl_ListObjAppendElement(interp, obj, subobj);
 	subobj = Tcl_NewDoubleObj(arcPtr->bbox[1]);
 	Tcl_ListObjAppendElement(interp, obj, subobj);
@@ -393,7 +374,7 @@ ArcCoords(interp, canvas, itemPtr, objc, objv)
 		return TCL_ERROR;
 	    } else if (objc != 4) {
 		char buf[64 + TCL_INTEGER_SPACE];
-	
+
 		sprintf(buf, "wrong # coordinates: expected 4, got %d", objc);
 		Tcl_SetResult(interp, buf, TCL_VOLATILE);
 		return TCL_ERROR;
@@ -412,7 +393,7 @@ ArcCoords(interp, canvas, itemPtr, objc, objv)
 	ComputeArcBbox(canvas, arcPtr);
     } else {
 	char buf[64 + TCL_INTEGER_SPACE];
-	
+
 	sprintf(buf, "wrong # coordinates: expected 0 or 4, got %d", objc);
 	Tcl_SetResult(interp, buf, TCL_VOLATILE);
 	return TCL_ERROR;
@@ -425,28 +406,28 @@ ArcCoords(interp, canvas, itemPtr, objc, objv)
  *
  * ConfigureArc --
  *
- *	This procedure is invoked to configure various aspects
- *	of a arc item, such as its outline and fill colors.
+ *	This function is invoked to configure various aspects of a arc item,
+ *	such as its outline and fill colors.
  *
  * Results:
- *	A standard Tcl result code.  If an error occurs, then
- *	an error message is left in the interp's result.
+ *	A standard Tcl result code. If an error occurs, then an error message
+ *	is left in the interp's result.
  *
  * Side effects:
- *	Configuration information, such as colors and stipple
- *	patterns, may be set for itemPtr.
+ *	Configuration information, such as colors and stipple patterns, may be
+ *	set for itemPtr.
  *
  *--------------------------------------------------------------
  */
 
 static int
-ConfigureArc(interp, canvas, itemPtr, objc, objv, flags)
-    Tcl_Interp *interp;		/* Used for error reporting. */
-    Tk_Canvas canvas;		/* Canvas containing itemPtr. */
-    Tk_Item *itemPtr;		/* Arc item to reconfigure. */
-    int objc;			/* Number of elements in objv.  */
-    Tcl_Obj *CONST objv[];	/* Arguments describing things to configure. */
-    int flags;			/* Flags to pass to Tk_ConfigureWidget. */
+ConfigureArc(
+    Tcl_Interp *interp,		/* Used for error reporting. */
+    Tk_Canvas canvas,		/* Canvas containing itemPtr. */
+    Tk_Item *itemPtr,		/* Arc item to reconfigure. */
+    int objc,			/* Number of elements in objv. */
+    Tcl_Obj *CONST objv[],	/* Arguments describing things to configure. */
+    int flags)			/* Flags to pass to Tk_ConfigureWidget. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
     XGCValues gcValues;
@@ -468,8 +449,8 @@ ConfigureArc(interp, canvas, itemPtr, objc, objv, flags)
     state = itemPtr->state;
 
     /*
-     * A few of the options require additional processing, such as
-     * style and graphics contexts.
+     * A few of the options require additional processing, such as style and
+     * graphics contexts.
      */
 
     if (arcPtr->outline.activeWidth > arcPtr->outline.width ||
@@ -508,8 +489,7 @@ ConfigureArc(interp, canvas, itemPtr, objc, objv, flags)
     i = (int) (arcPtr->extent/360.0);
     arcPtr->extent -= i*360.0;
 
-    mask = Tk_ConfigOutlineGC(&gcValues, canvas, itemPtr,
-	    &(arcPtr->outline));
+    mask = Tk_ConfigOutlineGC(&gcValues, canvas, itemPtr, &(arcPtr->outline));
     if (mask) {
 	gcValues.cap_style = CapButt;
 	mask |= GCCapStyle;
@@ -598,8 +578,8 @@ ConfigureArc(interp, canvas, itemPtr, objc, objv, flags)
  *
  * DeleteArc --
  *
- *	This procedure is called to clean up the data structure
- *	associated with a arc item.
+ *	This function is called to clean up the data structure associated with
+ *	an arc item.
  *
  * Results:
  *	None.
@@ -611,11 +591,10 @@ ConfigureArc(interp, canvas, itemPtr, objc, objv, flags)
  */
 
 static void
-DeleteArc(canvas, itemPtr, display)
-    Tk_Canvas canvas;			/* Info about overall canvas. */
-    Tk_Item *itemPtr;			/* Item that is being deleted. */
-    Display *display;			/* Display containing window for
-					 * canvas. */
+DeleteArc(
+    Tk_Canvas canvas,		/* Info about overall canvas. */
+    Tk_Item *itemPtr,		/* Item that is being deleted. */
+    Display *display)		/* Display containing window for canvas. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
 
@@ -651,31 +630,29 @@ DeleteArc(canvas, itemPtr, display)
  *
  * ComputeArcBbox --
  *
- *	This procedure is invoked to compute the bounding box of
- *	all the pixels that may be drawn as part of an arc.
+ *	This function is invoked to compute the bounding box of all the pixels
+ *	that may be drawn as part of an arc.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	The fields x1, y1, x2, and y2 are updated in the header
- *	for itemPtr.
+ *	The fields x1, y1, x2, and y2 are updated in the header for itemPtr.
  *
  *--------------------------------------------------------------
  */
 
 	/* ARGSUSED */
 static void
-ComputeArcBbox(canvas, arcPtr)
-    Tk_Canvas canvas;			/* Canvas that contains item. */
-    ArcItem *arcPtr;			/* Item whose bbox is to be
-					 * recomputed. */
+ComputeArcBbox(
+    Tk_Canvas canvas,		/* Canvas that contains item. */
+    ArcItem *arcPtr)		/* Item whose bbox is to be recomputed. */
 {
     double tmp, center[2], point[2];
     double width;
     Tk_State state = arcPtr->header.state;
 
-    if(state == TK_STATE_NULL) {
+    if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
 
@@ -702,14 +679,14 @@ ComputeArcBbox(canvas, arcPtr)
      */
 
     if (arcPtr->bbox[1] > arcPtr->bbox[3]) {
-	double tmp;
-	tmp = arcPtr->bbox[3];
+	double tmp = arcPtr->bbox[3];
+
 	arcPtr->bbox[3] = arcPtr->bbox[1];
 	arcPtr->bbox[1] = tmp;
     }
     if (arcPtr->bbox[0] > arcPtr->bbox[2]) {
-	double tmp;
-	tmp = arcPtr->bbox[2];
+	double tmp = arcPtr->bbox[2];
+
 	arcPtr->bbox[2] = arcPtr->bbox[0];
 	arcPtr->bbox[0] = tmp;
     }
@@ -717,10 +694,10 @@ ComputeArcBbox(canvas, arcPtr)
     ComputeArcOutline(canvas,arcPtr);
 
     /*
-     * To compute the bounding box, start with the the bbox formed
-     * by the two endpoints of the arc.  Then add in the center of
-     * the arc's oval (if relevant) and the 3-o'clock, 6-o'clock,
-     * 9-o'clock, and 12-o'clock positions, if they are relevant.
+     * To compute the bounding box, start with the the bbox formed by the two
+     * endpoints of the arc. Then add in the center of the arc's oval (if
+     * relevant) and the 3-o'clock, 6-o'clock, 9-o'clock, and 12-o'clock
+     * positions, if they are relevant.
      */
 
     arcPtr->header.x1 = arcPtr->header.x2 = (int) arcPtr->center1[0];
@@ -770,8 +747,8 @@ ComputeArcBbox(canvas, arcPtr)
     }
 
     /*
-     * Lastly, expand by the width of the arc (if the arc's outline is
-     * being drawn) and add one extra pixel just for safety.
+     * Lastly, expand by the width of the arc (if the arc's outline is being
+     * drawn) and add one extra pixel just for safety.
      */
 
     if (arcPtr->outline.gc == None) {
@@ -790,28 +767,26 @@ ComputeArcBbox(canvas, arcPtr)
  *
  * DisplayArc --
  *
- *	This procedure is invoked to draw an arc item in a given
- *	drawable.
+ *	This function is invoked to draw an arc item in a given drawable.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	ItemPtr is drawn in drawable using the transformation
- *	information in canvas.
+ *	ItemPtr is drawn in drawable using the transformation information in
+ *	canvas.
  *
  *--------------------------------------------------------------
  */
 
 static void
-DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
-    Tk_Canvas canvas;			/* Canvas that contains item. */
-    Tk_Item *itemPtr;			/* Item to be displayed. */
-    Display *display;			/* Display on which to draw item. */
-    Drawable drawable;			/* Pixmap or window in which to draw
-					 * item. */
-    int x, y, width, height;		/* Describes region of canvas that
-					 * must be redisplayed (not used). */
+DisplayArc(
+    Tk_Canvas canvas,		/* Canvas that contains item. */
+    Tk_Item *itemPtr,		/* Item to be displayed. */
+    Display *display,		/* Display on which to draw item. */
+    Drawable drawable,		/* Pixmap or window in which to draw item. */
+    int x, int y,		/* Describes region of canvas that must be */
+    int width, int height)	/* redisplayed (not used). */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
     short x1, y1, x2, y2;
@@ -820,7 +795,7 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
     Tk_State state = itemPtr->state;
     Pixmap stipple;
 
-    if(state == TK_STATE_NULL) {
+    if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
     lineWidth = arcPtr->outline.width;
@@ -839,7 +814,7 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
 	if (arcPtr->activeFillStipple != None) {
 	    stipple = arcPtr->activeFillStipple;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (arcPtr->outline.disabledWidth > 0) {
 	    lineWidth = arcPtr->outline.disabledWidth;
 	}
@@ -852,8 +827,8 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
     }
 
     /*
-     * Compute the screen coordinates of the bounding box for the item,
-     * plus integer values for the angles.
+     * Compute the screen coordinates of the bounding box for the item, plus
+     * integer values for the angles.
      */
 
     Tk_CanvasDrawableCoords(canvas, arcPtr->bbox[0], arcPtr->bbox[1],
@@ -870,16 +845,18 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
     extent = (int) ((64*arcPtr->extent) + 0.5);
 
     /*
-     * Display filled arc first (if wanted), then outline.  If the extent
-     * is zero then don't invoke XFillArc or XDrawArc, since this causes
-     * some window servers to crash and should be a no-op anyway.
+     * Display filled arc first (if wanted), then outline. If the extent is
+     * zero then don't invoke XFillArc or XDrawArc, since this causes some
+     * window servers to crash and should be a no-op anyway.
      */
 
     if ((arcPtr->fillGC != None) && (extent != 0)) {
 	if (stipple != None) {
-	    int w=0; int h=0;
+	    int w = 0;
+	    int h = 0;
 	    Tk_TSOffset *tsoffset = &arcPtr->tsoffset;
 	    int flags = tsoffset->flags;
+
 	    if (flags & (TK_OFFSET_CENTER|TK_OFFSET_MIDDLE)) {
 		Tk_SizeOfBitmap(display, stipple, &w, &h);
 		if (flags & TK_OFFSET_CENTER) {
@@ -916,10 +893,10 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
 	}
 
 	/*
-	 * If the outline width is very thin, don't use polygons to draw
-	 * the linear parts of the outline (this often results in nothing
-	 * being displayed); just draw lines instead. The same is done if
-	 * the outline is dashed, because then polygons don't work.
+	 * If the outline width is very thin, don't use polygons to draw the
+	 * linear parts of the outline (this often results in nothing being
+	 * displayed); just draw lines instead. The same is done if the
+	 * outline is dashed, because then polygons don't work.
 	 */
 
 	if (lineWidth < 1.5 || dashnumber != 0) {
@@ -950,8 +927,8 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
 		TkFillPolygon(canvas, arcPtr->outlinePtr, PIE_OUTLINE1_PTS,
 			display, drawable, arcPtr->outline.gc, None);
 		TkFillPolygon(canvas, arcPtr->outlinePtr + 2*PIE_OUTLINE1_PTS,
-			PIE_OUTLINE2_PTS, display, drawable, arcPtr->outline.gc,
-			None);
+			PIE_OUTLINE2_PTS, display, drawable,
+			arcPtr->outline.gc, None);
 	    }
 	}
 
@@ -964,17 +941,16 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
  *
  * ArcToPoint --
  *
- *	Computes the distance from a given point to a given
- *	arc, in canvas units.
+ *	Computes the distance from a given point to a given arc, in canvas
+ *	units.
  *
  * Results:
- *	The return value is 0 if the point whose x and y coordinates
- *	are coordPtr[0] and coordPtr[1] is inside the arc.  If the
- *	point isn't inside the arc then the return value is the
- *	distance from the point to the arc.  If itemPtr is filled,
- *	then anywhere in the interior is considered "inside"; if
- *	itemPtr isn't filled, then "inside" means only the area
- *	occupied by the outline.
+ *	The return value is 0 if the point whose x and y coordinates are
+ *	coordPtr[0] and coordPtr[1] is inside the arc. If the point isn't
+ *	inside the arc then the return value is the distance from the point to
+ *	the arc. If itemPtr is filled, then anywhere in the interior is
+ *	considered "inside"; if itemPtr isn't filled, then "inside" means only
+ *	the area occupied by the outline.
  *
  * Side effects:
  *	None.
@@ -984,10 +960,10 @@ DisplayArc(canvas, itemPtr, display, drawable, x, y, width, height)
 
 	/* ARGSUSED */
 static double
-ArcToPoint(canvas, itemPtr, pointPtr)
-    Tk_Canvas canvas;		/* Canvas containing item. */
-    Tk_Item *itemPtr;		/* Item to check against point. */
-    double *pointPtr;		/* Pointer to x and y coordinates. */
+ArcToPoint(
+    Tk_Canvas canvas,		/* Canvas containing item. */
+    Tk_Item *itemPtr,		/* Item to check against point. */
+    double *pointPtr)		/* Pointer to x and y coordinates. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
     double vertex[2], pointAngle, diff, dist, newDist;
@@ -995,7 +971,7 @@ ArcToPoint(canvas, itemPtr, pointPtr)
     int filled, angleInRange;
     Tk_State state = itemPtr->state;
 
-    if(state == TK_STATE_NULL) {
+    if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
 
@@ -1011,10 +987,9 @@ ArcToPoint(canvas, itemPtr, pointPtr)
     }
 
     /*
-     * See if the point is within the angular range of the arc.
-     * Remember, X angles are backwards from the way we'd normally
-     * think of them.  Also, compensate for any eccentricity of
-     * the oval.
+     * See if the point is within the angular range of the arc. Remember, X
+     * angles are backwards from the way we'd normally think of them. Also,
+     * compensate for any eccentricity of the oval.
      */
 
     vertex[0] = (arcPtr->bbox[0] + arcPtr->bbox[2])/2.0;
@@ -1041,14 +1016,13 @@ ArcToPoint(canvas, itemPtr, pointPtr)
 	    ((arcPtr->extent < 0) && ((diff - 360.0) >= arcPtr->extent));
 
     /*
-     * Now perform different tests depending on what kind of arc
-     * we're dealing with.
+     * Now perform different tests depending on what kind of arc we're dealing
+     * with.
      */
 
     if (arcPtr->style == ARC_STYLE) {
 	if (angleInRange) {
-	    return TkOvalToPoint(arcPtr->bbox, width,
-		    0, pointPtr);
+	    return TkOvalToPoint(arcPtr->bbox, width, 0, pointPtr);
 	}
 	dist = hypot(pointPtr[0] - arcPtr->center1[0],
 		pointPtr[1] - arcPtr->center1[1]);
@@ -1074,7 +1048,7 @@ ArcToPoint(canvas, itemPtr, pointPtr)
 	    dist = TkPolygonToPoint(arcPtr->outlinePtr, PIE_OUTLINE1_PTS,
 		    pointPtr);
 	    newDist = TkPolygonToPoint(arcPtr->outlinePtr + 2*PIE_OUTLINE1_PTS,
-			PIE_OUTLINE2_PTS, pointPtr);
+		    PIE_OUTLINE2_PTS, pointPtr);
 	} else {
 	    dist = TkLineToPoint(vertex, arcPtr->center1, pointPtr);
 	    newDist = TkLineToPoint(vertex, arcPtr->center2, pointPtr);
@@ -1092,17 +1066,16 @@ ArcToPoint(canvas, itemPtr, pointPtr)
     }
 
     /*
-     * This is a chord-style arc.  We have to deal specially with the
-     * triangular piece that represents the difference between a
-     * chord-style arc and a pie-slice arc (for small angles this piece
-     * is excluded here where it would be included for pie slices;
-     * for large angles the piece is included here but would be
-     * excluded for pie slices).
+     * This is a chord-style arc. We have to deal specially with the
+     * triangular piece that represents the difference between a chord-style
+     * arc and a pie-slice arc (for small angles this piece is excluded here
+     * where it would be included for pie slices; for large angles the piece
+     * is included here but would be excluded for pie slices).
      */
 
     if (width > 1.0) {
 	dist = TkPolygonToPoint(arcPtr->outlinePtr, CHORD_OUTLINE_PTS,
-		    pointPtr);
+		pointPtr);
     } else {
 	dist = TkLineToPoint(arcPtr->center1, arcPtr->center2, pointPtr);
     }
@@ -1136,14 +1109,13 @@ ArcToPoint(canvas, itemPtr, pointPtr)
  *
  * ArcToArea --
  *
- *	This procedure is called to determine whether an item
- *	lies entirely inside, entirely outside, or overlapping
- *	a given area.
+ *	This function is called to determine whether an item lies entirely
+ *	inside, entirely outside, or overlapping a given area.
  *
  * Results:
- *	-1 is returned if the item is entirely outside the area
- *	given by rectPtr, 0 if it overlaps, and 1 if it is entirely
- *	inside the given area.
+ *	-1 is returned if the item is entirely outside the area given by
+ *	rectPtr, 0 if it overlaps, and 1 if it is entirely inside the given
+ *	area.
  *
  * Side effects:
  *	None.
@@ -1153,26 +1125,25 @@ ArcToPoint(canvas, itemPtr, pointPtr)
 
 	/* ARGSUSED */
 static int
-ArcToArea(canvas, itemPtr, rectPtr)
-    Tk_Canvas canvas;		/* Canvas containing item. */
-    Tk_Item *itemPtr;		/* Item to check against arc. */
-    double *rectPtr;		/* Pointer to array of four coordinates
-				 * (x1, y1, x2, y2) describing rectangular
-				 * area.  */
+ArcToArea(
+    Tk_Canvas canvas,		/* Canvas containing item. */
+    Tk_Item *itemPtr,		/* Item to check against arc. */
+    double *rectPtr)		/* Pointer to array of four coordinates (x1,
+				 * y1, x2, y2) describing rectangular area. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
-    double rx, ry;		/* Radii for transformed oval:  these define
-				 * an oval centered at the origin. */
-    double tRect[4];		/* Transformed version of x1, y1, x2, y2,
-				 * for coord. system where arc is centered
-				 * on the origin. */
+    double rx, ry;		/* Radii for transformed oval: these define an
+				 * oval centered at the origin. */
+    double tRect[4];		/* Transformed version of x1, y1, x2, y2, for
+				 * coord. system where arc is centered on the
+				 * origin. */
     double center[2], width, angle, tmp;
     double points[20], *pointPtr;
     int numPoints, filled;
     int inside;			/* Non-zero means every test so far suggests
-				 * that arc is inside rectangle.  0 means
-				 * every test so far shows arc to be outside
-				 * of rectangle. */
+				 * that arc is inside rectangle. 0 means every
+				 * test so far shows arc to be outside of
+				 * rectangle. */
     int newInside;
     Tk_State state = itemPtr->state;
 
@@ -1184,7 +1155,7 @@ ArcToArea(canvas, itemPtr, rectPtr)
 	if (arcPtr->outline.activeWidth>width) {
 	    width = (double) arcPtr->outline.activeWidth;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (arcPtr->outline.disabledWidth>0) {
 	    width = (double) arcPtr->outline.disabledWidth;
 	}
@@ -1200,8 +1171,8 @@ ArcToArea(canvas, itemPtr, rectPtr)
     }
 
     /*
-     * Transform both the arc and the rectangle so that the arc's oval
-     * is centered on the origin.
+     * Transform both the arc and the rectangle so that the arc's oval is
+     * centered on the origin.
      */
 
     center[0] = (arcPtr->bbox[0] + arcPtr->bbox[2])/2.0;
@@ -1214,17 +1185,16 @@ ArcToArea(canvas, itemPtr, rectPtr)
     ry = arcPtr->bbox[3] - center[1] + width/2.0;
 
     /*
-     * Find the extreme points of the arc and see whether these are all
-     * inside the rectangle (in which case we're done), partly in and
-     * partly out (in which case we're done), or all outside (in which
-     * case we have more work to do).  The extreme points include the
-     * following, which are checked in order:
+     * Find the extreme points of the arc and see whether these are all inside
+     * the rectangle (in which case we're done), partly in and partly out (in
+     * which case we're done), or all outside (in which case we have more work
+     * to do). The extreme points include the following, which are checked in
+     * order:
      *
-     * 1. The outside points of the arc, corresponding to start and
-     *	  extent.
+     * 1. The outside points of the arc, corresponding to start and extent.
      * 2. The center of the arc (but only in pie-slice mode).
-     * 3. The 12, 3, 6, and 9-o'clock positions (but only if the arc
-     *    includes those angles).
+     * 3. The 12, 3, 6, and 9-o'clock positions (but only if the arc includes
+     *	  those angles).
      */
 
     pointPtr = points;
@@ -1285,8 +1255,8 @@ ArcToArea(canvas, itemPtr, rectPtr)
     }
 
     /*
-     * Now that we've located the extreme points, loop through them all
-     * to see which are inside the rectangle.
+     * Now that we've located the extreme points, loop through them all to see
+     * which are inside the rectangle.
      */
 
     inside = (points[0] > tRect[0]) && (points[0] < tRect[2])
@@ -1304,17 +1274,17 @@ ArcToArea(canvas, itemPtr, rectPtr)
     }
 
     /*
-     * So far, oval appears to be outside rectangle, but can't yet tell
-     * for sure.  Next, test each of the four sides of the rectangle
-     * against the bounding region for the arc.  If any intersections
-     * are found, then return "overlapping".  First, test against the
-     * polygon(s) forming the sides of a chord or pie-slice.
+     * So far, oval appears to be outside rectangle, but can't yet tell for
+     * sure. Next, test each of the four sides of the rectangle against the
+     * bounding region for the arc. If any intersections are found, then
+     * return "overlapping". First, test against the polygon(s) forming the
+     * sides of a chord or pie-slice.
      */
 
     if (arcPtr->style == PIESLICE_STYLE) {
 	if (width >= 1.0) {
 	    if (TkPolygonToArea(arcPtr->outlinePtr, PIE_OUTLINE1_PTS,
-		    rectPtr) != -1)  {
+		    rectPtr) != -1) {
 		return 0;
 	    }
 	    if (TkPolygonToArea(arcPtr->outlinePtr + 2*PIE_OUTLINE1_PTS,
@@ -1342,9 +1312,9 @@ ArcToArea(canvas, itemPtr, rectPtr)
     }
 
     /*
-     * Next check for overlap between each of the four sides and the
-     * outer perimiter of the arc.  If the arc isn't filled, then also
-     * check the inner perimeter of the arc.
+     * Next check for overlap between each of the four sides and the outer
+     * perimiter of the arc. If the arc isn't filled, then also check the
+     * inner perimeter of the arc.
      */
 
     if (HorizLineToArc(tRect[0], tRect[2], tRect[1], rx, ry, arcPtr->start,
@@ -1373,11 +1343,11 @@ ArcToArea(canvas, itemPtr, rectPtr)
     }
 
     /*
-     * The arc still appears to be totally disjoint from the rectangle,
-     * but it's also possible that the rectangle is totally inside the arc.
-     * Do one last check, which is to check one point of the rectangle
-     * to see if it's inside the arc.  If it is, we've got overlap.  If
-     * it isn't, the arc's really outside the rectangle.
+     * The arc still appears to be totally disjoint from the rectangle, but
+     * it's also possible that the rectangle is totally inside the arc. Do one
+     * last check, which is to check one point of the rectangle to see if it's
+     * inside the arc. If it is, we've got overlap. If it isn't, the arc's
+     * really outside the rectangle.
      */
 
     if (ArcToPoint(canvas, itemPtr, rectPtr) == 0.0) {
@@ -1391,15 +1361,14 @@ ArcToArea(canvas, itemPtr, rectPtr)
  *
  * ScaleArc --
  *
- *	This procedure is invoked to rescale an arc item.
+ *	This function is invoked to rescale an arc item.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	The arc referred to by itemPtr is rescaled so that the
- *	following transformation is applied to all point
- *	coordinates:
+ *	The arc referred to by itemPtr is rescaled so that the following
+ *	transformation is applied to all point coordinates:
  *		x' = originX + scaleX*(x-originX)
  *		y' = originY + scaleY*(y-originY)
  *
@@ -1407,12 +1376,13 @@ ArcToArea(canvas, itemPtr, rectPtr)
  */
 
 static void
-ScaleArc(canvas, itemPtr, originX, originY, scaleX, scaleY)
-    Tk_Canvas canvas;			/* Canvas containing arc. */
-    Tk_Item *itemPtr;			/* Arc to be scaled. */
-    double originX, originY;		/* Origin about which to scale rect. */
-    double scaleX;			/* Amount to scale in X direction. */
-    double scaleY;			/* Amount to scale in Y direction. */
+ScaleArc(
+    Tk_Canvas canvas,		/* Canvas containing arc. */
+    Tk_Item *itemPtr,		/* Arc to be scaled. */
+    double originX,		/* Origin about which to scale rect. */
+    double originY,
+    double scaleX,		/* Amount to scale in X direction. */
+    double scaleY)		/* Amount to scale in Y direction. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
 
@@ -1428,25 +1398,24 @@ ScaleArc(canvas, itemPtr, originX, originY, scaleX, scaleY)
  *
  * TranslateArc --
  *
- *	This procedure is called to move an arc by a given amount.
+ *	This function is called to move an arc by a given amount.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	The position of the arc is offset by (xDelta, yDelta), and
- *	the bounding box is updated in the generic part of the item
- *	structure.
+ *	The position of the arc is offset by (xDelta, yDelta), and the
+ *	bounding box is updated in the generic part of the item structure.
  *
  *--------------------------------------------------------------
  */
 
 static void
-TranslateArc(canvas, itemPtr, deltaX, deltaY)
-    Tk_Canvas canvas;			/* Canvas containing item. */
-    Tk_Item *itemPtr;			/* Item that is being moved. */
-    double deltaX, deltaY;		/* Amount by which item is to be
-					 * moved. */
+TranslateArc(
+    Tk_Canvas canvas,		/* Canvas containing item. */
+    Tk_Item *itemPtr,		/* Item that is being moved. */
+    double deltaX,		/* Amount by which item is to be moved. */
+    double deltaY)
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
 
@@ -1462,26 +1431,25 @@ TranslateArc(canvas, itemPtr, deltaX, deltaY)
  *
  * ComputeArcOutline --
  *
- *	This procedure creates a polygon describing everything in
- *	the outline for an arc except what's in the curved part.
- *	For a "pie slice" arc this is a V-shaped chunk, and for
- *	a "chord" arc this is a linear chunk (with cutaway corners).
- *	For "arc" arcs, this stuff isn't relevant.
+ *	This function creates a polygon describing everything in the outline
+ *	for an arc except what's in the curved part. For a "pie slice" arc
+ *	this is a V-shaped chunk, and for a "chord" arc this is a linear chunk
+ *	(with cutaway corners). For "arc" arcs, this stuff isn't relevant.
  *
  * Results:
  *	None.
  *
  * Side effects:
- *	The information at arcPtr->outlinePtr gets modified, and
- *	storage for arcPtr->outlinePtr may be allocated or freed.
+ *	The information at arcPtr->outlinePtr gets modified, and storage for
+ *	arcPtr->outlinePtr may be allocated or freed.
  *
  *--------------------------------------------------------------
  */
 
 static void
-ComputeArcOutline(canvas,arcPtr)
-    Tk_Canvas canvas;			/* Information about overall canvas. */
-    ArcItem *arcPtr;			/* Information about arc. */
+ComputeArcOutline(
+    Tk_Canvas canvas,		/* Information about overall canvas. */
+    ArcItem *arcPtr)		/* Information about arc. */
 {
     double sin1, cos1, sin2, cos2, angle, width, halfWidth;
     double boxWidth, boxHeight;
@@ -1489,10 +1457,9 @@ ComputeArcOutline(canvas,arcPtr)
     double *outlinePtr;
     Tk_State state = arcPtr->header.state;
 
-
     /*
-     * Make sure that the outlinePtr array is large enough to hold
-     * either a chord or pie-slice outline.
+     * Make sure that the outlinePtr array is large enough to hold either a
+     * chord or pie-slice outline.
      */
 
     if (arcPtr->numOutlinePoints == 0) {
@@ -1502,14 +1469,13 @@ ComputeArcOutline(canvas,arcPtr)
     }
     outlinePtr = arcPtr->outlinePtr;
 
-    if(state == TK_STATE_NULL) {
+    if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
 
     /*
-     * First compute the two points that lie at the centers of
-     * the ends of the curved arc segment, which are marked with
-     * X's in the figure below:
+     * First compute the two points that lie at the centers of the ends of the
+     * curved arc segment, which are marked with X's in the figure below:
      *
      *
      *				  * * *
@@ -1519,13 +1485,13 @@ ComputeArcOutline(canvas,arcPtr)
      *			*   *             *   *
      *			 X *               * X
      *
-     * The code is tricky because the arc can be ovular in shape.
-     * It computes the position for a unit circle, and then
-     * scales to fit the shape of the arc's bounding box.
+     * The code is tricky because the arc can be ovular in shape. It computes
+     * the position for a unit circle, and then scales to fit the shape of the
+     * arc's bounding box.
      *
-     * Also, watch out because angles go counter-clockwise like you
-     * might expect, but the y-coordinate system is inverted.  To
-     * handle this, just negate the angles in all the computations.
+     * Also, watch out because angles go counter-clockwise like you might
+     * expect, but the y-coordinate system is inverted. To handle this, just
+     * negate the angles in all the computations.
      */
 
     boxWidth = arcPtr->bbox[2] - arcPtr->bbox[0];
@@ -1544,8 +1510,8 @@ ComputeArcOutline(canvas,arcPtr)
     arcPtr->center2[1] = vertex[1] + sin2*boxHeight/2.0;
 
     /*
-     * Next compute the "outermost corners" of the arc, which are
-     * marked with X's in the figure below:
+     * Next compute the "outermost corners" of the arc, which are marked with
+     * X's in the figure below:
      *
      *				  * * *
      *			      *          *
@@ -1554,12 +1520,11 @@ ComputeArcOutline(canvas,arcPtr)
      *			X   *             *   X
      *			   *               *
      *
-     * The code below is tricky because it has to handle eccentricity
-     * in the shape of the oval.  The key in the code below is to
-     * realize that the slope of the line from arcPtr->center1 to corner1
-     * is (boxWidth*sin1)/(boxHeight*cos1), and similarly for arcPtr->center2
-     * and corner2.  These formulas can be computed from the formula for
-     * the oval.
+     * The code below is tricky because it has to handle eccentricity in the
+     * shape of the oval. The key in the code below is to realize that the
+     * slope of the line from arcPtr->center1 to corner1 is (boxWidth*sin1)
+     * divided by (boxHeight*cos1), and similarly for arcPtr->center2 and
+     * corner2. These formulas can be computed from the formula for the oval.
      */
 
     width = arcPtr->outline.width;
@@ -1567,7 +1532,7 @@ ComputeArcOutline(canvas,arcPtr)
 	if (arcPtr->outline.activeWidth>arcPtr->outline.width) {
 	    width = arcPtr->outline.activeWidth;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (arcPtr->outline.disabledWidth>arcPtr->outline.width) {
 	    width = arcPtr->outline.disabledWidth;
 	}
@@ -1590,10 +1555,10 @@ ComputeArcOutline(canvas,arcPtr)
     corner2[1] = arcPtr->center2[1] + sin(angle)*halfWidth;
 
     /*
-     * For a chord outline, generate a six-sided polygon with three
-     * points for each end of the chord.  The first and third points
-     * for each end are butt points generated on either side of the
-     * center point.  The second point is the corner point.
+     * For a chord outline, generate a six-sided polygon with three points for
+     * each end of the chord. The first and third points for each end are butt
+     * points generated on either side of the center point. The second point
+     * is the corner point.
      */
 
     if (arcPtr->style == CHORD_STYLE) {
@@ -1613,10 +1578,9 @@ ComputeArcOutline(canvas,arcPtr)
 		- arcPtr->center1[1];
     } else if (arcPtr->style == PIESLICE_STYLE) {
 	/*
-	 * For pie slices, generate two polygons, one for each side
-	 * of the pie slice.  The first arm has a shape like this,
-	 * where the center of the oval is X, arcPtr->center1 is at Y, and
-	 * corner1 is at Z:
+	 * For pie slices, generate two polygons, one for each side of the pie
+	 * slice. The first arm has a shape like this, where the center of the
+	 * oval is X, arcPtr->center1 is at Y, and corner1 is at Z:
 	 *
 	 *	 _____________________
 	 *	|		      \
@@ -1624,7 +1588,6 @@ ComputeArcOutline(canvas,arcPtr)
 	 *	X		     Y  Z
 	 *	|		       /
 	 *	|_____________________/
-	 *
 	 */
 
 	TkGetButtPoints(arcPtr->center1, vertex, width, 0,
@@ -1641,7 +1604,6 @@ ComputeArcOutline(canvas,arcPtr)
 	/*
 	 * The second arm has a shape like this:
 	 *
-	 *
 	 *	   ______________________
 	 *	  /			  \
 	 *	 /			   \
@@ -1650,10 +1612,10 @@ ComputeArcOutline(canvas,arcPtr)
 	 *	  \______________________/
 	 *
 	 * Similar to above X is the center of the oval/circle, Y is
-	 * arcPtr->center2, and Z is corner2.  The extra jog out to the left
-	 * of X is needed in or to produce a butted joint with the
-	 * first arm;  the corner to the right of X is one of the
-	 * first two points of the first arm, depending on extent.
+	 * arcPtr->center2, and Z is corner2. The extra jog out to the left of
+	 * X is needed in or to produce a butted joint with the first arm; the
+	 * corner to the right of X is one of the first two points of the
+	 * first arm, depending on extent.
 	 */
 
 	TkGetButtPoints(arcPtr->center2, vertex, width, 0,
@@ -1682,15 +1644,13 @@ ComputeArcOutline(canvas,arcPtr)
  *
  * HorizLineToArc --
  *
- *	Determines whether a horizontal line segment intersects
- *	a given arc.
+ *	Determines whether a horizontal line segment intersects a given arc.
  *
  * Results:
- *	The return value is 1 if the given line intersects the
- *	infinitely-thin arc section defined by rx, ry, start,
- *	and extent, and 0 otherwise.  Only the perimeter of the
- *	arc is checked: interior areas (e.g. pie-slice or chord)
- *	are not checked.
+ *	The return value is 1 if the given line intersects the infinitely-thin
+ *	arc section defined by rx, ry, start, and extent, and 0 otherwise.
+ *	Only the perimeter of the arc is checked: interior areas (e.g. chord
+ *	or pie-slice) are not checked.
  *
  * Side effects:
  *	None.
@@ -1699,25 +1659,24 @@ ComputeArcOutline(canvas,arcPtr)
  */
 
 static int
-HorizLineToArc(x1, x2, y, rx, ry, start, extent)
-    double x1, x2;		/* X-coords of endpoints of line segment. 
-				 * X1 must be <= x2. */
-    double y;			/* Y-coordinate of line segment. */
-    double rx, ry;		/* These x- and y-radii define an oval
+HorizLineToArc(
+    double x1, double x2,	/* X-coords of endpoints of line segment. X1
+				 * must be <= x2. */
+    double y,			/* Y-coordinate of line segment. */
+    double rx, double ry,	/* These x- and y-radii define an oval
 				 * centered at the origin. */
-    double start, extent;	/* Angles that define extent of arc, in
-				 * the standard fashion for this module. */
+    double start, double extent)/* Angles that define extent of arc, in the
+				 * standard fashion for this module. */
 {
-    double tmp;
+    double tmp, x;
     double tx, ty;		/* Coordinates of intersection point in
 				 * transformed coordinate system. */
-    double x;
 
     /*
-     * Compute the x-coordinate of one possible intersection point
-     * between the arc and the line.  Use a transformed coordinate
-     * system where the oval is a unit circle centered at the origin.
-     * Then scale back to get actual x-coordinate.
+     * Compute the x-coordinate of one possible intersection point between the
+     * arc and the line. Use a transformed coordinate system where the oval is
+     * a unit circle centered at the origin. Then scale back to get actual
+     * x-coordinate.
      */
 
     ty = y/ry;
@@ -1746,15 +1705,13 @@ HorizLineToArc(x1, x2, y, rx, ry, start, extent)
  *
  * VertLineToArc --
  *
- *	Determines whether a vertical line segment intersects
- *	a given arc.
+ *	Determines whether a vertical line segment intersects a given arc.
  *
  * Results:
- *	The return value is 1 if the given line intersects the
- *	infinitely-thin arc section defined by rx, ry, start,
- *	and extent, and 0 otherwise.  Only the perimeter of the
- *	arc is checked: interior areas (e.g. pie-slice or chord)
- *	are not checked.
+ *	The return value is 1 if the given line intersects the infinitely-thin
+ *	arc section defined by rx, ry, start, and extent, and 0 otherwise.
+ *	Only the perimeter of the arc is checked: interior areas (e.g. chord
+ *	or pie-slice) are not checked.
  *
  * Side effects:
  *	None.
@@ -1763,25 +1720,24 @@ HorizLineToArc(x1, x2, y, rx, ry, start, extent)
  */
 
 static int
-VertLineToArc(x, y1, y2, rx, ry, start, extent)
-    double x;			/* X-coordinate of line segment. */
-    double y1, y2;		/* Y-coords of endpoints of line segment. 
-				 * Y1 must be <= y2. */
-    double rx, ry;		/* These x- and y-radii define an oval
+VertLineToArc(
+    double x,			/* X-coordinate of line segment. */
+    double y1, double y2,	/* Y-coords of endpoints of line segment. Y1
+				 * must be <= y2. */
+    double rx, double ry,	/* These x- and y-radii define an oval
 				 * centered at the origin. */
-    double start, extent;	/* Angles that define extent of arc, in
-				 * the standard fashion for this module. */
+    double start, double extent)/* Angles that define extent of arc, in the
+				 * standard fashion for this module. */
 {
-    double tmp;
+    double tmp, y;
     double tx, ty;		/* Coordinates of intersection point in
 				 * transformed coordinate system. */
-    double y;
 
     /*
-     * Compute the y-coordinate of one possible intersection point
-     * between the arc and the line.  Use a transformed coordinate
-     * system where the oval is a unit circle centered at the origin.
-     * Then scale back to get actual y-coordinate.
+     * Compute the y-coordinate of one possible intersection point between the
+     * arc and the line. Use a transformed coordinate system where the oval is
+     * a unit circle centered at the origin. Then scale back to get actual
+     * y-coordinate.
      */
 
     tx = x/rx;
@@ -1810,15 +1766,14 @@ VertLineToArc(x, y1, y2, rx, ry, start, extent)
  *
  * AngleInRange --
  *
- *	Determine whether the angle from the origin to a given
- *	point is within a given range.
+ *	Determine whether the angle from the origin to a given point is within
+ *	a given range.
  *
  * Results:
- *	The return value is 1 if the angle from (0,0) to (x,y)
- *	is in the range given by start and extent, where angles
- *	are interpreted in the standard way for ovals (meaning
- *	backwards from normal interpretation).  Otherwise the
- *	return value is 0.
+ *	The return value is 1 if the angle from (0,0) to (x,y) is in the range
+ *	given by start and extent, where angles are interpreted in the
+ *	standard way for ovals (meaning backwards from normal interpretation).
+ *	Otherwise the return value is 0.
  *
  * Side effects:
  *	None.
@@ -1827,11 +1782,11 @@ VertLineToArc(x, y1, y2, rx, ry, start, extent)
  */
 
 static int
-AngleInRange(x, y, start, extent)
-    double x, y;		/* Coordinate of point;  angle measured
-				 * from origin to here, relative to x-axis. */
-    double start;		/* First angle, degrees, >=0, <=360. */
-    double extent;		/* Size of arc in degrees >=-360, <=360. */
+AngleInRange(
+    double x, double y,		/* Coordinate of point; angle measured from
+				 * origin to here, relative to x-axis. */
+    double start,		/* First angle, degrees, >=0, <=360. */
+    double extent)		/* Size of arc in degrees >=-360, <=360. */
 {
     double diff;
 
@@ -1857,15 +1812,13 @@ AngleInRange(x, y, start, extent)
  *
  * ArcToPostscript --
  *
- *	This procedure is called to generate Postscript for
- *	arc items.
+ *	This function is called to generate Postscript for arc items.
  *
  * Results:
- *	The return value is a standard Tcl result.  If an error
- *	occurs in generating Postscript then an error message is
- *	left in the interp's result, replacing whatever used
- *	to be there.  If no error occurs, then Postscript for the
- *	item is appended to the result.
+ *	The return value is a standard Tcl result. If an error occurs in
+ *	generating Postscript then an error message is left in the interp's
+ *	result, replacing whatever used to be there. If no error occurs, then
+ *	Postscript for the item is appended to the result.
  *
  * Side effects:
  *	None.
@@ -1874,15 +1827,13 @@ AngleInRange(x, y, start, extent)
  */
 
 static int
-ArcToPostscript(interp, canvas, itemPtr, prepass)
-    Tcl_Interp *interp;			/* Leave Postscript or error message
-					 * here. */
-    Tk_Canvas canvas;			/* Information about overall canvas. */
-    Tk_Item *itemPtr;			/* Item for which Postscript is
-					 * wanted. */
-    int prepass;			/* 1 means this is a prepass to
-					 * collect font information;  0 means
-					 * final Postscript is being created. */
+ArcToPostscript(
+    Tcl_Interp *interp,		/* Leave Postscript or error message here. */
+    Tk_Canvas canvas,		/* Information about overall canvas. */
+    Tk_Item *itemPtr,		/* Item for which Postscript is wanted. */
+    int prepass)		/* 1 means this is a prepass to collect font
+				 * information; 0 means final Postscript is
+				 * being created. */
 {
     ArcItem *arcPtr = (ArcItem *) itemPtr;
     char buffer[400];
@@ -1902,7 +1853,7 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 	ang2 = arcPtr->start;
     }
 
-    if(state == TK_STATE_NULL) {
+    if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
     color = arcPtr->outline.color;
@@ -1922,7 +1873,7 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 	if (arcPtr->activeFillStipple!=None) {
 	    fillStipple = arcPtr->activeFillStipple;
 	}
-    } else if (state==TK_STATE_DISABLED) {
+    } else if (state == TK_STATE_DISABLED) {
 	if (arcPtr->outline.disabledColor!=NULL) {
 	    color = arcPtr->outline.disabledColor;
 	}
@@ -1938,15 +1889,15 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
     }
 
     /*
-     * If the arc is filled, output Postscript for the interior region
-     * of the arc.
+     * If the arc is filled, output Postscript for the interior region of the
+     * arc.
      */
 
     if (arcPtr->fillGC != None) {
 	sprintf(buffer, "matrix currentmatrix\n%.15g %.15g translate %.15g %.15g scale\n",
 		(arcPtr->bbox[0] + arcPtr->bbox[2])/2, (y1 + y2)/2,
 		(arcPtr->bbox[2] - arcPtr->bbox[0])/2, (y1 - y2)/2);
-	Tcl_AppendResult(interp, buffer, (char *) NULL);
+	Tcl_AppendResult(interp, buffer, NULL);
 	if (arcPtr->style == CHORD_STYLE) {
 	    sprintf(buffer, "0 0 1 %.15g %.15g arc closepath\nsetmatrix\n",
 		    ang1, ang2);
@@ -1955,21 +1906,20 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 		    "0 0 moveto 0 0 1 %.15g %.15g arc closepath\nsetmatrix\n",
 		    ang1, ang2);
 	}
-	Tcl_AppendResult(interp, buffer, (char *) NULL);
+	Tcl_AppendResult(interp, buffer, NULL);
 	if (Tk_CanvasPsColor(interp, canvas, fillColor) != TCL_OK) {
 	    return TCL_ERROR;
-	};
+	}
 	if (fillStipple != None) {
-	    Tcl_AppendResult(interp, "clip ", (char *) NULL);
-	    if (Tk_CanvasPsStipple(interp, canvas, fillStipple)
-		    != TCL_OK) {
+	    Tcl_AppendResult(interp, "clip ", NULL);
+	    if (Tk_CanvasPsStipple(interp, canvas, fillStipple) != TCL_OK) {
 		return TCL_ERROR;
 	    }
 	    if (arcPtr->outline.gc != None) {
-		Tcl_AppendResult(interp, "grestore gsave\n", (char *) NULL);
+		Tcl_AppendResult(interp, "grestore gsave\n", NULL);
 	    }
 	} else {
-	    Tcl_AppendResult(interp, "fill\n", (char *) NULL);
+	    Tcl_AppendResult(interp, "fill\n", NULL);
 	}
     }
 
@@ -1981,16 +1931,15 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 	sprintf(buffer, "matrix currentmatrix\n%.15g %.15g translate %.15g %.15g scale\n",
 		(arcPtr->bbox[0] + arcPtr->bbox[2])/2, (y1 + y2)/2,
 		(arcPtr->bbox[2] - arcPtr->bbox[0])/2, (y1 - y2)/2);
-	Tcl_AppendResult(interp, buffer, (char *) NULL);
+	Tcl_AppendResult(interp, buffer, NULL);
 	sprintf(buffer, "0 0 1 %.15g %.15g", ang1, ang2);
 	Tcl_AppendResult(interp, buffer,
-		" arc\nsetmatrix\n0 setlinecap\n", (char *) NULL);
-	if (Tk_CanvasPsOutline(canvas, itemPtr,
-		&(arcPtr->outline)) != TCL_OK) {
+		" arc\nsetmatrix\n0 setlinecap\n", NULL);
+	if (Tk_CanvasPsOutline(canvas, itemPtr, &(arcPtr->outline)) != TCL_OK){
 	    return TCL_ERROR;
 	}
 	if (arcPtr->style != ARC_STYLE) {
-	    Tcl_AppendResult(interp, "grestore gsave\n", (char *) NULL);
+	    Tcl_AppendResult(interp, "grestore gsave\n", NULL);
 	    if (arcPtr->style == CHORD_STYLE) {
 		Tk_CanvasPsPath(interp, canvas, arcPtr->outlinePtr,
 			CHORD_OUTLINE_PTS);
@@ -2002,15 +1951,14 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 		    return TCL_ERROR;
 		}
 		if (stipple != None) {
-		    Tcl_AppendResult(interp, "clip ", (char *) NULL);
-		    if (Tk_CanvasPsStipple(interp, canvas,
-			    stipple) != TCL_OK) {
+		    Tcl_AppendResult(interp, "clip ", NULL);
+		    if (Tk_CanvasPsStipple(interp, canvas, stipple) != TCL_OK){
 			return TCL_ERROR;
 		    }
 		} else {
-		    Tcl_AppendResult(interp, "fill\n", (char *) NULL);
+		    Tcl_AppendResult(interp, "fill\n", NULL);
 		}
-		Tcl_AppendResult(interp, "grestore gsave\n", (char *) NULL);
+		Tcl_AppendResult(interp, "grestore gsave\n", NULL);
 		Tk_CanvasPsPath(interp, canvas,
 			arcPtr->outlinePtr + 2*PIE_OUTLINE1_PTS,
 			PIE_OUTLINE2_PTS);
@@ -2020,13 +1968,12 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
 		return TCL_ERROR;
 	    }
 	    if (stipple != None) {
-		Tcl_AppendResult(interp, "clip ", (char *) NULL);
-		if (Tk_CanvasPsStipple(interp, canvas,
-			stipple) != TCL_OK) {
+		Tcl_AppendResult(interp, "clip ", NULL);
+		if (Tk_CanvasPsStipple(interp, canvas, stipple) != TCL_OK) {
 		    return TCL_ERROR;
 		}
 	    } else {
-		Tcl_AppendResult(interp, "fill\n", (char *) NULL);
+		Tcl_AppendResult(interp, "fill\n", NULL);
 	    }
 	}
     }
@@ -2039,34 +1986,34 @@ ArcToPostscript(interp, canvas, itemPtr, prepass)
  *
  * StyleParseProc --
  *
- *	This procedure is invoked during option processing to handle
- *	the "-style" option.
+ *	This function is invoked during option processing to handle the
+ *	"-style" option.
  *
  * Results:
  *	A standard Tcl return value.
  *
  * Side effects:
- *	The state for a given item gets replaced by the state
- *	indicated in the value argument.
+ *	The state for a given item gets replaced by the state indicated in the
+ *	value argument.
  *
  *--------------------------------------------------------------
  */
 
 static int
-StyleParseProc(clientData, interp, tkwin, value, widgRec, offset)
-    ClientData clientData;		/* some flags.*/
-    Tcl_Interp *interp;			/* Used for reporting errors. */
-    Tk_Window tkwin;			/* Window containing canvas widget. */
-    CONST char *value;			/* Value of option. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item. */
+StyleParseProc(
+    ClientData clientData,	/* some flags.*/
+    Tcl_Interp *interp,		/* Used for reporting errors. */
+    Tk_Window tkwin,		/* Window containing canvas widget. */
+    CONST char *value,		/* Value of option. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset)			/* Offset into item. */
 {
     int c;
     size_t length;
 
     register Style *stylePtr = (Style *) (widgRec + offset);
 
-    if(value == NULL || *value == 0) {
+    if (value == NULL || *value == 0) {
 	*stylePtr = PIESLICE_STYLE;
 	return TCL_OK;
     }
@@ -2087,9 +2034,8 @@ StyleParseProc(clientData, interp, tkwin, value, widgRec, offset)
 	return TCL_OK;
     }
 
-    Tcl_AppendResult(interp, "bad -style option \"",
-	    value, "\": must be arc, chord, or pieslice",
-	    (char *) NULL);
+    Tcl_AppendResult(interp, "bad -style option \"", value,
+	    "\": must be arc, chord, or pieslice", NULL);
     *stylePtr = PIESLICE_STYLE;
     return TCL_ERROR;
 }
@@ -2099,16 +2045,15 @@ StyleParseProc(clientData, interp, tkwin, value, widgRec, offset)
  *
  * StylePrintProc --
  *
- *	This procedure is invoked by the Tk configuration code
- *	to produce a printable string for the "-style"
- *	configuration option.
+ *	This function is invoked by the Tk configuration code to produce a
+ *	printable string for the "-style" configuration option.
  *
  * Results:
- *	The return value is a string describing the state for
- *	the item referred to by "widgRec".  In addition, *freeProcPtr
- *	is filled in with the address of a procedure to call to free
- *	the result string when it's no longer needed (or NULL to
- *	indicate that the string doesn't need to be freed).
+ *	The return value is a string describing the state for the item
+ *	referred to by "widgRec". In addition, *freeProcPtr is filled in with
+ *	the address of a function to call to free the result string when it's
+ *	no longer needed (or NULL to indicate that the string doesn't need to
+ *	be freed).
  *
  * Side effects:
  *	None.
@@ -2117,22 +2062,30 @@ StyleParseProc(clientData, interp, tkwin, value, widgRec, offset)
  */
 
 static char *
-StylePrintProc(clientData, tkwin, widgRec, offset, freeProcPtr)
-    ClientData clientData;		/* Ignored. */
-    Tk_Window tkwin;			/* Ignored. */
-    char *widgRec;			/* Pointer to record for item. */
-    int offset;				/* Offset into item. */
-    Tcl_FreeProc **freeProcPtr;		/* Pointer to variable to fill in with
-					 * information about how to reclaim
-					 * storage for return string. */
+StylePrintProc(
+    ClientData clientData,	/* Ignored. */
+    Tk_Window tkwin,		/* Ignored. */
+    char *widgRec,		/* Pointer to record for item. */
+    int offset,			/* Offset into item. */
+    Tcl_FreeProc **freeProcPtr)	/* Pointer to variable to fill in with
+				 * information about how to reclaim storage
+				 * for return string. */
 {
     register Style *stylePtr = (Style *) (widgRec + offset);
 
-    if (*stylePtr==ARC_STYLE) {
+    if (*stylePtr == ARC_STYLE) {
 	return "arc";
-    } else if (*stylePtr==CHORD_STYLE) {
+    } else if (*stylePtr == CHORD_STYLE) {
 	return "chord";
     } else {
 	return "pieslice";
     }
 }
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 78
+ * End:
+ */

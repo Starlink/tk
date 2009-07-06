@@ -4,7 +4,7 @@
 #	Unix platform. This implementation is used only if the
 #	"::tk_strictMotif" flag is set.
 #
-# RCS: @(#) $Id: xmfbox.tcl,v 1.25.2.3 2006/03/17 10:50:11 patthoyts Exp $
+# RCS: @(#) $Id: xmfbox.tcl,v 1.31 2007/12/13 15:26:28 dgp Exp $
 #
 # Copyright (c) 1996 Sun Microsystems, Inc.
 # Copyright (c) 1998-2000 Scriptics Corporation
@@ -157,7 +157,22 @@ proc ::tk::MotifFDialog_FileTypes {w} {
 
     # The filetypes radiobuttons
     # set data(fileType) $data(-defaulttype)
+    # Default type to first entry
+    set initialTypeName [lindex $data(-filetypes) 0 0]
+    if {($data(-typevariable) ne "")
+	&& [uplevel 4 [list info exists $data(-typevariable)]]} {
+	set initialTypeName [uplevel 4 [list set $data(-typevariable)]]
+    }
+    set ix 0
     set data(fileType) 0
+    foreach fltr $data(-filetypes) {
+	set fname [lindex $fltr 0]
+	if {[string first $initialTypeName $fname] == 0} {
+	    set data(fileType) $ix
+	    break
+	}
+	incr ix
+    }
 
     MotifFDialog_SetFilter $w [lindex $data(-filetypes) $data(fileType)]
 
@@ -168,7 +183,7 @@ proc ::tk::MotifFDialog_FileTypes {w} {
 
     frame $f
     set cnt 0
-    if {$data(-filetypes) ne ""} {
+    if {$data(-filetypes) ne {}} {
 	foreach type $data(-filetypes) {
 	    set title  [lindex [lindex $type 0] 0]
 	    set filter [lindex $type 1]
@@ -176,7 +191,7 @@ proc ::tk::MotifFDialog_FileTypes {w} {
 		-text $title \
 		-variable ::tk::dialog::file::[winfo name $w](fileType) \
 		-value $cnt \
-		-command "[list tk::MotifFDialog_SetFilter $w $type]"
+		-command [list tk::MotifFDialog_SetFilter $w $type]
 	    pack $f.b$cnt -side left
 	    incr cnt
 	}
@@ -226,8 +241,9 @@ proc ::tk::MotifFDialog_Config {dataName type argList} {
 	{-initialfile "" "" ""}
 	{-parent "" "" "."}
 	{-title "" "" ""}
+	{-typevariable "" "" ""}
     }
-    if { $type eq "open" } {
+    if {$type eq "open"} {
 	lappend specs {-multiple "" "" "0"}
     }
 
@@ -249,7 +265,7 @@ proc ::tk::MotifFDialog_Config {dataName type argList} {
 	    if {$data(-multiple) != 0} {
 		set data(-title) "[mc {Open Multiple Files}]"
 	    } else {
-	    set data(-title) [mc "Open"]
+		set data(-title) [mc "Open"]
 	    }
 	} else {
 	    set data(-title) [mc "Save As"]
@@ -489,7 +505,7 @@ proc ::tk::MotifFDialog_InterpFilter {w} {
 
     if {$relative} {
 	tk_messageBox -icon warning -type ok \
-	    -message "\"$text\" must be an absolute pathname"
+		-message "\"$text\" must be an absolute pathname"
 
 	$data(fEnt) delete 0 end
 	$data(fEnt) insert 0 [::tk::dialog::file::JoinFile $data(selectPath) \
@@ -577,12 +593,12 @@ proc ::tk::MotifFDialog_LoadFiles {w} {
 	} else {
             foreach pat $data(filter) {
                 if {[string match $pat $f]} {
-		if {[string match .* $f]} {
-		    incr top
-		}
-		lappend flist $f
+		    if {[string match .* $f]} {
+			incr top
+		    }
+		    lappend flist $f
                     break
-	    }
+		}
             }
 	}
     }
@@ -727,7 +743,7 @@ proc ::tk::MotifFDialog_BrowseFList {w} {
 	$data(sEnt) insert 0 $data(selectFile)
     } else {
 	$data(sEnt) insert 0 [::tk::dialog::file::JoinFile $data(selectPath) \
-				  [lindex $data(selectFile) 0]]
+		[lindex $data(selectFile) 0]]
     }
     $data(sEnt) xview end
 }
@@ -831,21 +847,25 @@ proc ::tk::MotifFDialog_ActivateSEnt {w} {
 			-message [mc {File "%1$s" does not exist.} $item]
 		return
 	    }
-	} else {
-	    if {$data(type) eq "save"} {
-		set message [format %s%s \
-			[mc "File \"%1\$s\" already exists.\n\n" \
-			$selectFilePath] \
-			[mc {Replace existing file?}]]
-		set answer [tk_messageBox -icon warning -type yesno \
-			-message $message]
-		if {$answer eq "no"} {
-		    return
-		}
+	} elseif {$data(type) eq "save"} {
+	    set message [format %s%s \
+		    [mc "File \"%1\$s\" already exists.\n\n" $selectFilePath] \
+		    [mc {Replace existing file?}]]
+	    set answer [tk_messageBox -icon warning -type yesno \
+		    -message $message]
+	    if {$answer eq "no"} {
+		return
 	    }
 	}
-	
+
 	lappend newFileList $item
+    }
+
+    # Return selected filter
+    if {[info exists data(-typevariable)] && $data(-typevariable) ne ""
+	&& [info exists data(-filetypes)] && $data(-filetypes) ne ""} {
+	upvar 2 $data(-typevariable) initialTypeName
+	set initialTypeName [lindex $data(-filetypes) $data(fileType) 0]
     }
 
     if {$data(-multiple) != 0} {

@@ -5,21 +5,18 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # Copyright (c) 2002 ActiveState Corporation.
 #
-# RCS: @(#) $Id: tk.test,v 1.9 2002/09/02 19:15:38 hobbs Exp $
+# RCS: @(#) $Id: tk.test,v 1.14 2005/06/01 15:48:50 rmax Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
 
-test tk-1.1 {tk command: general} {
-    list [catch {tk} msg] $msg
-} {1 {wrong # args: should be "tk option ?arg?"}}
-test tk-1.2 {tk command: general} {
-    list [catch {tk xyz} msg] $msg
-} {1 {bad option "xyz": must be appname, caret, scaling, useinputmethods, or windowingsystem}}
+test tk-1.1 {tk command: general} \
+    -body {tk} -returnCodes 1 \
+    -result {wrong # args: should be "tk option ?arg?"}
+test tk-1.2 {tk command: general} \
+    -body {tk xyz} -returnCodes 1 \
+    -result {bad option "xyz": must be appname, caret, scaling, useinputmethods, windowingsystem, or inactive}
 
 set appname [tk appname]
 test tk-2.1 {tk command: appname} {
@@ -28,7 +25,7 @@ test tk-2.1 {tk command: appname} {
 test tk-2.2 {tk command: appname} {
     tk appname foobazgarply
 } {foobazgarply}
-test tk-2.3 {tk command: appname} {unixOnly} {
+test tk-2.3 {tk command: appname} unix {
     tk appname bazfoogarply
     expr {[lsearch -exact [winfo interps] [tk appname]] >= 0}
 } {1}
@@ -97,7 +94,7 @@ test tk-4.4 {tk command: useinputmethods: set new} {
 test tk-4.5 {tk command: useinputmethods: set new} {
     list [catch {tk useinputmethods -displayof . xyz} msg] $msg
 } {1 {expected boolean value but got "xyz"}}
-test tk-4.6 {tk command: useinputmethods: set new} {unixOnly} {
+test tk-4.6 {tk command: useinputmethods: set new} unix {
     # This isn't really a test, but more of a check...
     # The answer is what was given, because we may be on a Unix
     # system that doesn't have the XIM stuff
@@ -106,7 +103,7 @@ test tk-4.6 {tk command: useinputmethods: set new} {unixOnly} {
     }
     set useim
 } $useim
-test tk-4.7 {tk command: useinputmethods: set new} {macOrPc} {
+test tk-4.7 {tk command: useinputmethods: set new} win {
     # Mac and Windows don't have X Input Methods, so this should
     # always return 0
     tk useinputmethods 1
@@ -132,6 +129,38 @@ test tk-5.6 {tk caret} {
     list [catch {tk caret . -x 20 -y 25 -h 30; tk caret . -hei} msg] $msg
 } {0 30}
 
+# tk inactive
+test tk-6.1 {tk inactive} -body {
+    string is integer [tk inactive]
+} -result 1
+test tk-6.2 {tk inactive reset} -body {
+    catch {tk inactive reset}
+} -result 0
+test tk-6.3 {tk inactive wrong argument} -body {
+    tk inactive foo
+} -returnCodes 1 -result {bad option "foo": must be reset}
+test tk-6.4 {tk inactive too many arguments} -body {
+    tk inactive reset foo
+} -returnCodes 1 -result {wrong # args: should be "tk inactive ?-displayof window? ?reset?"}
+test tk-6.5 {tk inactive} -body {
+    tk inactive reset
+    update
+    after 100
+    set i [tk inactive]
+    expr {$i == -1 || ( $i > 90 && $i < 200 )}
+} -result 1
+
+# tk inactive in safe interpreters
+safe::interpCreate foo
+safe::loadTk foo
+test tk-7.1 {tk inactive in a safe interpreter} -body {
+    foo eval {tk inactive}
+} -result -1
+test tk-7.2 {tk inactive reset in a safe interpreter} -body {
+    foo eval {tk inactive reset}
+} -returnCodes 1 -result {resetting the user inactivity timer is not allowed in a safe interpreter}
+::safe::interpDelete foo
+
 # cleanup
-::tcltest::cleanupTests
+cleanupTests
 return

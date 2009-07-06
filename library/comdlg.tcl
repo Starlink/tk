@@ -3,7 +3,7 @@
 #	Some functions needed for the common dialog boxes. Probably need to go
 #	in a different file.
 #
-# RCS: @(#) $Id: comdlg.tcl,v 1.9.2.1 2006/01/25 18:21:41 dgp Exp $
+# RCS: @(#) $Id: comdlg.tcl,v 1.14 2007/05/16 18:10:35 dgp Exp $
 #
 # Copyright (c) 1996 Sun Microsystems, Inc.
 #
@@ -184,7 +184,7 @@ proc ::tk::FocusGroup_Destroy {t w} {
 	    unset FocusOut($name)
 	}
     } else {
-	if {[info exists Priv(focus,$t)] && $Priv(focus,$t) eq $w} {
+	if {[info exists Priv(focus,$t)] && ($Priv(focus,$t) eq $w)} {
 	    set Priv(focus,$t) ""
 	}
 	unset -nocomplain FocusIn($t,$w) FocusOut($t,$w)
@@ -259,7 +259,7 @@ proc ::tk::FDGetFileTypes {string} {
 	if {[llength $t] < 2 || [llength $t] > 3} {
 	    error "bad file type \"$t\", should be \"typeName {extension ?extensions ...?} ?{macType ?macTypes ...?}?\""
 	}
-	eval lappend [list fileTypes([lindex $t 0])] [lindex $t 1]
+	lappend fileTypes([lindex $t 0]) {*}[lindex $t 1]
     }
 
     set types {}
@@ -271,6 +271,15 @@ proc ::tk::FDGetFileTypes {string} {
 	    continue
 	}
 
+	# Validate each macType.  This is to agree with the 
+	# behaviour of TkGetFileFilters().  This list may be
+	# empty.
+	foreach macType [lindex $t 2] {
+	    if {[string length $macType] != 4} {
+		error "bad Macintosh file type \"$macType\""
+	    }
+	}
+	
 	set name "$label \("
 	set sep ""
 	set doAppend 1

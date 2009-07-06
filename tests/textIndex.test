@@ -6,17 +6,12 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: textIndex.test,v 1.7.2.1 2005/05/13 13:48:21 vincentdarley Exp $
+# RCS: @(#) $Id: textIndex.test,v 1.18 2005/07/18 22:12:05 vincentdarley Exp $
 
 package require tcltest 2.1
-namespace import -force tcltest::configure
-namespace import -force tcltest::testsDirectory
-configure -testdir [file join [pwd] [file dirname [info script]]]
-configure -loadfile [file join [testsDirectory] constraints.tcl]
+eval tcltest::configure $argv
 tcltest::loadTestedCommands
-
-# Some tests require the testtext command
-testConstraint testtext [llength [info commands testtext]]
+namespace import -force tcltest::test
 
 catch {destroy .t}
 text .t -font {Courier -12} -width 20 -height 10
@@ -648,7 +643,7 @@ test textIndex-15.15 {StartEnd} {
     list [catch {.t index {2.12 word}} msg] $msg
 } {1 {bad text index "2.12 word"}}
 
-test testIndex-16.1 {TkTextPrintIndex} {
+test textIndex-16.1 {TkTextPrintIndex} {
     set t [text .t2]
     $t insert end \n
     $t window create end -window [button $t.b]
@@ -657,8 +652,7 @@ test testIndex-16.1 {TkTextPrintIndex} {
     catch {destroy $t}
 } 0
 
-
-test testIndex-16.2 {TkTextPrintIndex} {
+test textIndex-16.2 {TkTextPrintIndex} {
     set t [text .t2]
     $t insert end \n
     $t window create end -window [button $t.b]
@@ -666,6 +660,231 @@ test testIndex-16.2 {TkTextPrintIndex} {
     pack $t
     catch {destroy $t}
 } 0
+
+test textIndex-17.1 {Object indices} {
+    set res {}
+    set t [text .t2 -height 20]
+    for {set i 0} {$i < 100} {incr i} {
+	$t insert end $i\n
+    }
+    pack $t
+    update
+    set idx @0,0
+    lappend res $idx [$t index $idx]
+    $t yview scroll 2 pages
+    lappend res $idx [$t index $idx]
+    catch {destroy $t}
+    unset i
+    unset idx
+    list $res
+} {{@0,0 1.0 @0,0 37.0}}
+
+test textIndex-18.1 {Object indices don't cache mark names} {
+    set res {}
+    text .t2
+    .t2 insert 1.0 1234\n1234\n1234
+    set pos "insert"
+    lappend res [.t2 index $pos]
+    .t2 mark set $pos 3.0
+    lappend res [.t2 index $pos]
+    .t2 mark set $pos 1.0
+    lappend res [.t2 index $pos]
+    catch {destroy .t2}
+    set res
+} {3.4 3.0 1.0}
+
+frame .f -width 100 -height 20
+pack append . .f left
+
+set fixedFont {Courier -12}
+set fixedHeight [font metrics $fixedFont -linespace]
+set fixedWidth [font measure $fixedFont m]
+
+set varFont {Times -14}
+set bigFont {Helvetica -24}
+destroy .t
+text .t -font $fixedFont -width 20 -height 10 -wrap char
+pack append . .t {top expand fill}
+.t tag configure big -font $bigFont
+.t debug on
+wm geometry . {}
+
+# The statements below reset the main window;  it's needed if the window
+# manager is mwm to make mwm forget about a previous minimum size setting.
+
+wm withdraw .
+wm minsize . 1 1
+wm positionfrom . user
+wm deiconify .
+update
+
+# Some window managers (like olwm under SunOS 4.1.3) misbehave in a way
+# that tends to march windows off the top and left of the screen.  If
+# this happens, some tests will fail because parts of the window will
+# not need to be displayed (because they're off-screen).  To keep this
+# from happening, move the window if it's getting near the left or top
+# edges of the screen.
+
+if {([winfo rooty .] < 50) || ([winfo rootx .] < 50)} {
+    wm geom . +50+50
+}
+
+set str [string repeat "hello " 20]
+
+.t insert end "$str one two three four five six seven height nine ten\n"
+.t insert end "$str one two three four five six seven height nine ten\n"
+.t insert end "$str one two three four five six seven height nine ten\n"
+
+test textIndex-19.1 {Display lines} {
+    .t index "2.7 displaylinestart"
+} {2.0}
+
+test textIndex-19.2 {Display lines} {
+    .t index "2.7 displaylineend"
+} {2.19}
+
+test textIndex-19.3 {Display lines} {
+    .t index "2.30 displaylinestart"
+} {2.20}
+
+test textIndex-19.4 {Display lines} {
+    .t index "2.30 displaylineend"
+} {2.39}
+
+test textIndex-19.5 {Display lines} {
+    .t index "2.40 displaylinestart"
+} {2.40}
+
+test textIndex-19.6 {Display lines} {
+    .t index "2.40 displaylineend"
+} {2.59}
+
+test textIndex-19.7 {Display lines} {
+    .t index "2.7 +1displaylines"
+} {2.27}
+
+test textIndex-19.8 {Display lines} {
+    .t index "2.7 -1displaylines"
+} {1.167}
+
+test textIndex-19.9 {Display lines} {
+    .t index "2.30 +1displaylines"
+} {2.50}
+
+test textIndex-19.10 {Display lines} {
+    .t index "2.30 -1displaylines"
+} {2.10}
+
+test textIndex-19.11 {Display lines} {
+    .t index "2.40 +1displaylines"
+} {2.60}
+
+test textIndex-19.12 {Display lines} {
+    .t index "2.40 -1displaylines"
+} {2.20}
+
+test textIndex-19.13 {Display lines} {
+    destroy .t
+    text .txt -height 1 -wrap word -yscroll ".sbar set" -width 400
+    scrollbar .sbar -command ".txt yview"
+    grid .txt .sbar -sticky news
+    grid configure .sbar -sticky ns
+    grid rowconfigure    . 0 -weight 1
+    grid columnconfigure . 0 -weight 1
+    .txt configure -width 10
+    .txt tag config STAMP -elide 1
+    .txt tag config NICK-tick -elide 0
+    .txt insert end "+++++ Loading History ++++++++++++++++\n"
+    .txt mark set HISTORY {2.0 - 1 line}
+    .txt insert HISTORY {	} STAMP
+    .txt insert HISTORY {tick	} {NICK NICK-tick}
+    .txt insert HISTORY "\n" {NICK NICK-tick}
+    .txt insert HISTORY {[23:51]	} STAMP
+    .txt insert HISTORY "\n" {NICK NICK-tick}
+    # Must not crash
+    .txt index "2.0 - 2 display lines"
+    destroy .txt .sbar
+} {}
+
+proc text_test_word {startend chars start} {
+    destroy .t
+    text .t
+    .t insert end $chars
+    if {[regexp {end} $start]} {
+	set start [.t index "${start}chars -2c"]
+    } else {
+	set start [.t index "1.0 + ${start}chars"]
+    }
+    if {[.t compare $start >= "end-1c"]} {
+	set start "end-2c"
+    }
+    set res [.t index "$start $startend"]
+    .t count 1.0 $res
+}
+
+# Following tests copied from tests from string wordstart/end in Tcl
+
+test textIndex-21.4 {text index wordend} {
+    text_test_word wordend abc. -1
+} 3
+test textIndex-21.5 {text index wordend} {
+    text_test_word wordend abc. 100
+} 4
+test textIndex-21.6 {text index wordend} {
+    text_test_word wordend "word_one two three" 2
+} 8
+test textIndex-21.7 {text index wordend} {
+    text_test_word wordend "one .&# three" 5
+} 6
+test textIndex-21.8 {text index wordend} {
+    text_test_word worde "x.y" 0
+} 1
+test textIndex-21.9 {text index wordend} {
+    text_test_word worde "x.y" end-1
+} 2
+test textIndex-21.10 {text index wordend, unicode} {
+    text_test_word wordend "xyz\u00c7de fg" 0
+} 6
+test textIndex-21.11 {text index wordend, unicode} {
+    text_test_word wordend "xyz\uc700de fg" 0
+} 6
+test textIndex-21.12 {text index wordend, unicode} {
+    text_test_word wordend "xyz\u203fde fg" 0
+} 6
+test textIndex-21.13 {text index wordend, unicode} {
+    text_test_word wordend "xyz\u2045de fg" 0
+} 3
+test textIndex-21.14 {text index wordend, unicode} {
+    text_test_word wordend "\uc700\uc700 abc" 8
+} 6
+
+test textIndex-22.5 {text index wordstart} {
+    text_test_word wordstart "one two three_words" 400
+} 8
+test textIndex-22.6 {text index wordstart} {
+    text_test_word wordstart "one two three_words" 2
+} 0
+test textIndex-22.7 {text index wordstart} {
+    text_test_word wordstart "one two three_words" -2
+} 0
+test textIndex-22.8 {text index wordstart} {
+    text_test_word wordstart "one .*&^ three" 6
+} 6
+test textIndex-22.9 {text index wordstart} {
+    text_test_word wordstart "one two three" 4
+} 4
+test textIndex-22.10 {text index wordstart} {
+    text_test_word wordstart "one two three" end-5
+} 7
+test textIndex-22.11 {text index wordstart, unicode} {
+    text_test_word wordstart "one tw\u00c7o three" 7
+} 4
+test textIndex-22.12 {text index wordstart, unicode} {
+    text_test_word wordstart "ab\uc700\uc700 cdef ghi" 12
+} 10
+test textIndex-22.13 {text index wordstart, unicode} {
+    text_test_word wordstart "\uc700\uc700 abc" 8
+} 3
 
 test textIndex-23.1 {text paragraph start} {
     pack [text .t2]
@@ -678,21 +897,19 @@ test textIndex-23.1 {text paragraph start} {
     set res
 } {2.0 1.1 1.1}
 
+test textIndex-24.1 {text mark prev} {
+    pack [text .t2]
+    .t2 insert end [string repeat "1 2 3 4 5 6 7 8 9 0\n" 12]
+    .t2 mark set 1.0 10.0
+    update
+    # then this crash Tk:
+    set res [.t2 mark previous 10.10]
+    destroy .t2
+    set res
+} {1.0}
+
 # cleanup
 rename textimage {}
 catch {destroy .t}
-::tcltest::cleanupTests
+cleanupTests
 return
-
-
-
-
-
-
-
-
-
-
-
-
-

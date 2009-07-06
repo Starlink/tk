@@ -2,11 +2,13 @@
 #
 # This demonstration script prompts the user to select a file.
 #
-# RCS: @(#) $Id: filebox.tcl,v 1.3.4.1 2004/09/10 20:48:41 dkf Exp $
+# RCS: @(#) $Id: filebox.tcl,v 1.9 2007/12/13 15:27:07 dgp Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
 }
+
+package require Tk
 
 set w .filebox
 catch {destroy $w}
@@ -18,11 +20,9 @@ positionWindow $w
 label $w.msg -font $font -wraplength 4i -justify left -text "Enter a file name in the entry box or click on the \"Browse\" buttons to select a file name using the file selection dialog."
 pack $w.msg -side top
 
-frame $w.buttons
-pack $w.buttons -side bottom -fill x -pady 2m
-button $w.buttons.dismiss -text Dismiss -command "destroy $w"
-button $w.buttons.code -text "See Code" -command "showCode $w"
-pack $w.buttons.dismiss $w.buttons.code -side left -expand 1
+## See Code / Dismiss buttons
+set btns [addSeeDismiss $w.buttons $w]
+pack $btns -side bottom -fill x
 
 foreach i {open save} {
     set f [frame $w.$i]
@@ -35,7 +35,7 @@ foreach i {open save} {
     pack $f -fill x -padx 1c -pady 3
 }
 
-if {![string compare $tcl_platform(platform) unix]} {
+if {$tcl_platform(platform) eq "unix"} {
     checkbutton $w.strict -text "Use Motif Style Dialog" \
 	-variable tk_strictMotif -onvalue 1 -offvalue 0
     pack $w.strict -anchor c
@@ -61,10 +61,16 @@ proc fileDialog {w ent operation} {
 	{"All files"		*}
     }
     if {$operation == "open"} {
-	set file [tk_getOpenFile -filetypes $types -parent $w]
+	global selected_type
+	if {![info exists selected_type]} {
+	    set selected_type "Tcl Scripts"
+	}
+	set file [tk_getOpenFile -filetypes $types -parent $w \
+		-typevariable selected_type]
+	puts "You selected filetype \"$selected_type\""
     } else {
 	set file [tk_getSaveFile -filetypes $types -parent $w \
-	    -initialfile Untitled -defaultextension .txt]
+		-initialfile Untitled -defaultextension .txt]
     }
     if {[string compare $file ""]} {
 	$ent delete 0 end
