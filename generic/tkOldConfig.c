@@ -69,12 +69,17 @@ static void		DeleteSpecCacheTable(ClientData clientData,
  *--------------------------------------------------------------
  */
 
+/* PWD: restore old non-threadsafe behaviour of supporting the 
+ * TK_CONFIG_OPTION_SPECIFIED flag. Skycat and GAIA depend on this, so 
+ * we need to do this or recode Skycat and GAIA (which is what we should do 
+ * when time permits).
+ */
 int
 Tk_ConfigureWidget(
     Tcl_Interp *interp,		/* Interpreter for error reporting. */
     Tk_Window tkwin,		/* Window containing widget (needed to set up
 				 * X resources). */
-    Tk_ConfigSpec *specs,	/* Describes legal options. */
+    Tk_ConfigSpec *origSpecs,	/* Describes legal options. */
     int argc,			/* Number of elements in argv. */
     CONST char **argv,		/* Command-line options. */
     char *widgRec,		/* Record whose fields are to be modified.
@@ -84,7 +89,7 @@ Tk_ConfigureWidget(
 				 * considered. Also, may have
 				 * TK_CONFIG_ARGV_ONLY set. */
 {
-    register Tk_ConfigSpec *specPtr;
+    register Tk_ConfigSpec *specs, *specPtr, *origSpecPtr;
     Tk_Uid value;		/* Value of option from database. */
     int needFlags;		/* Specs must contain this set of flags or
 				 * else they are not considered. */
@@ -112,7 +117,12 @@ Tk_ConfigureWidget(
      * Get the build of the config for this interpreter.
      */
 
-    specs = GetCachedSpecs(interp, specs);
+    specs = GetCachedSpecs(interp, origSpecs);
+
+    for (specPtr = specs; specPtr->type != TK_CONFIG_END; specPtr++) {
+        specPtr->specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
+    }
+
 
     /*
      * Pass one: scan through all of the arguments, processing those that
@@ -153,9 +163,19 @@ Tk_ConfigureWidget(
 	    Tcl_AddErrorInfo(interp, msg);
 	    return TCL_ERROR;
 	}
-	if (!(flags & TK_CONFIG_ARGV_ONLY)) {
-	    specPtr->specFlags |= TK_CONFIG_OPTION_SPECIFIED;
-	}
+        specPtr->specFlags |= TK_CONFIG_OPTION_SPECIFIED;
+    }
+
+
+    /*
+     * Thread Unsafe!  For compatibility through 8.4.x, we set the original
+     * specPtr flags to indicate changed options.  This has been removed
+     * from 8.5.  Switch to Tcl_Obj-based options instead. [Bug 749908]
+     */
+
+    for (origSpecPtr = origSpecs, specPtr = specs;
+	 specPtr->type != TK_CONFIG_END; origSpecPtr++, specPtr++) {
+	origSpecPtr->specFlags = specPtr->specFlags;
     }
 
     /*
@@ -169,7 +189,6 @@ Tk_ConfigureWidget(
 	    if ((specPtr->specFlags & TK_CONFIG_OPTION_SPECIFIED)
 		    || (specPtr->argvName == NULL)
 		    || (specPtr->type == TK_CONFIG_SYNONYM)) {
-		specPtr->specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
 		continue;
 	    }
 	    if (((specPtr->specFlags & needFlags) != needFlags)
