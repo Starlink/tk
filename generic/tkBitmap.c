@@ -11,7 +11,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkBitmap.c,v 1.21 2007/12/13 15:24:13 dgp Exp $
+ * RCS: @(#) $Id: tkBitmap.c,v 1.24 2008/11/08 18:44:39 dkf Exp $
  */
 
 #include "tkInt.h"
@@ -122,7 +122,7 @@ static void		InitBitmapObj(Tcl_Obj *objPtr);
  * field of the Tcl_Obj points to a TkBitmap object.
  */
 
-Tcl_ObjType tkBitmapObjType = {
+const Tcl_ObjType tkBitmapObjType = {
     "bitmap",			/* name */
     FreeBitmapObjProc,		/* freeIntRepProc */
     DupBitmapObjProc,		/* dupIntRepProc */
@@ -967,7 +967,7 @@ InitBitmapObj(
     Tcl_GetString(objPtr);
     typePtr = objPtr->typePtr;
     if ((typePtr != NULL) && (typePtr->freeIntRepProc != NULL)) {
-	(*typePtr->freeIntRepProc)(objPtr);
+	typePtr->freeIntRepProc(objPtr);
     }
     objPtr->typePtr = &tkBitmapObjType;
     objPtr->internalRep.twoPtrValue.ptr1 = NULL;
@@ -1091,7 +1091,7 @@ TkReadBitmapFile(
 {
     char *data;
 
-    data = TkGetBitmapData(NULL, NULL, (char *) filename,
+    data = TkGetBitmapData(NULL, NULL, filename,
 	    (int *) width_return, (int *) height_return, x_hot_return,
 	    y_hot_return);
     if (data == NULL) {

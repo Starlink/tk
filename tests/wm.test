@@ -7,7 +7,7 @@
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
 #
-# RCS: @(#) $Id: wm.test,v 1.39.2.2 2008/11/15 00:37:30 patthoyts Exp $
+# RCS: @(#) $Id: wm.test,v 1.46 2008/11/15 00:00:27 patthoyts Exp $
 
 # This file tests window manager interactions that work across platforms.
 # Window manager tests that only work on a specific platform should be placed

@@ -1,4 +1,4 @@
-/* $Id: ttkTheme.h,v 1.13 2007/12/13 15:26:26 dgp Exp $
+/* $Id: ttkTheme.h,v 1.16 2008/12/03 18:44:49 jenglish Exp $
  * Copyright (c) 2003 Joe English.  Freely redistributable.
  *
  * Declarations for Tk theme engine.
@@ -48,7 +48,7 @@ typedef unsigned int Ttk_State;
 #define TTK_STATE_ALTERNATE	(1<<6)
 #define TTK_STATE_INVALID	(1<<7)
 #define TTK_STATE_READONLY 	(1<<8)
-#define TTK_STATE_USER7 	(1<<9)
+#define TTK_STATE_HOVER		(1<<9)
 #define TTK_STATE_USER6		(1<<10)
 #define TTK_STATE_USER5		(1<<11)
 #define TTK_STATE_USER4		(1<<12)
@@ -205,6 +205,7 @@ typedef struct Ttk_Theme_ *Ttk_Theme;
 typedef struct Ttk_ElementImpl_ *Ttk_ElementImpl;
 typedef struct Ttk_Layout_ *Ttk_Layout;
 typedef struct Ttk_LayoutNode_ Ttk_LayoutNode;
+typedef struct Ttk_Style_ *Ttk_Style;
 
 TTKAPI Ttk_Theme Ttk_GetTheme(Tcl_Interp *interp, const char *name);
 TTKAPI Ttk_Theme Ttk_GetDefaultTheme(Tcl_Interp *interp);
@@ -235,10 +236,10 @@ typedef void (Ttk_ElementDrawProc)(void *clientData, void *elementRecord,
 
 typedef struct Ttk_ElementOptionSpec
 {
-    char *optionName;		/* Command-line name of the widget option */
+    const char *optionName;		/* Command-line name of the widget option */
     Tk_OptionType type; 	/* Accepted option types */
     int offset;			/* Offset of Tcl_Obj* field in element record */
-    char *defaultValue;		/* Default value to used if resource missing */
+    const char *defaultValue;		/* Default value to used if resource missing */
 } Ttk_ElementOptionSpec;
 
 #define TK_OPTION_ANY TK_OPTION_STRING
@@ -340,6 +341,10 @@ MODULE_SCOPE void Ttk_PlaceLayoutNode(Ttk_Layout,Ttk_LayoutNode *, Ttk_Box);
 MODULE_SCOPE void Ttk_ChangeElementState(Ttk_LayoutNode *,unsigned set,unsigned clr);
 
 MODULE_SCOPE Tcl_Obj *Ttk_QueryOption(Ttk_Layout, const char *, Ttk_State);
+
+TTKAPI Ttk_Style Ttk_LayoutStyle(Ttk_Layout);
+TTKAPI Tcl_Obj *Ttk_StyleDefault(Ttk_Style, const char *optionName);
+TTKAPI Tcl_Obj *Ttk_StyleMap(Ttk_Style, const char *optionName, Ttk_State);
 
 /*------------------------------------------------------------------------
  * +++ Resource cache.

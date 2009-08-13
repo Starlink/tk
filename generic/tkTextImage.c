@@ -9,7 +9,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkTextImage.c,v 1.22.2.1 2009/02/06 08:13:23 das Exp $
+ * RCS: @(#) $Id: tkTextImage.c,v 1.25 2008/10/30 23:18:59 nijtmans Exp $
  */
 
 #include "tkPort.h"
@@ -71,7 +71,7 @@ static const Tk_SegType tkTextEmbImageType = {
  * Definitions for alignment values:
  */
 
-static char *alignStrings[] = {
+static const char *const alignStrings[] = {
     "baseline", "bottom", "center", "top", NULL
 };
 
@@ -100,7 +100,7 @@ static const Tk_OptionSpec optionSpecs[] = {
     {TK_OPTION_END}
 };
 
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -130,7 +130,7 @@ TkTextImageCmd(
     int idx;
     register TkTextSegment *eiPtr;
     TkTextIndex index;
-    static const char *optionStrings[] = {
+    static const char *const optionStrings[] = {
 	"cget", "configure", "create", "names", NULL
     };
     enum opts {
@@ -138,7 +138,7 @@ TkTextImageCmd(
     };
 
     if (objc < 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "option ?arg arg ...?");
+	Tcl_WrongNumArgs(interp, 2, objv, "option ?arg ...?");
 	return TCL_ERROR;
     }
     if (Tcl_GetIndexFromObj(interp, objv[2], optionStrings, "option", 0,
@@ -173,7 +173,7 @@ TkTextImageCmd(
     }
     case CMD_CONF:
 	if (objc < 4) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "index ?option value ...?");
+	    Tcl_WrongNumArgs(interp, 3, objv, "index ?-option value ...?");
 	    return TCL_ERROR;
 	}
 	if (TkTextGetObjIndex(interp, textPtr, objv[3], &index) != TCL_OK) {
@@ -217,7 +217,7 @@ TkTextImageCmd(
 	 */
 
 	if (objc < 4) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "index ?option value ...?");
+	    Tcl_WrongNumArgs(interp, 3, objv, "index ?-option value ...?");
 	    return TCL_ERROR;
 	}
 	if (TkTextGetObjIndex(interp, textPtr, objv[3], &index) != TCL_OK) {
@@ -292,7 +292,7 @@ TkTextImageCmd(
     }
     return TCL_ERROR;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -420,7 +420,7 @@ EmbImageConfigure(
 
     return TCL_OK;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -472,13 +472,10 @@ EmbImageDeleteProc(
 
     Tk_FreeConfigOptions((char *) &eiPtr->body.ei, eiPtr->body.ei.optionTable,
 	    NULL);
-    if (eiPtr->body.ei.name) {
-	ckfree(eiPtr->body.ei.name);
-    }
     ckfree((char *) eiPtr);
     return 0;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -504,7 +501,7 @@ EmbImageCleanupProc(
     eiPtr->body.ei.linePtr = linePtr;
     return eiPtr;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -592,7 +589,7 @@ EmbImageLayoutProc(
     eiPtr->body.ei.chunkCount += 1;
     return 1;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -624,7 +621,7 @@ EmbImageCheckProc(
 		eiPtr->size);
     }
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -683,7 +680,7 @@ EmbImageDisplayProc(
 
     Tk_RedrawImage(image, 0, 0, width, height, dst, imageX, imageY);
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -752,7 +749,7 @@ EmbImageBboxProc(
 	break;
     }
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -791,7 +788,7 @@ TkTextImageIndex(
     indexPtr->byteIndex = TkTextSegToOffset(eiPtr, indexPtr->linePtr);
     return 1;
 }
-
+
 /*
  *--------------------------------------------------------------
  *
@@ -836,7 +833,7 @@ EmbImageProc(
     TkTextInvalidateLineMetrics(eiPtr->body.ei.sharedTextPtr, NULL,
 	    index.linePtr, 0, TK_TEXT_INVALIDATE_ONLY);
 }
-
+
 /*
  * Local Variables:
  * mode: c

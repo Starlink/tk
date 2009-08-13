@@ -1,4 +1,4 @@
-/* $Id: ttkProgress.c,v 1.5 2007/01/11 14:49:47 jenglish Exp $
+/* $Id: ttkProgress.c,v 1.7 2008/11/09 23:53:09 jenglish Exp $
  *
  * Copyright (c) Joe English, Pat Thoyts, Michael Kirkham
  *
@@ -185,12 +185,11 @@ static void VariableChanged(void *recordPtr, const char *value)
  * +++ Widget class methods:
  */
 
-static int ProgressbarInitialize(Tcl_Interp *interp, void *recordPtr)
+static void ProgressbarInitialize(Tcl_Interp *interp, void *recordPtr)
 {
     Progressbar *pb = recordPtr;
     pb->progress.variableTrace = 0;
     pb->progress.timer = 0;
-    return TCL_OK;
 }
 
 static void ProgressbarCleanup(void *recordPtr)
@@ -399,7 +398,7 @@ static Ttk_Layout ProgressbarGetLayout(
 /* $sb step ?amount?
  */
 static int ProgressbarStepCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Progressbar *pb = recordPtr;
     double value = 0.0, stepAmount = 1.0;
@@ -453,7 +452,7 @@ static int ProgressbarStepCommand(
  * and pass to interpreter.
  */
 static int ProgressbarStartStopCommand(
-    Tcl_Interp *interp, const char *cmdName, int objc, Tcl_Obj *CONST objv[])
+    Tcl_Interp *interp, const char *cmdName, int objc, Tcl_Obj *const objv[])
 {
     Tcl_Obj *cmd = Tcl_NewListObj(objc, objv);
     Tcl_Obj *prefix[2];
@@ -473,14 +472,14 @@ static int ProgressbarStartStopCommand(
 }
 
 static int ProgressbarStartCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     return ProgressbarStartStopCommand(
 	interp, "::ttk::progressbar::start", objc, objv);
 }
 
 static int ProgressbarStopCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     return ProgressbarStartStopCommand(
 	interp, "::ttk::progressbar::stop", objc, objv);

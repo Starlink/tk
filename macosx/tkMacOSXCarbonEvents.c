@@ -60,7 +60,7 @@
  *	software in accordance with the terms specified in this
  *	license.
  *
- * RCS: @(#) $Id: tkMacOSXCarbonEvents.c,v 1.19.2.1 2008/06/19 00:16:17 das Exp $
+ * RCS: @(#) $Id: tkMacOSXCarbonEvents.c,v 1.22 2008/12/10 05:02:52 das Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -211,6 +211,8 @@ TkMacOSXInitCarbonEvents(
 	{kEventClassApplication, kEventAppShown},
 	{kEventClassApplication, kEventAppAvailableWindowBoundsChanged},
 	{kEventClassAppearance,	 kEventAppearanceScrollBarVariantChanged},
+	{kEventClassFont,	 kEventFontPanelClosed},
+	{kEventClassFont,	 kEventFontSelection},
     };
 
     carbonEventHandlerUPP = NewEventHandlerUPP(CarbonEventHandlerProc);
@@ -588,7 +590,8 @@ TkMacOSXStopTclEventLoopCarbonTimer(void)
  */
 
 MODULE_SCOPE void
-TkMacOSXTrackingLoop(int tracking)
+TkMacOSXTrackingLoop(
+    int tracking)
 {
     static int previousServiceMode = TCL_SERVICE_NONE;
 

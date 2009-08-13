@@ -9,7 +9,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkUnixEvent.c,v 1.27 2008/03/26 19:04:10 jenglish Exp $
+ * RCS: @(#) $Id: tkUnixEvent.c,v 1.31 2008/10/22 16:30:16 das Exp $
  */
 
 #include "tkUnixInt.h"
@@ -115,7 +115,7 @@ DisplayExitHandler(
 
 TkDisplay *
 TkpOpenDisplay(
-    CONST char *displayNameStr)
+    const char *displayNameStr)
 {
     TkDisplay *dispPtr;
     Display *display = XOpenDisplay(displayNameStr);
@@ -155,8 +155,6 @@ TkpCloseDisplay(
     TkDisplay *dispPtr)
 {
     TkSendCleanup(dispPtr);
-
-    TkFreeXId(dispPtr);
 
     TkWmCleanup(dispPtr);
 
@@ -289,6 +287,14 @@ TransferXEventsToTcl(
 
     while (QLength(display) > 0) {
 	XNextEvent(display, &event);
+#ifdef GenericEvent
+	if (event.type == GenericEvent) {
+	    xGenericEvent *xgePtr = (xGenericEvent *) &event;
+
+	    Tcl_Panic("Wild GenericEvent; panic! (extension=%d,evtype=%d)",
+		    xgePtr->extension, xgePtr->evtype);
+	}
+#endif
 	if (event.type != KeyPress && event.type != KeyRelease) {
 	    if (XFilterEvent(&event, None)) {
 		continue;

@@ -1,5 +1,5 @@
 #
-# $Id: xpTheme.tcl,v 1.6.2.1 2008/04/03 11:48:00 patthoyts Exp $
+# $Id: xpTheme.tcl,v 1.12 2008/12/05 11:11:58 patthoyts Exp $
 #
 # Settings for 'xpnative' theme
 #
@@ -31,15 +31,8 @@ namespace eval ttk::theme::xpnative {
 
 	# Treeview:
 	ttk::style configure Heading -font TkHeadingFont
-	ttk::style configure Row -background SystemWindow
-	ttk::style configure Cell -background SystemWindow
-	ttk::style map Row \
-	    -background [list selected SystemHighlight] \
-	    -foreground [list selected SystemHighlightText] ;
-	ttk::style map Cell \
-	    -background [list selected SystemHighlight] \
-	    -foreground [list selected SystemHighlightText] ;
-	ttk::style map Item \
+	ttk::style configure Treeview -background SystemWindow
+	ttk::style map Treeview \
 	    -background [list selected SystemHighlight] \
 	    -foreground [list selected SystemHighlightText] ;
 
@@ -59,6 +52,13 @@ namespace eval ttk::theme::xpnative {
 	    -focusfill	[list {readonly focus} SystemHighlight] \
 	    ;
 
+	ttk::style configure TSpinbox -padding {2 0 14 0}
+	ttk::style map TSpinbox \
+	    -selectbackground [list !focus SystemWindow] \
+	    -selectforeground [list !focus SystemWindowText] \
+	    ;
+
 	ttk::style configure Toolbutton -padding {4 4}
+
     }
 }

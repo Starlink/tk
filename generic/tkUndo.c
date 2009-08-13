@@ -9,7 +9,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkUndo.c,v 1.13.2.1 2009/02/06 08:13:23 das Exp $
+ * RCS: @(#) $Id: tkUndo.c,v 1.14 2008/11/08 18:44:40 dkf Exp $
  */
 
 #include "tkInt.h"
@@ -131,7 +131,7 @@ TkUndoClearStack(
 	    TkUndoSubAtom *sub;
 
 	    sub = elem->apply;
-	    while (sub != NULL) {
+	    while (sub->next != NULL) {
 		TkUndoSubAtom *next = sub->next;
 
 		if (sub->action != NULL) {
@@ -142,7 +142,7 @@ TkUndoClearStack(
 	    }
 
 	    sub = elem->revert;
-	    while (sub != NULL) {
+	    while (sub->next != NULL) {
 		TkUndoSubAtom *next = sub->next;
 
 		if (sub->action != NULL) {
@@ -399,7 +399,7 @@ TkUndoSetDepth(
 	    prevelem = elem;
 	    if (elem->type != TK_UNDO_SEPARATOR) {
 		TkUndoSubAtom *sub = elem->apply;
-		while (sub != NULL) {
+		while (sub->next != NULL) {
 		    TkUndoSubAtom *next = sub->next;
 
 		    if (sub->action != NULL) {
@@ -409,7 +409,7 @@ TkUndoSetDepth(
 		    sub = next;
 		}
 		sub = elem->revert;
-		while (sub != NULL) {
+		while (sub->next != NULL) {
 		    TkUndoSubAtom *next = sub->next;
 
 		    if (sub->action != NULL) {
@@ -656,7 +656,7 @@ EvaluateActionList(
 
     while (action != NULL) {
 	if (action->funcPtr != NULL) {
-	    result = (*action->funcPtr)(interp, action->clientData,
+	    result = action->funcPtr(interp, action->clientData,
 		    action->action);
 	} else if (action->command != NULL) {
 	    Tcl_Obj *cmdNameObj, *evalObj;

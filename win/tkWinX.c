@@ -10,7 +10,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinX.c,v 1.57 2007/12/13 15:28:56 dgp Exp $
+ * RCS: @(#) $Id: tkWinX.c,v 1.59 2008/12/10 05:02:52 das Exp $
  */
 
 /*
@@ -70,7 +70,7 @@ static TkWinProcs asciiProcs = {
 	    WPARAM wParam, LPARAM lParam)) CallWindowProcA,
     (LRESULT (WINAPI *)(HWND hWnd, UINT Msg, WPARAM wParam,
 	    LPARAM lParam)) DefWindowProcA,
-    (ATOM (WINAPI *)(CONST WNDCLASS *lpWndClass)) RegisterClassA,
+    (ATOM (WINAPI *)(const WNDCLASS *lpWndClass)) RegisterClassA,
     (BOOL (WINAPI *)(HWND hWnd, LPCTSTR lpString)) SetWindowTextA,
     (HWND (WINAPI *)(DWORD dwExStyle, LPCTSTR lpClassName,
 	    LPCTSTR lpWindowName, DWORD dwStyle, int x, int y,
@@ -79,6 +79,8 @@ static TkWinProcs asciiProcs = {
     (BOOL (WINAPI *)(HMENU hMenu, UINT uPosition, UINT uFlags,
 	    UINT uIDNewItem, LPCTSTR lpNewItem)) InsertMenuA,
     (int (WINAPI *)(HWND hWnd, LPCTSTR lpString, int nMaxCount)) GetWindowTextA,
+    (HWND (WINAPI *)(LPCTSTR lpClassName, LPCTSTR lpWindowName)) FindWindowA,
+    (int (WINAPI *)(HWND hwnd, LPTSTR lpClassName, int nMaxCount)) GetClassNameA,
 };
 
 static TkWinProcs unicodeProcs = {
@@ -88,7 +90,7 @@ static TkWinProcs unicodeProcs = {
 	    WPARAM wParam, LPARAM lParam)) CallWindowProcW,
     (LRESULT (WINAPI *)(HWND hWnd, UINT Msg, WPARAM wParam,
 	    LPARAM lParam)) DefWindowProcW,
-    (ATOM (WINAPI *)(CONST WNDCLASS *lpWndClass)) RegisterClassW,
+    (ATOM (WINAPI *)(const WNDCLASS *lpWndClass)) RegisterClassW,
     (BOOL (WINAPI *)(HWND hWnd, LPCTSTR lpString)) SetWindowTextW,
     (HWND (WINAPI *)(DWORD dwExStyle, LPCTSTR lpClassName,
 	    LPCTSTR lpWindowName, DWORD dwStyle, int x, int y,
@@ -97,6 +99,8 @@ static TkWinProcs unicodeProcs = {
     (BOOL (WINAPI *)(HMENU hMenu, UINT uPosition, UINT uFlags,
 	    UINT uIDNewItem, LPCTSTR lpNewItem)) InsertMenuW,
     (int (WINAPI *)(HWND hWnd, LPCTSTR lpString, int nMaxCount)) GetWindowTextW,
+    (HWND (WINAPI *)(LPCTSTR lpClassName, LPCTSTR lpWindowName)) FindWindowW,
+    (int (WINAPI *)(HWND hwnd, LPTSTR lpClassName, int nMaxCount)) GetClassNameW,
 };
 
 TkWinProcs *tkWinProcs;
@@ -464,10 +468,10 @@ TkWinGetPlatformTheme(void)
  *----------------------------------------------------------------------
  */
 
-CONST char *
+const char *
 TkGetDefaultScreenName(
     Tcl_Interp *interp,		/* Not used. */
-    CONST char *screenName)	/* If NULL, use default string. */
+    const char *screenName)	/* If NULL, use default string. */
 {
     if ((screenName == NULL) || (screenName[0] == '\0')) {
 	screenName = winScreenName;
@@ -589,7 +593,7 @@ TkWinDisplayChanged(
 
 TkDisplay *
 TkpOpenDisplay(
-    CONST char *display_name)
+    const char *display_name)
 {
     Screen *screen;
     TkWinDrawable *twdPtr;

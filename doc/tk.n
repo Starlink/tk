@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: tk.n,v 1.17 2007/12/13 15:23:43 dgp Exp $
+'\" RCS: @(#) $Id: tk.n,v 1.21 2008/12/10 05:02:40 das Exp $
 '\" 
 .so man.macros
 .TH tk n 8.4 Tk "Tk Built-In Commands"
@@ -16,7 +16,6 @@ tk \- Manipulate Tk internal state
 .SH SYNOPSIS
 \fBtk\fR \fIoption \fR?\fIarg arg ...\fR?
 .BE
-
 .SH DESCRIPTION
 .PP
 The \fBtk\fR command provides access to miscellaneous
@@ -48,6 +47,13 @@ If sends have been disabled by deleting the \fBsend\fR command,
 this command will reenable them and recreate the \fBsend\fR
 command.
 .TP
+\fBtk busy \fIsubcommand\fR ...
+.
+This command controls the marking of window hierarchies as
+.QW busy ,
+rendering them non-interactive while some other operation is proceeding. For
+more details see the \fBbusy\fR manual page.
+.TP
 \fBtk caret window \fR?\fB\-x \fIx\fR? ?\fB\-y \fIy\fR? ?\fB\-height \fIheight\fR?
 .
 Sets and queries the caret location for the display of the specified
@@ -59,31 +65,6 @@ the last values used for setting the caret are return in option-value pair
 format.  \fI\-x\fR and \fI\-y\fR represent window-relative coordinates, and
 \fI\-height\fR is the height of the current cursor location, or the height
 of the specified \fIwindow\fR if none is given.
-.TP
-\fBtk scaling \fR?\fB\-displayof \fIwindow\fR? ?\fInumber\fR?
-.
-Sets and queries the current scaling factor used by Tk to convert between
-physical units (for example, points, inches, or millimeters) and pixels.  The
-\fInumber\fR argument is a floating point number that specifies the number of
-pixels per point on \fIwindow\fR's display.  If the \fIwindow\fR argument is
-omitted, it defaults to the main window.  If the \fInumber\fR argument is 
-omitted, the current value of the scaling factor is returned.
-.RS
-.PP
-A
-.QW point
-is a unit of measurement equal to 1/72 inch.  A scaling factor
-of 1.0 corresponds to 1 pixel per point, which is equivalent to a standard
-72 dpi monitor.  A scaling factor of 1.25 would mean 1.25 pixels per point,
-which is the setting for a 90 dpi monitor; setting the scaling factor to
-1.25 on a 72 dpi monitor would cause everything in the application to be
-displayed 1.25 times as large as normal.  The initial value for the scaling
-factor is set when the application starts, based on properties of the
-installed monitor, but it can be changed at any time.  Measurements made
-after the scaling factor is changed will use the new scaling factor, but it
-is undefined whether existing widgets will resize themselves dynamically to
-accommodate the new scaling factor.
-.RE
 .TP
 \fBtk inactive \fR?\fB\-displayof \fIwindow\fR? ?\fBreset\fR?
 .
@@ -103,6 +84,35 @@ inactivity time is forbidden in safe interpreters and will throw and
 error if tried.
 .RE
 .TP
+\fBtk fontchooser \fIsubcommand\fR ...
+Controls the Tk font selection dialog. For more details see the
+\fBfontchooser\fR manual page.
+.TP
+\fBtk scaling \fR?\fB\-displayof \fIwindow\fR? ?\fInumber\fR?
+.
+Sets and queries the current scaling factor used by Tk to convert between
+physical units (for example, points, inches, or millimeters) and pixels.  The
+\fInumber\fR argument is a floating point number that specifies the number of
+pixels per point on \fIwindow\fR's display.  If the \fIwindow\fR argument is
+omitted, it defaults to the main window.  If the \fInumber\fR argument is
+omitted, the current value of the scaling factor is returned.
+.RS
+.PP
+A
+.QW point
+is a unit of measurement equal to 1/72 inch.  A scaling factor
+of 1.0 corresponds to 1 pixel per point, which is equivalent to a standard
+72 dpi monitor.  A scaling factor of 1.25 would mean 1.25 pixels per point,
+which is the setting for a 90 dpi monitor; setting the scaling factor to
+1.25 on a 72 dpi monitor would cause everything in the application to be
+displayed 1.25 times as large as normal.  The initial value for the scaling
+factor is set when the application starts, based on properties of the
+installed monitor, but it can be changed at any time.  Measurements made
+after the scaling factor is changed will use the new scaling factor, but it
+is undefined whether existing widgets will resize themselves dynamically to
+accommodate the new scaling factor.
+.RE
+.TP
 \fBtk useinputmethods \fR?\fB\-displayof \fIwindow\fR? ?\fIboolean\fR?
 .
 Sets and queries the state of whether Tk should use XIM (X Input Methods)
@@ -119,6 +129,9 @@ Returns the current Tk windowing system, one of
 \fBx11\fR (X11-based), \fBwin32\fR (MS Windows),
 or \fBaqua\fR (Mac OS X Aqua).
 .SH "SEE ALSO"
-send(n), winfo(n)
+busy(n), fontchooser(n), send(n), winfo(n)
 .SH KEYWORDS
 application name, send
+'\" Local Variables:
+'\" mode: nroff
+'\" End:

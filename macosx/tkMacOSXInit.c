@@ -11,12 +11,10 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXInit.c,v 1.34.2.2 2008/06/19 00:13:10 das Exp $
+ * RCS: @(#) $Id: tkMacOSXInit.c,v 1.38 2008/12/15 16:17:18 dgp Exp $
  */
 
 #include "tkMacOSXPrivate.h"
-
-#include "tclInt.h" /* for Tcl_GetStartupScript() & Tcl_SetStartupScript() */
 
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -134,6 +132,7 @@ TkpInit(
 	int i;
 	struct utsname name;
 	long osVersion = 0;
+	struct stat st;
 
 	initialized = 1;
 	
@@ -350,32 +349,30 @@ TkpInit(
 	 * clicking Wish) then use the Tk based console interpreter.
 	 */
 
-	if (!isatty(0)) {
-	    struct stat st;
+	if (getenv("TK_CONSOLE") ||
+		(!isatty(0) && (fstat(0, &st) ||
+		(S_ISCHR(st.st_mode) && st.st_blocks == 0)))) {
+	    Tk_InitConsoleChannels(interp);
+	    Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDIN));
+	    Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDOUT));
+	    Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDERR));
 
-	    if (fstat(0, &st) || (S_ISCHR(st.st_mode) && st.st_blocks == 0)) {
-		Tk_InitConsoleChannels(interp);
-		Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDIN));
-		Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDOUT));
-		Tcl_RegisterChannel(interp, Tcl_GetStdChannel(TCL_STDERR));
+	    /*
+	     * Only show the console if we don't have a startup script
+	     * and tcl_interactive hasn't been set already.
+	     */
 
-		/*
-		 * Only show the console if we don't have a startup script
-		 * and tcl_interactive hasn't been set already.
-		 */
+	    if (Tcl_GetStartupScript(NULL) == NULL) {
+		const char *intvar = Tcl_GetVar(interp,
+			"tcl_interactive", TCL_GLOBAL_ONLY);
 
-		if (Tcl_GetStartupScript(NULL) == NULL) {
-		    const char *intvar = Tcl_GetVar(interp,
-			    "tcl_interactive", TCL_GLOBAL_ONLY);
-
-		    if (intvar == NULL) {
-			Tcl_SetVar(interp, "tcl_interactive", "1",
-				TCL_GLOBAL_ONLY);
-		    }
+		if (intvar == NULL) {
+		    Tcl_SetVar(interp, "tcl_interactive", "1",
+			    TCL_GLOBAL_ONLY);
 		}
-		if (Tk_CreateConsoleWindow(interp) == TCL_ERROR) {
-		    return TCL_ERROR;
-		}
+	    }
+	    if (Tk_CreateConsoleWindow(interp) == TCL_ERROR) {
+		return TCL_ERROR;
 	    }
 	}
     }
@@ -448,8 +445,8 @@ TkpGetAppName(
 
 void
 TkpDisplayWarning(
-    CONST char *msg,		/* Message to be displayed. */
-    CONST char *title)		/* Title of warning. */
+    const char *msg,		/* Message to be displayed. */
+    const char *title)		/* Title of warning. */
 {
     Tcl_Channel errChannel = Tcl_GetStdChannel(TCL_STDERR);
 

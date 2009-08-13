@@ -8,6 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		F9067BCD0BFBA2900074F726 /* tkOldTest.c in Sources */ = {isa = PBXBuildFile; fileRef = F966BAFE08F27A39005CB29B /* tkOldTest.c */; };
+		F9152B090EAF8A5000CD5C7B /* tkBusy.c in Sources */ = {isa = PBXBuildFile; fileRef = F9152B080EAF8A5000CD5C7B /* tkBusy.c */; };
+		F9152B0A0EAF8A5700CD5C7B /* tkBusy.c in Sources */ = {isa = PBXBuildFile; fileRef = F9152B080EAF8A5000CD5C7B /* tkBusy.c */; };
+		F92EE8BF0E62F846001A6E80 /* tkImgPhInstance.c in Sources */ = {isa = PBXBuildFile; fileRef = F92EE8BE0E62F846001A6E80 /* tkImgPhInstance.c */; };
+		F92EE8D30E62F939001A6E80 /* tkImgPhInstance.c in Sources */ = {isa = PBXBuildFile; fileRef = F92EE8BE0E62F846001A6E80 /* tkImgPhInstance.c */; };
+		F93599B30DF1F75400E04F67 /* tclOO.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B20DF1F75400E04F67 /* tclOO.c */; };
+		F93599B70DF1F76100E04F67 /* tclOOBasic.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B60DF1F76100E04F67 /* tclOOBasic.c */; };
+		F93599B90DF1F76600E04F67 /* tclOOCall.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B80DF1F76600E04F67 /* tclOOCall.c */; };
+		F93599BC0DF1F77000E04F67 /* tclOODefineCmds.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599BB0DF1F77000E04F67 /* tclOODefineCmds.c */; };
+		F93599BE0DF1F77400E04F67 /* tclOOInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599BD0DF1F77400E04F67 /* tclOOInfo.c */; };
+		F93599C20DF1F78300E04F67 /* tclOOMethod.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C10DF1F78300E04F67 /* tclOOMethod.c */; };
+		F93599C40DF1F78800E04F67 /* tclOOStubInit.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C30DF1F78800E04F67 /* tclOOStubInit.c */; };
+		F93599C60DF1F78D00E04F67 /* tclOOStubLib.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C50DF1F78D00E04F67 /* tclOOStubLib.c */; };
+		F95D77EA0DFD820D00A8BF6F /* tclIORTrans.c in Sources */ = {isa = PBXBuildFile; fileRef = F95D77E90DFD820D00A8BF6F /* tclIORTrans.c */; };
+		F96437CA0EF0D4B2003F468E /* tclZlib.c in Sources */ = {isa = PBXBuildFile; fileRef = F96437C90EF0D4B2003F468E /* tclZlib.c */; };
+		F96437CB0EF0D4B2003F468E /* tclZlib.c in Sources */ = {isa = PBXBuildFile; fileRef = F96437C90EF0D4B2003F468E /* tclZlib.c */; };
+		F96437E70EF0D652003F468E /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F96437E60EF0D652003F468E /* libz.dylib */; };
+		F96437E80EF0D652003F468E /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F96437E60EF0D652003F468E /* libz.dylib */; };
 		F966BDCF08F27A3F005CB29B /* tk3d.c in Sources */ = {isa = PBXBuildFile; fileRef = F966BAAC08F27A39005CB29B /* tk3d.c */; };
 		F966BDD108F27A3F005CB29B /* tkArgv.c in Sources */ = {isa = PBXBuildFile; fileRef = F966BAAE08F27A39005CB29B /* tkArgv.c */; };
 		F966BDD208F27A3F005CB29B /* tkAtom.c in Sources */ = {isa = PBXBuildFile; fileRef = F966BAAF08F27A39005CB29B /* tkAtom.c */; };
@@ -593,22 +610,70 @@
 		F9FD349B0CC1BB0D0073837D /* libfreetype.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F9FD34990CC1BB0D0073837D /* libfreetype.dylib */; };
 		F9FD349C0CC1BB0D0073837D /* libXft.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F9FD349A0CC1BB0D0073837D /* libXft.dylib */; };
 		F9FD34C40CC1BBD70073837D /* libfontconfig.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F9FD34C30CC1BBD70073837D /* libfontconfig.dylib */; };
+		F9FFAF1D0DFDDB26007F8A6A /* tclIORTrans.c in Sources */ = {isa = PBXBuildFile; fileRef = F95D77E90DFD820D00A8BF6F /* tclIORTrans.c */; };
+		F9FFAF1F0DFDDB2F007F8A6A /* tclOO.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B20DF1F75400E04F67 /* tclOO.c */; };
+		F9FFAF200DFDDB32007F8A6A /* tclOOBasic.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B60DF1F76100E04F67 /* tclOOBasic.c */; };
+		F9FFAF210DFDDB32007F8A6A /* tclOOCall.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599B80DF1F76600E04F67 /* tclOOCall.c */; };
+		F9FFAF220DFDDB34007F8A6A /* tclOODefineCmds.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599BB0DF1F77000E04F67 /* tclOODefineCmds.c */; };
+		F9FFAF230DFDDB35007F8A6A /* tclOOInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599BD0DF1F77400E04F67 /* tclOOInfo.c */; };
+		F9FFAF240DFDDB36007F8A6A /* tclOOMethod.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C10DF1F78300E04F67 /* tclOOMethod.c */; };
+		F9FFAF250DFDDB37007F8A6A /* tclOOStubInit.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C30DF1F78800E04F67 /* tclOOStubInit.c */; };
+		F9FFAF260DFDDB38007F8A6A /* tclOOStubLib.c in Sources */ = {isa = PBXBuildFile; fileRef = F93599C50DF1F78D00E04F67 /* tclOOStubLib.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		8DD76FB20486AB0100D96B5E /* tktest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tktest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9099B8A0CC67D30005A9580 /* textpeer.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = textpeer.tcl; sourceTree = "<group>"; };
 		F9099B8B0CC67D3E005A9580 /* ttkbut.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = ttkbut.tcl; sourceTree = "<group>"; };
+		F9152B080EAF8A5000CD5C7B /* tkBusy.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tkBusy.c; sourceTree = "<group>"; };
+		F91543270EF201A90032D1E8 /* fontchoose.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = fontchoose.tcl; sourceTree = "<group>"; };
+		F915432A0EF201CF0032D1E8 /* zlib.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = zlib.test; sourceTree = "<group>"; };
+		F915432D0EF201EE0032D1E8 /* zlib.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = zlib.n; sourceTree = "<group>"; };
+		F9183E640EFC80CD0030B814 /* throw.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = throw.n; sourceTree = "<group>"; };
+		F9183E650EFC80D70030B814 /* try.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = try.n; sourceTree = "<group>"; };
+		F9183E6A0EFC81560030B814 /* README */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = README; sourceTree = "<group>"; };
+		F9183E8F0EFC817B0030B814 /* tdbc */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tdbc; sourceTree = "<group>"; };
+		F91DC23C0E44C51B002CB8D1 /* nre.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = nre.test; sourceTree = "<group>"; };
+		F91DC23D0E44C530002CB8D1 /* unsupported.test */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = unsupported.test; sourceTree = "<group>"; };
 		F91E62260C1AE686006C9D96 /* Tclsh-Info.plist.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = "Tclsh-Info.plist.in"; sourceTree = "<group>"; };
 		F92240290D7C620F005EC715 /* knightstour.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = knightstour.tcl; sourceTree = "<group>"; };
+		F92D7F100DE777240033A13A /* tsdPerf.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = tsdPerf.tcl; sourceTree = "<group>"; };
+		F92D7F140DE777670033A13A /* tsdPerf.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tsdPerf.c; sourceTree = "<group>"; };
+		F92EE8BE0E62F846001A6E80 /* tkImgPhInstance.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tkImgPhInstance.c; sourceTree = "<group>"; };
+		F93599B20DF1F75400E04F67 /* tclOO.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOO.c; sourceTree = "<group>"; };
+		F93599B40DF1F75900E04F67 /* tclOO.decls */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = tclOO.decls; sourceTree = "<group>"; };
+		F93599B50DF1F75D00E04F67 /* tclOO.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclOO.h; sourceTree = "<group>"; };
+		F93599B60DF1F76100E04F67 /* tclOOBasic.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOBasic.c; sourceTree = "<group>"; };
+		F93599B80DF1F76600E04F67 /* tclOOCall.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOCall.c; sourceTree = "<group>"; };
+		F93599BA0DF1F76A00E04F67 /* tclOODecls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclOODecls.h; sourceTree = "<group>"; };
+		F93599BB0DF1F77000E04F67 /* tclOODefineCmds.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOODefineCmds.c; sourceTree = "<group>"; };
+		F93599BD0DF1F77400E04F67 /* tclOOInfo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOInfo.c; sourceTree = "<group>"; };
+		F93599BF0DF1F77900E04F67 /* tclOOInt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclOOInt.h; sourceTree = "<group>"; };
+		F93599C00DF1F77D00E04F67 /* tclOOIntDecls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclOOIntDecls.h; sourceTree = "<group>"; };
+		F93599C10DF1F78300E04F67 /* tclOOMethod.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOMethod.c; sourceTree = "<group>"; };
+		F93599C30DF1F78800E04F67 /* tclOOStubInit.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOStubInit.c; sourceTree = "<group>"; };
+		F93599C50DF1F78D00E04F67 /* tclOOStubLib.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclOOStubLib.c; sourceTree = "<group>"; };
+		F93599C80DF1F81900E04F67 /* oo.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = oo.test; sourceTree = "<group>"; };
+		F93599CF0DF1F87F00E04F67 /* Class.3 */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = Class.3; sourceTree = "<group>"; };
+		F93599D00DF1F89E00E04F67 /* class.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = class.n; sourceTree = "<group>"; };
+		F93599D20DF1F8DF00E04F67 /* copy.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = copy.n; sourceTree = "<group>"; };
+		F93599D30DF1F8F500E04F67 /* define.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = define.n; sourceTree = "<group>"; };
+		F93599D40DF1F91900E04F67 /* Method.3 */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = Method.3; sourceTree = "<group>"; };
+		F93599D50DF1F93700E04F67 /* my.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = my.n; sourceTree = "<group>"; };
+		F93599D60DF1F95000E04F67 /* next.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = next.n; sourceTree = "<group>"; };
+		F93599D70DF1F96800E04F67 /* object.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = object.n; sourceTree = "<group>"; };
+		F93599D80DF1F98300E04F67 /* self.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = self.n; sourceTree = "<group>"; };
 		F936FCD70CCD984500716967 /* ttkprogress.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = ttkprogress.tcl; sourceTree = "<group>"; };
 		F936FCD80CCD984600716967 /* tree.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = tree.tcl; sourceTree = "<group>"; };
 		F936FCD90CCD984600716967 /* toolbar.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = toolbar.tcl; sourceTree = "<group>"; };
 		F936FCDA0CCD984600716967 /* ttknote.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = ttknote.tcl; sourceTree = "<group>"; };
 		F936FCDB0CCD984600716967 /* combo.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = combo.tcl; sourceTree = "<group>"; };
 		F93E5EFD09CF8711008FA367 /* tkMacOSXFont.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tkMacOSXFont.h; sourceTree = "<group>"; };
+		F95D77E90DFD820D00A8BF6F /* tclIORTrans.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclIORTrans.c; sourceTree = "<group>"; };
 		F95FAFF90B34F1130072E431 /* macOSXLoad.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = macOSXLoad.test; sourceTree = "<group>"; };
 		F962F7C60DADC26200648DB8 /* vsapi.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = vsapi.test; sourceTree = "<group>"; };
+		F96437C90EF0D4B2003F468E /* tclZlib.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclZlib.c; sourceTree = "<group>"; };
+		F96437E60EF0D652003F468E /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = /usr/lib/libz.dylib; sourceTree = "<absolute>"; };
 		F966BA0408F27A37005CB29B /* error.xbm */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; path = error.xbm; sourceTree = "<group>"; };
 		F966BA0508F27A37005CB29B /* gray12.xbm */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; path = gray12.xbm; sourceTree = "<group>"; };
 		F966BA0608F27A37005CB29B /* gray25.xbm */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; path = gray25.xbm; sourceTree = "<group>"; };
@@ -947,7 +1012,6 @@
 		F966BB8708F27A3A005CB29B /* optMenu.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = optMenu.tcl; sourceTree = "<group>"; };
 		F966BB8808F27A3A005CB29B /* palette.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = palette.tcl; sourceTree = "<group>"; };
 		F966BB8908F27A3B005CB29B /* panedwindow.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = panedwindow.tcl; sourceTree = "<group>"; };
-		F966BB8A08F27A3B005CB29B /* prolog.ps */ = {isa = PBXFileReference; explicitFileType = text; fileEncoding = 4; path = prolog.ps; sourceTree = "<group>"; };
 		F966BB8B08F27A3B005CB29B /* safetk.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = safetk.tcl; sourceTree = "<group>"; };
 		F966BB8C08F27A3B005CB29B /* scale.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = scale.tcl; sourceTree = "<group>"; };
 		F966BB8D08F27A3B005CB29B /* scrlbar.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = scrlbar.tcl; sourceTree = "<group>"; };
@@ -1055,7 +1119,6 @@
 		F966BC2F08F27A3C005CB29B /* get.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = get.test; sourceTree = "<group>"; };
 		F966BC3008F27A3C005CB29B /* grab.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = grab.test; sourceTree = "<group>"; };
 		F966BC3108F27A3C005CB29B /* grid.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = grid.test; sourceTree = "<group>"; };
-		F966BC3208F27A3C005CB29B /* id.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = id.test; sourceTree = "<group>"; };
 		F966BC3308F27A3C005CB29B /* image.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = image.test; sourceTree = "<group>"; };
 		F966BC3408F27A3C005CB29B /* imgBmap.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = imgBmap.test; sourceTree = "<group>"; };
 		F966BC3508F27A3C005CB29B /* imgPhoto.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = imgPhoto.test; sourceTree = "<group>"; };
@@ -1839,7 +1902,6 @@
 		F96D437B08F272B6004A47F5 /* io.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = io.test; sourceTree = "<group>"; };
 		F96D437C08F272B6004A47F5 /* ioCmd.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = ioCmd.test; sourceTree = "<group>"; };
 		F96D437D08F272B6004A47F5 /* iogt.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = iogt.test; sourceTree = "<group>"; };
-		F96D437E08F272B6004A47F5 /* ioUtil.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = ioUtil.test; sourceTree = "<group>"; };
 		F96D437F08F272B6004A47F5 /* join.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = join.test; sourceTree = "<group>"; };
 		F96D438008F272B6004A47F5 /* lindex.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = lindex.test; sourceTree = "<group>"; };
 		F96D438108F272B6004A47F5 /* link.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = link.test; sourceTree = "<group>"; };
@@ -2031,16 +2093,21 @@
 		F96D449808F272BA004A47F5 /* tclWinThrd.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclWinThrd.c; sourceTree = "<group>"; };
 		F96D449908F272BA004A47F5 /* tclWinThrd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclWinThrd.h; sourceTree = "<group>"; };
 		F96D449A08F272BA004A47F5 /* tclWinTime.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tclWinTime.c; sourceTree = "<group>"; };
+		F973E5960EE99384001A648E /* vistaTheme.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = vistaTheme.tcl; sourceTree = "<group>"; };
 		F976F6A70C325FB6005066D9 /* tkMacOSXPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tkMacOSXPrivate.h; sourceTree = "<group>"; };
 		F97AE7F10B65C1E900310EA2 /* Wish-Common.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Wish-Common.xcconfig"; sourceTree = "<group>"; };
 		F97AE82B0B65C69B00310EA2 /* Wish-Release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Wish-Release.xcconfig"; sourceTree = "<group>"; };
 		F97AE8330B65C87F00310EA2 /* Wish-Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Wish-Debug.xcconfig"; sourceTree = "<group>"; };
 		F9903CAF094FAADA004613E9 /* tclTomMath.decls */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = tclTomMath.decls; sourceTree = "<group>"; };
 		F9903CB0094FAADA004613E9 /* tclTomMathDecls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tclTomMathDecls.h; sourceTree = "<group>"; };
+		F99388380EE0114B0065FE6B /* fontchooser.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = fontchooser.tcl; sourceTree = "<group>"; };
+		F99388950EE02D980065FE6B /* fontchooser.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = fontchooser.test; sourceTree = "<group>"; };
+		F99D61180EF5573A00BBFE01 /* TclZlib.3 */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = TclZlib.3; sourceTree = "<group>"; };
 		F9A3082D08F2D4AB00BAE1AB /* Tk.framework */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.framework; path = Tk.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9A3084B08F2D4CE00BAE1AB /* Wish.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wish.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9A3084E08F2D4F400BAE1AB /* Tcl.framework */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.framework; path = Tcl.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9A493240CEBF38300B78AE2 /* chanio.test */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = chanio.test; sourceTree = "<group>"; };
+		F9C888C20EEF6571003F63AD /* fontchooser.n */ = {isa = PBXFileReference; explicitFileType = text.man; fileEncoding = 4; path = fontchooser.n; sourceTree = "<group>"; };
 		F9D1360A0CDC252C00DBE0B5 /* mclist.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = mclist.tcl; sourceTree = "<group>"; };
 		F9ECB1120B26521500A28025 /* pkgIndex.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = pkgIndex.tcl; sourceTree = "<group>"; };
 		F9ECB1130B26521500A28025 /* platform.tcl */ = {isa = PBXFileReference; explicitFileType = text.script; fileEncoding = 4; path = platform.tcl; sourceTree = "<group>"; };
@@ -2068,6 +2135,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F966C07508F2820D005CB29B /* CoreFoundation.framework in Frameworks */,
+				F96437E70EF0D652003F468E /* libz.dylib in Frameworks */,
 				F966C07708F2821B005CB29B /* Carbon.framework in Frameworks */,
 				F966C07908F28233005CB29B /* IOKit.framework in Frameworks */,
 			);
@@ -2078,6 +2146,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F9FD31E40CC1AD070073837D /* CoreFoundation.framework in Frameworks */,
+				F96437E80EF0D652003F468E /* libz.dylib in Frameworks */,
 				F9FD32170CC1AF170073837D /* libX11.dylib in Frameworks */,
 				F9FD32180CC1AF170073837D /* libXext.dylib in Frameworks */,
 				F9FD32190CC1AF170073837D /* libXss.dylib in Frameworks */,
@@ -2098,7 +2167,7 @@
 				F966C06F08F281DC005CB29B /* Frameworks */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
 			);
-			comments = "Copyright (c) 2004-2008 Daniel A. Steffen <das@users.sourceforge.net>\n\nSee the file \"license.terms\" for information on usage and redistribution of\nthis file, and for a DISCLAIMER OF ALL WARRANTIES.\n\nRCS: @(#) $Id: project.pbxproj,v 1.37.2.3 2008/06/12 06:35:03 das Exp $\n";
+			comments = "Copyright (c) 2004-2008 Daniel A. Steffen <das@users.sourceforge.net>\n\nSee the file \"license.terms\" for information on usage and redistribution of\nthis file, and for a DISCLAIMER OF ALL WARRANTIES.\n\nRCS: @(#) $Id: project.pbxproj,v 1.52 2008/12/20 01:57:22 das Exp $\n";
 			name = Wish;
 			path = .;
 			sourceTree = SOURCE_ROOT;
@@ -2114,6 +2183,15 @@
 			);
 			includeInIndex = 0;
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F9183E690EFC81560030B814 /* pkgs */ = {
+			isa = PBXGroup;
+			children = (
+				F9183E6A0EFC81560030B814 /* README */,
+				F9183E8F0EFC817B0030B814 /* tdbc */,
+			);
+			path = pkgs;
 			sourceTree = "<group>";
 		};
 		F966BA0308F27A37005CB29B /* bitmaps */ = {
@@ -2179,6 +2257,7 @@
 				F966BA3908F27A37005CB29B /* focus.n */,
 				F966BA3A08F27A37005CB29B /* focusNext.n */,
 				F966BA3B08F27A37005CB29B /* font.n */,
+				F9C888C20EEF6571003F63AD /* fontchooser.n */,
 				F966BA3C08F27A37005CB29B /* FontId.3 */,
 				F966BA3D08F27A37005CB29B /* frame.n */,
 				F966BA3E08F27A37005CB29B /* FreeXId.3 */,
@@ -2324,6 +2403,7 @@
 				F966BAAF08F27A39005CB29B /* tkAtom.c */,
 				F966BAB008F27A39005CB29B /* tkBind.c */,
 				F966BAB108F27A39005CB29B /* tkBitmap.c */,
+				F9152B080EAF8A5000CD5C7B /* tkBusy.c */,
 				F966BAB208F27A39005CB29B /* tkButton.c */,
 				F966BAB308F27A39005CB29B /* tkButton.h */,
 				F966BAB408F27A39005CB29B /* tkCanvArc.c */,
@@ -2363,6 +2443,7 @@
 				F966BAD708F27A39005CB29B /* tkImage.c */,
 				F966BAD808F27A39005CB29B /* tkImgBmap.c */,
 				F966BAD908F27A39005CB29B /* tkImgGIF.c */,
+				F92EE8BE0E62F846001A6E80 /* tkImgPhInstance.c */,
 				F966BADA08F27A39005CB29B /* tkImgPhoto.c */,
 				F966BADB08F27A39005CB29B /* tkImgPPM.c */,
 				F966BADC08F27A39005CB29B /* tkImgUtil.c */,
@@ -2435,6 +2516,7 @@
 				F966BB6208F27A3A005CB29B /* dialog.tcl */,
 				F966BB6308F27A3A005CB29B /* entry.tcl */,
 				F966BB6408F27A3A005CB29B /* focus.tcl */,
+				F99388380EE0114B0065FE6B /* fontchooser.tcl */,
 				F966BB7308F27A3A005CB29B /* listbox.tcl */,
 				F966BB7408F27A3A005CB29B /* menu.tcl */,
 				F966BB7508F27A3A005CB29B /* mkpsenc.tcl */,
@@ -2443,7 +2525,6 @@
 				F966BB8708F27A3A005CB29B /* optMenu.tcl */,
 				F966BB8808F27A3A005CB29B /* palette.tcl */,
 				F966BB8908F27A3B005CB29B /* panedwindow.tcl */,
-				F966BB8A08F27A3B005CB29B /* prolog.ps */,
 				F966BB8B08F27A3B005CB29B /* safetk.tcl */,
 				F966BB8C08F27A3B005CB29B /* scale.tcl */,
 				F966BB8D08F27A3B005CB29B /* scrlbar.tcl */,
@@ -2483,6 +2564,7 @@
 				F966BB2C08F27A39005CB29B /* entry3.tcl */,
 				F966BB2D08F27A39005CB29B /* filebox.tcl */,
 				F966BB2E08F27A39005CB29B /* floor.tcl */,
+				F91543270EF201A90032D1E8 /* fontchoose.tcl */,
 				F966BB2F08F27A39005CB29B /* form.tcl */,
 				F966BB3008F27A39005CB29B /* goldberg.tcl */,
 				F966BB3108F27A39005CB29B /* hello */,
@@ -2640,12 +2722,12 @@
 				F966BC2A08F27A3C005CB29B /* focus.test */,
 				F966BC2B08F27A3C005CB29B /* focusTcl.test */,
 				F966BC2C08F27A3C005CB29B /* font.test */,
+				F99388950EE02D980065FE6B /* fontchooser.test */,
 				F966BC2D08F27A3C005CB29B /* frame.test */,
 				F966BC2E08F27A3C005CB29B /* geometry.test */,
 				F966BC2F08F27A3C005CB29B /* get.test */,
 				F966BC3008F27A3C005CB29B /* grab.test */,
 				F966BC3108F27A3C005CB29B /* grid.test */,
-				F966BC3208F27A3C005CB29B /* id.test */,
 				F966BC3308F27A3C005CB29B /* image.test */,
 				F966BC3408F27A3C005CB29B /* imgBmap.test */,
 				F966BC3508F27A3C005CB29B /* imgPhoto.test */,
@@ -2852,6 +2934,7 @@
 			isa = PBXGroup;
 			children = (
 				F966C07408F2820D005CB29B /* CoreFoundation.framework */,
+				F96437E60EF0D652003F468E /* libz.dylib */,
 				F966C07608F2821B005CB29B /* Carbon.framework */,
 				F966C07808F28233005CB29B /* IOKit.framework */,
 				F9FD32140CC1AF170073837D /* libX11.dylib */,
@@ -2932,6 +3015,7 @@
 				F968884C0AF787B3000797B5 /* ttk.tcl */,
 				F968884D0AF787B3000797B5 /* utils.tcl */,
 				F968884E0AF787B3000797B5 /* winTheme.tcl */,
+				F973E5960EE99384001A648E /* vistaTheme.tcl */,
 				F968884F0AF787B3000797B5 /* xpTheme.tcl */,
 			);
 			path = ttk;
@@ -2971,6 +3055,7 @@
 				F96D434408F272B5004A47F5 /* tests */,
 				F96D3DFC08F272A4004A47F5 /* doc */,
 				F96D43D008F272B8004A47F5 /* tools */,
+				F9183E690EFC81560030B814 /* pkgs */,
 				F96D3DFA08F272A4004A47F5 /* ChangeLog */,
 				F96D3DFB08F272A4004A47F5 /* changes */,
 				F96D434308F272B5004A47F5 /* README */,
@@ -3025,12 +3110,15 @@
 				F96D3E1108F272A5004A47F5 /* cd.n */,
 				F96D3E1208F272A5004A47F5 /* chan.n */,
 				F96D3E1308F272A5004A47F5 /* ChnlStack.3 */,
+				F93599CF0DF1F87F00E04F67 /* Class.3 */,
+				F93599D00DF1F89E00E04F67 /* class.n */,
 				F96D3E1408F272A5004A47F5 /* clock.n */,
 				F96D3E1508F272A5004A47F5 /* close.n */,
 				F96D3E1608F272A5004A47F5 /* CmdCmplt.3 */,
 				F96D3E1708F272A5004A47F5 /* Concat.3 */,
 				F96D3E1808F272A5004A47F5 /* concat.n */,
 				F96D3E1908F272A5004A47F5 /* continue.n */,
+				F93599D20DF1F8DF00E04F67 /* copy.n */,
 				F96D3E1A08F272A5004A47F5 /* CrtChannel.3 */,
 				F96D3E1B08F272A5004A47F5 /* CrtChnlHdlr.3 */,
 				F96D3E1C08F272A5004A47F5 /* CrtCloseHdlr.3 */,
@@ -3043,6 +3131,7 @@
 				F96D3E2308F272A5004A47F5 /* CrtTimerHdlr.3 */,
 				F96D3E2408F272A5004A47F5 /* CrtTrace.3 */,
 				F96D3E2508F272A5004A47F5 /* dde.n */,
+				F93599D30DF1F8F500E04F67 /* define.n */,
 				F96D3E2608F272A5004A47F5 /* DetachPids.3 */,
 				F96D3E2708F272A5004A47F5 /* dict.n */,
 				F96D3E2808F272A5004A47F5 /* DictObj.3 */,
@@ -3120,11 +3209,15 @@
 				F96D3E7008F272A6004A47F5 /* man.macros */,
 				F96D3E7108F272A6004A47F5 /* mathfunc.n */,
 				F96D3E7208F272A6004A47F5 /* memory.n */,
+				F93599D40DF1F91900E04F67 /* Method.3 */,
 				F96D3E7308F272A6004A47F5 /* msgcat.n */,
+				F93599D50DF1F93700E04F67 /* my.n */,
 				F96D3E7408F272A6004A47F5 /* Namespace.3 */,
 				F96D3E7508F272A6004A47F5 /* namespace.n */,
+				F93599D60DF1F95000E04F67 /* next.n */,
 				F96D3E7608F272A6004A47F5 /* Notifier.3 */,
 				F96D3E7708F272A6004A47F5 /* Object.3 */,
+				F93599D70DF1F96800E04F67 /* object.n */,
 				F96D3E7808F272A6004A47F5 /* ObjectType.3 */,
 				F96D3E7908F272A6004A47F5 /* open.n */,
 				F96D3E7A08F272A6004A47F5 /* OpenFileChnl.3 */,
@@ -3158,6 +3251,7 @@
 				F96D3E9408F272A6004A47F5 /* SaveResult.3 */,
 				F96D3E9508F272A6004A47F5 /* scan.n */,
 				F96D3E9608F272A6004A47F5 /* seek.n */,
+				F93599D80DF1F98300E04F67 /* self.n */,
 				F96D3E9708F272A6004A47F5 /* set.n */,
 				F96D3E9808F272A6004A47F5 /* SetChanErr.3 */,
 				F96D3E9908F272A6004A47F5 /* SetErrno.3 */,
@@ -3181,6 +3275,7 @@
 				F96D3EAB08F272A7004A47F5 /* SubstObj.3 */,
 				F96D3EAC08F272A7004A47F5 /* switch.n */,
 				F96D3EAD08F272A7004A47F5 /* Tcl.n */,
+				F99D61180EF5573A00BBFE01 /* TclZlib.3 */,
 				F96D3EAE08F272A7004A47F5 /* Tcl_Main.3 */,
 				F96D3EAF08F272A7004A47F5 /* TCL_MEM_DEBUG.3 */,
 				F96D3EB008F272A7004A47F5 /* tclsh.1 */,
@@ -3188,6 +3283,7 @@
 				F96D3EB208F272A7004A47F5 /* tclvars.n */,
 				F96D3EB308F272A7004A47F5 /* tell.n */,
 				F96D3EB408F272A7004A47F5 /* Thread.3 */,
+				F9183E640EFC80CD0030B814 /* throw.n */,
 				F96D3EB508F272A7004A47F5 /* time.n */,
 				F96D3EB608F272A7004A47F5 /* tm.n */,
 				F96D3EB708F272A7004A47F5 /* ToUpper.3 */,
@@ -3195,6 +3291,7 @@
 				F96D3EB908F272A7004A47F5 /* TraceCmd.3 */,
 				F96D3EBA08F272A7004A47F5 /* TraceVar.3 */,
 				F96D3EBB08F272A7004A47F5 /* Translate.3 */,
+				F9183E650EFC80D70030B814 /* try.n */,
 				F96D3EBC08F272A7004A47F5 /* UniCharIsAlpha.3 */,
 				F96D3EBD08F272A7004A47F5 /* unknown.n */,
 				F96D3EBE08F272A7004A47F5 /* unload.n */,
@@ -3208,6 +3305,7 @@
 				F96D3EC608F272A7004A47F5 /* vwait.n */,
 				F96D3EC708F272A7004A47F5 /* while.n */,
 				F96D3EC808F272A7004A47F5 /* WrongNumArgs.3 */,
+				F915432D0EF201EE0032D1E8 /* zlib.n */,
 			);
 			path = doc;
 			sourceTree = "<group>";
@@ -3273,6 +3371,7 @@
 				F96D3F0008F272A7004A47F5 /* tclIOCmd.c */,
 				F96D3F0108F272A7004A47F5 /* tclIOGT.c */,
 				F96D3F0208F272A7004A47F5 /* tclIORChan.c */,
+				F95D77E90DFD820D00A8BF6F /* tclIORTrans.c */,
 				F96D3F0308F272A7004A47F5 /* tclIOSock.c */,
 				F96D3F0408F272A7004A47F5 /* tclIOUtil.c */,
 				F96D3F0508F272A7004A47F5 /* tclLink.c */,
@@ -3284,6 +3383,19 @@
 				F96D3F0B08F272A7004A47F5 /* tclNamesp.c */,
 				F96D3F0C08F272A7004A47F5 /* tclNotify.c */,
 				F96D3F0D08F272A7004A47F5 /* tclObj.c */,
+				F93599B20DF1F75400E04F67 /* tclOO.c */,
+				F93599B40DF1F75900E04F67 /* tclOO.decls */,
+				F93599B50DF1F75D00E04F67 /* tclOO.h */,
+				F93599B60DF1F76100E04F67 /* tclOOBasic.c */,
+				F93599B80DF1F76600E04F67 /* tclOOCall.c */,
+				F93599BA0DF1F76A00E04F67 /* tclOODecls.h */,
+				F93599BB0DF1F77000E04F67 /* tclOODefineCmds.c */,
+				F93599BD0DF1F77400E04F67 /* tclOOInfo.c */,
+				F93599BF0DF1F77900E04F67 /* tclOOInt.h */,
+				F93599C00DF1F77D00E04F67 /* tclOOIntDecls.h */,
+				F93599C10DF1F78300E04F67 /* tclOOMethod.c */,
+				F93599C30DF1F78800E04F67 /* tclOOStubInit.c */,
+				F93599C50DF1F78D00E04F67 /* tclOOStubLib.c */,
 				F96D3F0E08F272A7004A47F5 /* tclPanic.c */,
 				F96D3F0F08F272A7004A47F5 /* tclParse.c */,
 				F96D3F1108F272A7004A47F5 /* tclPathObj.c */,
@@ -3322,6 +3434,7 @@
 				F96D3F3408F272A7004A47F5 /* tclUtf.c */,
 				F96D3F3508F272A7004A47F5 /* tclUtil.c */,
 				F96D3F3608F272A7004A47F5 /* tclVar.c */,
+				F96437C90EF0D4B2003F468E /* tclZlib.c */,
 				F96D3F3708F272A7004A47F5 /* tommath.h */,
 			);
 			path = generic;
@@ -3622,7 +3735,6 @@
 				F96D437B08F272B6004A47F5 /* io.test */,
 				F96D437C08F272B6004A47F5 /* ioCmd.test */,
 				F96D437D08F272B6004A47F5 /* iogt.test */,
-				F96D437E08F272B6004A47F5 /* ioUtil.test */,
 				F96D437F08F272B6004A47F5 /* join.test */,
 				F96D438008F272B6004A47F5 /* lindex.test */,
 				F96D438108F272B6004A47F5 /* link.test */,
@@ -3646,7 +3758,9 @@
 				F96D439108F272B6004A47F5 /* namespace-old.test */,
 				F96D439208F272B7004A47F5 /* namespace.test */,
 				F96D439308F272B7004A47F5 /* notify.test */,
+				F91DC23C0E44C51B002CB8D1 /* nre.test */,
 				F96D439408F272B7004A47F5 /* obj.test */,
+				F93599C80DF1F81900E04F67 /* oo.test */,
 				F96D439508F272B7004A47F5 /* opt.test */,
 				F96D439608F272B7004A47F5 /* package.test */,
 				F96D439708F272B7004A47F5 /* parse.test */,
@@ -3692,6 +3806,7 @@
 				F96D43BF08F272B7004A47F5 /* unixNotfy.test */,
 				F96D43C008F272B7004A47F5 /* unknown.test */,
 				F96D43C108F272B7004A47F5 /* unload.test */,
+				F91DC23D0E44C530002CB8D1 /* unsupported.test */,
 				F96D43C208F272B7004A47F5 /* uplevel.test */,
 				F96D43C308F272B7004A47F5 /* upvar.test */,
 				F96D43C408F272B7004A47F5 /* utf.test */,
@@ -3706,6 +3821,7 @@
 				F96D43CD08F272B7004A47F5 /* winNotify.test */,
 				F96D43CE08F272B7004A47F5 /* winPipe.test */,
 				F96D43CF08F272B7004A47F5 /* winTime.test */,
+				F915432A0EF201CF0032D1E8 /* zlib.test */,
 			);
 			path = tests;
 			sourceTree = "<group>";
@@ -3738,6 +3854,8 @@
 				F96D443708F272B9004A47F5 /* tclmin.wse */,
 				F96D443908F272B9004A47F5 /* tcltk-man2html.tcl */,
 				F96D443A08F272B9004A47F5 /* tclZIC.tcl */,
+				F92D7F140DE777670033A13A /* tsdPerf.c */,
+				F92D7F100DE777240033A13A /* tsdPerf.tcl */,
 				F96D443B08F272B9004A47F5 /* uniClass.tcl */,
 				F96D443C08F272B9004A47F5 /* uniParse.tcl */,
 			);
@@ -4113,6 +4231,7 @@
 				F96D459F08F272BC004A47F5 /* tclIOCmd.c in Sources */,
 				F96D45A008F272BC004A47F5 /* tclIOGT.c in Sources */,
 				F96D45A108F272BC004A47F5 /* tclIORChan.c in Sources */,
+				F95D77EA0DFD820D00A8BF6F /* tclIORTrans.c in Sources */,
 				F96D45A208F272BC004A47F5 /* tclIOSock.c in Sources */,
 				F96D45A308F272BC004A47F5 /* tclIOUtil.c in Sources */,
 				F96D45A408F272BC004A47F5 /* tclLink.c in Sources */,
@@ -4123,6 +4242,14 @@
 				F96D45AA08F272BC004A47F5 /* tclNamesp.c in Sources */,
 				F96D45AB08F272BC004A47F5 /* tclNotify.c in Sources */,
 				F96D45AC08F272BC004A47F5 /* tclObj.c in Sources */,
+				F93599B30DF1F75400E04F67 /* tclOO.c in Sources */,
+				F93599B70DF1F76100E04F67 /* tclOOBasic.c in Sources */,
+				F93599B90DF1F76600E04F67 /* tclOOCall.c in Sources */,
+				F93599BC0DF1F77000E04F67 /* tclOODefineCmds.c in Sources */,
+				F93599BE0DF1F77400E04F67 /* tclOOInfo.c in Sources */,
+				F93599C20DF1F78300E04F67 /* tclOOMethod.c in Sources */,
+				F93599C40DF1F78800E04F67 /* tclOOStubInit.c in Sources */,
+				F93599C60DF1F78D00E04F67 /* tclOOStubLib.c in Sources */,
 				F96D45AD08F272BC004A47F5 /* tclPanic.c in Sources */,
 				F96D45AE08F272BC004A47F5 /* tclParse.c in Sources */,
 				F96D45B008F272BC004A47F5 /* tclPathObj.c in Sources */,
@@ -4150,6 +4277,7 @@
 				F96D45D308F272BC004A47F5 /* tclUtf.c in Sources */,
 				F96D45D408F272BC004A47F5 /* tclUtil.c in Sources */,
 				F96D45D508F272BC004A47F5 /* tclVar.c in Sources */,
+				F96437CA0EF0D4B2003F468E /* tclZlib.c in Sources */,
 				F96D48E208F272C3004A47F5 /* bn_fast_s_mp_mul_digs.c in Sources */,
 				F96D48E408F272C3004A47F5 /* bn_fast_s_mp_sqr.c in Sources */,
 				F96D48E708F272C3004A47F5 /* bn_mp_add.c in Sources */,
@@ -4232,6 +4360,7 @@
 				F966BDD208F27A3F005CB29B /* tkAtom.c in Sources */,
 				F966BDD308F27A3F005CB29B /* tkBind.c in Sources */,
 				F966BDD408F27A3F005CB29B /* tkBitmap.c in Sources */,
+				F9152B090EAF8A5000CD5C7B /* tkBusy.c in Sources */,
 				F966BDD508F27A3F005CB29B /* tkButton.c in Sources */,
 				F966BDD708F27A3F005CB29B /* tkCanvArc.c in Sources */,
 				F966BDD808F27A3F005CB29B /* tkCanvas.c in Sources */,
@@ -4264,6 +4393,7 @@
 				F966BDFA08F27A3F005CB29B /* tkImage.c in Sources */,
 				F966BDFB08F27A3F005CB29B /* tkImgBmap.c in Sources */,
 				F966BDFC08F27A3F005CB29B /* tkImgGIF.c in Sources */,
+				F92EE8BF0E62F846001A6E80 /* tkImgPhInstance.c in Sources */,
 				F966BDFD08F27A3F005CB29B /* tkImgPhoto.c in Sources */,
 				F966BDFE08F27A3F005CB29B /* tkImgPPM.c in Sources */,
 				F966BE0708F27A3F005CB29B /* tkListbox.c in Sources */,
@@ -4415,6 +4545,7 @@
 				F9FD30DB0CC1AD070073837D /* tclIOCmd.c in Sources */,
 				F9FD30DC0CC1AD070073837D /* tclIOGT.c in Sources */,
 				F9FD30DD0CC1AD070073837D /* tclIORChan.c in Sources */,
+				F9FFAF1D0DFDDB26007F8A6A /* tclIORTrans.c in Sources */,
 				F9FD30DE0CC1AD070073837D /* tclIOSock.c in Sources */,
 				F9FD30DF0CC1AD070073837D /* tclIOUtil.c in Sources */,
 				F9FD30E00CC1AD070073837D /* tclLink.c in Sources */,
@@ -4425,6 +4556,14 @@
 				F9FD30E50CC1AD070073837D /* tclNamesp.c in Sources */,
 				F9FD30E60CC1AD070073837D /* tclNotify.c in Sources */,
 				F9FD30E70CC1AD070073837D /* tclObj.c in Sources */,
+				F9FFAF1F0DFDDB2F007F8A6A /* tclOO.c in Sources */,
+				F9FFAF200DFDDB32007F8A6A /* tclOOBasic.c in Sources */,
+				F9FFAF210DFDDB32007F8A6A /* tclOOCall.c in Sources */,
+				F9FFAF220DFDDB34007F8A6A /* tclOODefineCmds.c in Sources */,
+				F9FFAF230DFDDB35007F8A6A /* tclOOInfo.c in Sources */,
+				F9FFAF240DFDDB36007F8A6A /* tclOOMethod.c in Sources */,
+				F9FFAF250DFDDB37007F8A6A /* tclOOStubInit.c in Sources */,
+				F9FFAF260DFDDB38007F8A6A /* tclOOStubLib.c in Sources */,
 				F9FD30E80CC1AD070073837D /* tclPanic.c in Sources */,
 				F9FD30E90CC1AD070073837D /* tclParse.c in Sources */,
 				F9FD30EA0CC1AD070073837D /* tclPathObj.c in Sources */,
@@ -4452,6 +4591,7 @@
 				F9FD31000CC1AD070073837D /* tclUtf.c in Sources */,
 				F9FD31010CC1AD070073837D /* tclUtil.c in Sources */,
 				F9FD31020CC1AD070073837D /* tclVar.c in Sources */,
+				F96437CB0EF0D4B2003F468E /* tclZlib.c in Sources */,
 				F9FD31030CC1AD070073837D /* bn_fast_s_mp_mul_digs.c in Sources */,
 				F9FD31040CC1AD070073837D /* bn_fast_s_mp_sqr.c in Sources */,
 				F9FD31050CC1AD070073837D /* bn_mp_add.c in Sources */,
@@ -4534,6 +4674,7 @@
 				F9FD31510CC1AD070073837D /* tkAtom.c in Sources */,
 				F9FD31520CC1AD070073837D /* tkBind.c in Sources */,
 				F9FD31530CC1AD070073837D /* tkBitmap.c in Sources */,
+				F9152B0A0EAF8A5700CD5C7B /* tkBusy.c in Sources */,
 				F9FD31540CC1AD070073837D /* tkButton.c in Sources */,
 				F9FD31550CC1AD070073837D /* tkCanvArc.c in Sources */,
 				F9FD31560CC1AD070073837D /* tkCanvas.c in Sources */,
@@ -4566,6 +4707,7 @@
 				F9FD31710CC1AD070073837D /* tkImage.c in Sources */,
 				F9FD31720CC1AD070073837D /* tkImgBmap.c in Sources */,
 				F9FD31730CC1AD070073837D /* tkImgGIF.c in Sources */,
+				F92EE8D30E62F939001A6E80 /* tkImgPhInstance.c in Sources */,
 				F9FD31740CC1AD070073837D /* tkImgPhoto.c in Sources */,
 				F9FD31750CC1AD070073837D /* tkImgPPM.c in Sources */,
 				F9FD31760CC1AD070073837D /* tkListbox.c in Sources */,

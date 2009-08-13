@@ -1,4 +1,4 @@
-/* $Id: ttkNotebook.c,v 1.13 2008/01/28 00:36:08 jenglish Exp $
+/* $Id: ttkNotebook.c,v 1.16 2008/11/09 23:53:09 jenglish Exp $
  * Copyright (c) 2004, Joe English
  */
 
@@ -208,7 +208,7 @@ static void DestroyTab(Notebook *nb, Tab *tab)
 
 static int ConfigureTab(
     Tcl_Interp *interp, Notebook *nb, Tab *tab, Tk_Window slaveWindow,
-    int objc, Tcl_Obj *CONST objv[])
+    int objc, Tcl_Obj *const objv[])
 {
     Ttk_Sticky sticky = tab->sticky;
     Ttk_Padding padding = tab->padding;
@@ -854,7 +854,7 @@ static int GetTabIndex(
 /* $nb add window ?options ... ?
  */
 static int NotebookAddCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     int index = Ttk_NumberSlaves(nb->notebook.mgr);
@@ -863,7 +863,7 @@ static int NotebookAddCommand(
     Tab *tab;
 
     if (objc <= 2 || objc % 2 != 1) {
-	Tcl_WrongNumArgs(interp, 2, objv, "window ?options...?");
+	Tcl_WrongNumArgs(interp, 2, objv, "window ?-option value ...?");
 	return TCL_ERROR;
     }
 
@@ -890,7 +890,7 @@ static int NotebookAddCommand(
     return TCL_OK;
 }
 
-/* $nb insert $index $tab ?options...?
+/* $nb insert $index $tab ?-option value ...?
  * 	Insert new tab, or move existing one.
  */
 static int NotebookInsertCommand(
@@ -902,7 +902,7 @@ static int NotebookInsertCommand(
     int srcIndex, destIndex;
 
     if (objc < 4) {
-	Tcl_WrongNumArgs(interp, 2,objv, "index slave ?options...?");
+	Tcl_WrongNumArgs(interp, 2,objv, "index slave ?-option value ...?");
 	return TCL_ERROR;
     }
 
@@ -968,7 +968,7 @@ static int NotebookInsertCommand(
  * 	Removes the specified tab.
  */
 static int NotebookForgetCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     int index;
@@ -992,7 +992,7 @@ static int NotebookForgetCommand(
  * 	Hides the specified tab.
  */
 static int NotebookHideCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     int index;
@@ -1022,7 +1022,7 @@ static int NotebookHideCommand(
  * 	Returns name of tab element at $x,$y; empty string if none.
  */
 static int NotebookIdentifyCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     Ttk_LayoutNode *node = NULL;
@@ -1065,7 +1065,7 @@ static int NotebookIdentifyCommand(
  *	See above for valid item formats.
  */
 static int NotebookIndexCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     int index, status;
@@ -1097,7 +1097,7 @@ static int NotebookIndexCommand(
  * 	the currently-selected pane.
  */
 static int NotebookSelectCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
 
@@ -1123,7 +1123,7 @@ static int NotebookSelectCommand(
  * 	Return list of tabs.
  */
 static int NotebookTabsCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     Ttk_Manager *mgr = nb->notebook.mgr;
@@ -1148,7 +1148,7 @@ static int NotebookTabsCommand(
 /* $nb tab $tab ?-option ?value -option value...??
  */
 static int NotebookTabCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj * CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Notebook *nb = recordPtr;
     Ttk_Manager *mgr = nb->notebook.mgr;
@@ -1214,7 +1214,7 @@ static WidgetCommandSpec NotebookCommands[] =
  * +++ Widget class hooks.
  */
 
-static int NotebookInitialize(Tcl_Interp *interp, void *recordPtr)
+static void NotebookInitialize(Tcl_Interp *interp, void *recordPtr)
 {
     Notebook *nb = recordPtr;
 
@@ -1232,8 +1232,6 @@ static int NotebookInitialize(Tcl_Interp *interp, void *recordPtr)
 
     Tk_CreateEventHandler(
 	nb->core.tkwin, NotebookEventMask, NotebookEventHandler, recordPtr);
-
-    return TCL_OK;
 }
 
 static void NotebookCleanup(void *recordPtr)
@@ -1370,7 +1368,7 @@ TTK_END_LAYOUT
  * +++ Initialization.
  */
 
-MODULE_SCOPE 
+MODULE_SCOPE
 void TtkNotebook_Init(Tcl_Interp *interp)
 {
     Ttk_Theme themePtr = Ttk_GetDefaultTheme(interp);

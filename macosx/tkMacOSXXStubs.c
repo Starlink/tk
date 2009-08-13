@@ -13,7 +13,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXXStubs.c,v 1.25.2.2 2008/06/12 06:36:07 das Exp $
+ * RCS: @(#) $Id: tkMacOSXXStubs.c,v 1.31 2008/12/20 01:33:09 das Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -139,7 +139,7 @@ TkMacOSXDisplayChanged(
 
 TkDisplay *
 TkpOpenDisplay(
-    CONST char *display_name)
+    const char *display_name)
 {
     Display *display;
     Screen *screen;
@@ -171,7 +171,7 @@ TkpOpenDisplay(
     Gestalt(gestaltQuickdrawVersion, (long *) &display->proto_minor_version);
     display->proto_major_version = 10;
     display->proto_minor_version -= gestaltMacOSXQD;
-    display->vendor = "Apple";
+    display->vendor = (char*) "Apple";
     Gestalt(gestaltSystemVersion, (long *) &display->release);
 
     /*
@@ -318,33 +318,6 @@ MacXIdAlloc(
      */
 
     return ++cur_id;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkpWindowWasRecentlyDeleted --
- *
- *	Tries to determine whether the given window was recently deleted.
- *	Called from the generic code error handler to attempt to deal with
- *	async BadWindow errors under some circumstances.
- *
- * Results:
- *	Always 0, we do not keep this information on the Mac, so we do not
- *	know whether the window was destroyed.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TkpWindowWasRecentlyDeleted(
-    Window win,
-    TkDisplay *dispPtr)
-{
-    return 0;
 }
 
 /*
@@ -653,7 +626,8 @@ XGetWindowProperty(
 }
 
 void
-XRefreshKeyboardMapping( XMappingEvent* x)
+XRefreshKeyboardMapping(
+    XMappingEvent *x)
 {
     /* used by tkXEvent.c */
     Debugger();
@@ -1104,24 +1078,24 @@ AddPixel(
 
 void
 XChangeWindowAttributes(
-    Display* display,
+    Display *display,
     Window w,
     unsigned long value_mask,
-    XSetWindowAttributes* attributes)
+    XSetWindowAttributes *attributes)
 {
 }
 
 void
 XSetWindowBackground(
-	Display *display,
-	Window window,
-	unsigned long value)
+    Display *display,
+    Window window,
+    unsigned long value)
 {
 }
 
 void
 XSetWindowBackgroundPixmap(
-    Display* display,
+    Display *display,
     Window w,
     Pixmap background_pixmap)
 {
@@ -1129,7 +1103,7 @@ XSetWindowBackgroundPixmap(
 
 void
 XSetWindowBorder(
-    Display* display,
+    Display *display,
     Window w,
     unsigned long border_pixel)
 {
@@ -1137,7 +1111,7 @@ XSetWindowBorder(
 
 void
 XSetWindowBorderPixmap(
-    Display* display,
+    Display *display,
     Window w,
     Pixmap border_pixmap)
 {
@@ -1145,7 +1119,7 @@ XSetWindowBorderPixmap(
 
 void
 XSetWindowBorderWidth(
-    Display* display,
+    Display *display,
     Window w,
     unsigned int width)
 {
@@ -1153,7 +1127,7 @@ XSetWindowBorderWidth(
 
 void
 XSetWindowColormap(
-    Display* display,
+    Display *display,
     Window w,
     Colormap colormap)
 {
@@ -1162,24 +1136,25 @@ XSetWindowColormap(
 
 Status
 XStringListToTextProperty(
-    char** list,
+    char **list,
     int count,
-    XTextProperty* text_prop_return)
+    XTextProperty *text_prop_return)
 {
     Debugger();
     return (Status) 0;
 }
+
 void
 XSetWMClientMachine(
-    Display* display,
+    Display *display,
     Window w,
-    XTextProperty* text_prop)
+    XTextProperty *text_prop)
 {
     Debugger();
 }
+
 XIC
-XCreateIC(
-    void)
+XCreateIC(void)
 {
     Debugger();
     return (XIC) 0;
@@ -1202,10 +1177,10 @@ XCreateIC(
  *----------------------------------------------------------------------
  */
 
-CONST char *
+const char *
 TkGetDefaultScreenName(
     Tcl_Interp *interp,		/* Not used. */
-    CONST char *screenName)		/* If NULL, use default string. */
+    const char *screenName)		/* If NULL, use default string. */
 {
 #if 0
     if ((screenName == NULL) || (screenName[0] == '\0')) {

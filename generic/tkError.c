@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkError.c,v 1.6 2007/12/13 15:24:14 dgp Exp $
+ * RCS: @(#) $Id: tkError.c,v 1.8 2008/11/08 18:44:39 dkf Exp $
  */
 
 #include "tkInt.h"
@@ -248,8 +248,8 @@ ErrorProc(
 		    && (errorPtr->lastRequest < errEventPtr->serial))) {
 	    continue;
 	}
-	if (errorPtr->errorProc == NULL || (*errorPtr->errorProc)(
-		errorPtr->clientData, errEventPtr) == 0) {
+	if (errorPtr->errorProc == NULL ||
+		errorPtr->errorProc(errorPtr->clientData, errEventPtr) == 0) {
 	    return 0;
 	}
     }
@@ -271,8 +271,7 @@ ErrorProc(
     if (errEventPtr->error_code == BadWindow) {
 	Window w = (Window) errEventPtr->resourceid;
 
-	if (Tk_IdToWindow(display, w) != NULL
-		|| TkpWindowWasRecentlyDeleted(w, dispPtr)) {
+	if (Tk_IdToWindow(display, w) != NULL) {
 	    return 0;
 	}
     }
@@ -282,7 +281,7 @@ ErrorProc(
      */
 
   couldntHandle:
-    return (*defaultHandler)(display, errEventPtr);
+    return defaultHandler(display, errEventPtr);
 }
 
 /*

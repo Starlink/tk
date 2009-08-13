@@ -1,7 +1,7 @@
 Tcl/Tk Mac OS X README
 ----------------------
 
-RCS: @(#) $Id: README,v 1.27.2.1 2008/06/12 06:35:03 das Exp $
+RCS: @(#) $Id: README,v 1.29 2008/06/12 06:31:10 das Exp $
 
 This is the README file for the Mac OS X/Darwin version of Tcl/Tk.
 

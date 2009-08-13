@@ -5,7 +5,7 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: tkerror.n,v 1.2 1998/09/14 18:23:00 stanton Exp $
+'\" RCS: @(#) $Id: tkerror.n,v 1.5 2008/09/23 13:36:55 dkf Exp $
 '\" 
 .so man.macros
 .TH tkerror n 4.1 Tk "Tk Built-In Commands"
@@ -16,7 +16,6 @@ tkerror \- Command invoked to process background errors
 .SH SYNOPSIS
 \fBtkerror \fImessage\fR
 .BE
-
 .SH DESCRIPTION
 .PP
 Note: as of Tk 4.1 the \fBtkerror\fR command has been renamed to
@@ -33,6 +32,8 @@ to the user. If you want your own error management you should
 directly override \fBbgerror\fR instead of \fBtkerror\fR.
 Documentation for \fBbgerror\fR is available as part of Tcl's
 documentation.
-
 .SH KEYWORDS
 background error, reporting
+'\" Local Variables:
+'\" mode: nroff
+'\" End:

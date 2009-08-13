@@ -5,12 +5,12 @@
  *
  * Copyright (c) 1996-1997 Sun Microsystems, Inc.
  * Copyright 2001, Apple Computer, Inc.
- * Copyright (c) 2006-2007 Daniel A. Steffen <das@users.sourceforge.net>
+ * Copyright (c) 2006-2008 Daniel A. Steffen <das@users.sourceforge.net>
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkMacOSXDialog.c,v 1.36.2.5 2008/12/07 16:57:44 das Exp $
+ * RCS: @(#) $Id: tkMacOSXDialog.c,v 1.43 2008/12/10 05:02:52 das Exp $
  */
 
 #include "tkMacOSXPrivate.h"
@@ -105,7 +105,7 @@ static int fileDlgInited = 0;
 
 static NavObjectFilterUPP openFileFilterUPP;
 static NavEventUPP openFileEventUPP;
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -128,18 +128,17 @@ Tk_ChooseColorObjCmd(
     ClientData clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
-    Tcl_Obj *CONST objv[])	/* Argument objects. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     OSStatus err;
     int result = TCL_ERROR;
     Tk_Window parent, tkwin = clientData;
     const char *title;
     int i, srcRead, dstWrote;
-    CMError cmerr;
     CMProfileRef prof;
     NColorPickerInfo cpinfo;
     static RGBColor color = {0xffff, 0xffff, 0xffff};
-    static const char *optionStrings[] = {
+    static const char *const optionStrings[] = {
 	"-initialcolor", "-parent", "-title", NULL
     };
     enum options {
@@ -196,7 +195,7 @@ Tk_ChooseColorObjCmd(
 	}
     }
 
-    cmerr = CMGetDefaultProfileBySpace(cmRGBData, &prof);
+    ChkErr(CMGetDefaultProfileBySpace, cmRGBData, &prof);
     cpinfo.theColor.profile = prof;
     cpinfo.dstProfile = prof;
     cpinfo.flags = kColorPickerDialogIsMoveable | kColorPickerDialogIsModal;
@@ -209,7 +208,7 @@ Tk_ChooseColorObjCmd(
     TkMacOSXTrackingLoop(1);
     err = ChkErr(NPickColor, &cpinfo);
     TkMacOSXTrackingLoop(0);
-    cmerr = CMCloseProfile(prof);
+    ChkErr(CMCloseProfile, prof);
     if ((err == noErr) && (cpinfo.newColorChosen != 0)) {
 	char colorstr[8];
 
@@ -227,7 +226,7 @@ Tk_ChooseColorObjCmd(
   end:
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -249,7 +248,7 @@ Tk_GetOpenFileObjCmd(
     ClientData clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
-    Tcl_Obj *CONST objv[])	/* Argument objects. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     int i, result = TCL_ERROR, multiple = 0;
     OpenFileData ofd;
@@ -262,7 +261,7 @@ Tk_GetOpenFileObjCmd(
     char *initialFile = NULL, *initialDir = NULL;
     Tcl_Obj *typeVariablePtr = NULL;
     const char *initialtype = NULL;
-    static const char *openOptionStrings[] = {
+    static const char *const openOptionStrings[] = {
 	"-defaultextension", "-filetypes", "-initialdir", "-initialfile",
 	"-message", "-multiple", "-parent", "-title", "-typevariable", NULL
     };
@@ -396,7 +395,7 @@ Tk_GetOpenFileObjCmd(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -417,7 +416,7 @@ Tk_GetSaveFileObjCmd(
     ClientData clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
-    Tcl_Obj *CONST objv[])	/* Argument objects. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     int i, result = TCL_ERROR;
     char *initialFile = NULL;
@@ -427,7 +426,7 @@ Tk_GetSaveFileObjCmd(
     FSRef dirRef;
     CFStringRef title = NULL, message = NULL;
     OpenFileData ofd;
-    static const char *saveOptionStrings[] = {
+    static const char *const saveOptionStrings[] = {
 	"-defaultextension", "-filetypes", "-initialdir", "-initialfile",
 	"-message", "-parent", "-title", "-typevariable", NULL
     };
@@ -527,7 +526,7 @@ Tk_GetSaveFileObjCmd(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -551,7 +550,7 @@ Tk_ChooseDirectoryObjCmd(
     ClientData clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
-    Tcl_Obj *CONST objv[])	/* Argument objects. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     int i, result = TCL_ERROR;
     Tk_Window parent = NULL;
@@ -559,7 +558,7 @@ Tk_ChooseDirectoryObjCmd(
     FSRef dirRef;
     CFStringRef message = NULL, title = NULL;
     OpenFileData ofd;
-    static const char *chooseOptionStrings[] = {
+    static const char *const chooseOptionStrings[] = {
 	"-initialdir", "-message", "-mustexist", "-parent", "-title", NULL
     };
     enum chooseOptions {
@@ -639,7 +638,7 @@ Tk_ChooseDirectoryObjCmd(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -724,7 +723,7 @@ HandleInitialDirectory(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -748,7 +747,7 @@ InitFileDialogs(void)
     openFileFilterUPP = NewNavObjectFilterUPP(OpenFileFilterProc);
     openFileEventUPP = NewNavEventUPP(OpenEventProc);
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1029,7 +1028,7 @@ NavServicesGetFile(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1114,7 +1113,7 @@ OpenEventProc(
 	    break;
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1211,7 +1210,7 @@ OpenFileFilterProc(
     }
     return (result == MATCHED);
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1328,7 +1327,7 @@ MatchOneType(
 
     return UNMATCHED;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1367,7 +1366,7 @@ TkAboutDlg(void)
     DisposeDialog(aboutDlog);
     SelectWindow(ActiveNonFloatingWindow());
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1389,7 +1388,7 @@ Tk_MessageBoxObjCmd(
     ClientData clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
-    Tcl_Obj *CONST objv[])	/* Argument objects. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = clientData;
     AlertStdCFStringAlertParamRec paramCFStringRec;
@@ -1404,18 +1403,18 @@ Tk_MessageBoxObjCmd(
     int defaultNativeButtonIndex; /* 1, 2, 3: right to left */
     int typeIndex, i, indexDefaultOption = 0, result = TCL_ERROR;
 
-    static const char *movableAlertStrings[] = {
+    static const char *const movableAlertStrings[] = {
 	"-default", "-detail", "-icon", "-message", "-parent", "-title",
 	"-type", NULL
     };
-    static const char *movableTypeStrings[] = {
+    static const char *const movableTypeStrings[] = {
 	"abortretryignore", "ok", "okcancel", "retrycancel", "yesno",
 	"yesnocancel", NULL
     };
-    static const char *movableButtonStrings[] = {
+    static const char *const movableButtonStrings[] = {
 	"abort", "retry", "ignore", "ok", "cancel", "yes", "no", NULL
     };
-    static const char *movableIconStrings[] = {
+    static const char *const movableIconStrings[] = {
 	"error", "info", "question", "warning", NULL
     };
     enum movableAlertOptions {
@@ -1552,6 +1551,7 @@ Tk_MessageBoxObjCmd(
 	    break;
 
 	case ALERT_TITLE:
+	    /* TODO: message box title missing? */
 	    break;
 
 	case ALERT_TYPE:
@@ -1598,7 +1598,6 @@ Tk_MessageBoxObjCmd(
 	 * we do this here.
 	 */
 
-	str = Tcl_GetString(objv[indexDefaultOption + 1]);
 	if (Tcl_GetIndexFromObj(interp, objv[indexDefaultOption + 1],
 		movableButtonStrings, "value", TCL_EXACT, &defaultButtonIndex)
 		!= TCL_OK) {
@@ -1695,7 +1694,7 @@ Tk_MessageBoxObjCmd(
     }
     return result;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1742,3 +1741,566 @@ AlertHandler(
     }
     return eventNotHandledErr;
 }
+
+/*
+ *----------------------------------------------------------------------
+ */
+#pragma mark [tk fontchooser] implementation (TIP 324)
+/*
+ *----------------------------------------------------------------------
+ */
+
+#include "tkMacOSXEvent.h"
+#include "tkMacOSXFont.h"
+
+typedef struct FontchooserData {
+    Tcl_Obj *titleObj;
+    Tcl_Obj *cmdObj;
+    Tk_Window parent;
+} FontchooserData;
+
+static Tcl_Obj *FontchooserCget(FontchooserData *fcdPtr, int optionIndex);
+static int FontchooserConfigureCmd(ClientData clientData, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int FontchooserShowCmd(ClientData clientData, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static int FontchooserHideCmd(ClientData clientData, Tcl_Interp *interp,
+	int objc, Tcl_Obj *const objv[]);
+static void FontchooserParentEventHandler(ClientData clientData,
+	XEvent *eventPtr);
+static void DeleteFontchooserData(ClientData clientData, Tcl_Interp *interp);
+
+MODULE_SCOPE const TkEnsemble tkFontchooserEnsemble[];
+const TkEnsemble tkFontchooserEnsemble[] = {
+    { "configure", FontchooserConfigureCmd },
+    { "show", FontchooserShowCmd },
+    { "hide", FontchooserHideCmd },
+};
+
+static Tcl_Interp *fontchooserInterp = NULL;
+static FMFontFamily fontPanelFontFamily = kInvalidFontFamily;
+static FMFontStyle fontPanelFontStyle = -1;
+static FMFontSize fontPanelFontSize = 0;
+static FMFont fontPanelFontID = kInvalidFont;
+
+static const char *fontchooserOptionStrings[] = {
+    "-parent", "-title", "-font", "-command",
+    "-visible", NULL
+};
+enum FontchooserOption {
+    FontchooserParent, FontchooserTitle, FontchooserFont, FontchooserCmd,
+    FontchooserVisible
+};
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXProcessFontEvent --
+ *
+ *	This processes events generated by user interaction with the
+ *	font panel.
+ *
+ * Results:
+ *	True if Tk events are generated - false otherwise.
+ *
+ * Side effects:
+ *	Additional events may be place on the Tk event queue.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE int
+TkMacOSXProcessFontEvent(
+    TkMacOSXEvent * eventPtr,
+    MacEventStatus * statusPtr)
+{
+    OSStatus err;
+    int eventGenerated = 0;
+    FontchooserData *fcdPtr;
+
+    switch (eventPtr->eKind) {
+	case kEventFontPanelClosed:
+	case kEventFontSelection:
+	    break;
+	default:
+	    goto done;
+    }
+    if (!fontchooserInterp) {
+	goto done;
+    }
+    fcdPtr = Tcl_GetAssocData(fontchooserInterp, "::tk::fontchooser", NULL);
+    switch (eventPtr->eKind) {
+	case kEventFontPanelClosed:
+	    if (!FPIsFontPanelVisible() && fcdPtr->parent != None) {
+		TkSendVirtualEvent(fcdPtr->parent, "TkFontchooserVisibility");
+		fontchooserInterp = NULL;
+		eventGenerated = 1;
+	    }
+	    break;
+	case kEventFontSelection: {
+	    Tcl_Obj *fontObj = NULL;
+
+	    fontPanelFontFamily = kInvalidFontFamily;
+	    fontPanelFontStyle = -1;
+	    fontPanelFontSize = 0;
+	    fontPanelFontID = kInvalidFont;
+	    err = ChkErr(GetEventParameter, eventPtr->eventRef,
+		    kEventParamFMFontFamily, typeFMFontFamily, NULL,
+		    sizeof(FMFontFamily), NULL, &fontPanelFontFamily);
+	    err |= ChkErr(GetEventParameter, eventPtr->eventRef,
+		    kEventParamFMFontStyle, typeFMFontStyle, NULL,
+		    sizeof(FMFontStyle), NULL, &fontPanelFontStyle);
+	    err |= ChkErr(GetEventParameter, eventPtr->eventRef,
+		    kEventParamFMFontSize, typeFMFontSize, NULL,
+		    sizeof(FMFontSize), NULL, &fontPanelFontSize);
+	    if (err != noErr) {
+		/*
+		 * No/incomplete QD font spec, use ATSUI font ID
+		 */
+		Fixed fontFixedSize;
+
+		err = ChkErr(GetEventParameter, eventPtr->eventRef,
+			kEventParamATSUFontID, typeATSUFontID, NULL,
+			sizeof(ATSUFontID), NULL, &fontPanelFontID);
+		if (err == noErr) {
+		    ChkErr(FMGetFontFamilyInstanceFromFont, fontPanelFontID,
+			    &fontPanelFontFamily, &fontPanelFontStyle);
+		}
+		err = ChkErr(GetEventParameter, eventPtr->eventRef,
+			kEventParamATSUFontSize, typeATSUSize, NULL,
+			sizeof(Fixed), NULL, &fontFixedSize);
+		if (err == noErr) {
+		    fontPanelFontSize = FixedToInt(fontFixedSize);
+		}
+	    }
+	    fontObj = TkMacOSXFontDescriptionForFMFontInfo(
+		fontPanelFontFamily, fontPanelFontStyle,
+		fontPanelFontSize, fontPanelFontID);
+	    if (fontObj) {
+		if (fcdPtr->cmdObj) {
+		    int objc, result;
+		    Tcl_Obj **objv, **tmpv;
+
+		    result = Tcl_ListObjGetElements(fontchooserInterp,
+			    fcdPtr->cmdObj, &objc, &objv);
+		    if (result == TCL_OK) {
+			tmpv = (Tcl_Obj **) ckalloc(sizeof(Tcl_Obj *) *
+				(unsigned)(objc + 2));
+			memcpy(tmpv, objv, sizeof(Tcl_Obj *) * objc);
+			tmpv[objc] = fontObj;
+			result = TkBackgroundEvalObjv(fontchooserInterp,
+				objc + 1, tmpv, TCL_EVAL_GLOBAL);
+			ckfree((char *)tmpv);
+		    }
+		}
+		TkSendVirtualEvent(fcdPtr->parent, "TkFontchooserFontChanged");
+	    }
+	    break;
+	}
+    }
+done:
+    return eventGenerated;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * FontchooserCget --
+ *
+ *	Helper for the FontchooserConfigure command to return the
+ *	current value of any of the options (which may be NULL in
+ *	the structure)
+ *
+ * Results:
+ *	Tcl object of option value.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static Tcl_Obj *
+FontchooserCget(
+    FontchooserData *fcdPtr,
+    int optionIndex)
+{
+    Tcl_Obj *resObj = NULL;
+
+    switch(optionIndex) {
+	case FontchooserParent: {
+	    if (fcdPtr->parent != None) {
+		resObj = Tcl_NewStringObj(
+			((TkWindow*)fcdPtr->parent)->pathName, -1);
+	    } else {
+		resObj = Tcl_NewStringObj(".", 1);
+	    }
+	    break;
+	}
+	case FontchooserTitle: {
+	    if (fcdPtr->titleObj) {
+		resObj = fcdPtr->titleObj;
+	    } else {
+		resObj = Tcl_NewObj();
+	    }
+	    break;
+	}
+	case FontchooserFont: {
+	    resObj = TkMacOSXFontDescriptionForFMFontInfo(
+		fontPanelFontFamily, fontPanelFontStyle,
+		fontPanelFontSize, fontPanelFontID);
+	    if (!resObj) {
+		resObj = Tcl_NewObj();
+	    }
+	    break;
+	}
+	case FontchooserCmd: {
+	    if (fcdPtr->cmdObj) {
+		resObj = fcdPtr->cmdObj;
+	    } else {
+		resObj = Tcl_NewObj();
+	    }
+	    break;
+	}
+	case FontchooserVisible: {
+	    resObj = Tcl_NewBooleanObj(FPIsFontPanelVisible());
+	    break;
+	}
+	default: {
+	    resObj = Tcl_NewObj();
+	}
+    }
+    return resObj;
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * FontchooserConfigureCmd --
+ *
+ *	Implementation of the 'tk fontchooser configure' ensemble command.
+ *	See the user documentation for what it does.
+ *
+ * Results:
+ *	See the user documentation.
+ *
+ * Side effects:
+ *	Per-interp data structure may be modified
+ *
+ * ----------------------------------------------------------------------
+ */
+
+static int
+FontchooserConfigureCmd(
+    ClientData clientData,	/* Main window */
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[])
+{
+    Tk_Window tkwin = (Tk_Window)clientData;
+    FontchooserData *fcdPtr = Tcl_GetAssocData(interp, "::tk::fontchooser",
+	    NULL);
+    int i, r = TCL_OK;
+
+    /*
+     * With no arguments we return all the options in a dict
+     */
+
+    if (objc == 1) {
+	Tcl_Obj *keyObj, *valueObj;
+	Tcl_Obj *dictObj = Tcl_NewDictObj();
+	for (i = 0; r == TCL_OK && fontchooserOptionStrings[i] != NULL; ++i) {
+	    keyObj = Tcl_NewStringObj(fontchooserOptionStrings[i], -1);
+	    valueObj = FontchooserCget(fcdPtr, i);
+	    r = Tcl_DictObjPut(interp, dictObj, keyObj, valueObj);
+	}
+	if (r == TCL_OK) {
+	    Tcl_SetObjResult(interp, dictObj);
+	}
+	return r;
+    }
+
+    for (i = 1; i < objc; i += 2) {
+	int optionIndex, len;
+	if (Tcl_GetIndexFromObj(interp, objv[i], fontchooserOptionStrings,
+		"option", 0, &optionIndex) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+	if (objc == 2) {
+	    /* With one option and no arg, return the current value */
+	    Tcl_SetObjResult(interp, FontchooserCget(fcdPtr, optionIndex));
+	    return TCL_OK;
+	}
+	if (i + 1 == objc) {
+	    Tcl_AppendResult(interp, "value for \"",
+		Tcl_GetString(objv[i]), "\" missing", NULL);
+	    return TCL_ERROR;
+	}
+	switch (optionIndex) {
+	    case FontchooserVisible: {
+		const char *msg = "cannot change read-only option "
+		    "\"-visible\": use the show or hide command";
+
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(msg, sizeof(msg)-1));
+		return TCL_ERROR;
+	    }
+	    case FontchooserParent: {
+		Tk_Window parent = Tk_NameToWindow(interp,
+		    Tcl_GetString(objv[i+1]), tkwin);
+		if (parent == None) {
+		    return TCL_ERROR;
+		}
+		if (fcdPtr->parent) {
+		    Tk_DeleteEventHandler(fcdPtr->parent, StructureNotifyMask,
+			    FontchooserParentEventHandler, fcdPtr);
+		}
+		fcdPtr->parent = parent;
+		Tk_CreateEventHandler(fcdPtr->parent, StructureNotifyMask,
+			FontchooserParentEventHandler, fcdPtr);
+		break;
+	    }
+	    case FontchooserTitle:
+		if (fcdPtr->titleObj) {
+		    Tcl_DecrRefCount(fcdPtr->titleObj);
+		}
+		Tcl_GetStringFromObj(objv[i+1], &len);
+		if (len) {
+		    fcdPtr->titleObj = objv[i+1];
+		    if (Tcl_IsShared(fcdPtr->titleObj)) {
+			fcdPtr->titleObj = Tcl_DuplicateObj(fcdPtr->titleObj);
+		    }
+		    Tcl_IncrRefCount(fcdPtr->titleObj);
+		} else {
+		    fcdPtr->titleObj = NULL;
+		}
+		break;
+	    case FontchooserFont: {
+
+		Tcl_GetStringFromObj(objv[i+1], &len);
+		if (len) {
+		    Tk_Font f = Tk_AllocFontFromObj(interp, tkwin, objv[i+1]);
+		    if (f) {
+			ATSUStyle atsuStyle;
+
+			TkMacOSXFMFontInfoForFont(f, &fontPanelFontFamily,
+				 &fontPanelFontStyle, &fontPanelFontSize,
+				 &atsuStyle);
+			ChkErr(SetFontInfoForSelection,
+				kFontSelectionATSUIType, 1, &atsuStyle, NULL);
+			Tk_FreeFont(f);
+		    } else {
+			return TCL_ERROR;
+		    }
+		} else {
+		    fontPanelFontFamily = kInvalidFontFamily;
+		    ChkErr(SetFontInfoForSelection,
+			    kFontSelectionATSUIType, 0, NULL, NULL);
+		}
+		if (FPIsFontPanelVisible()) {
+		    TkSendVirtualEvent(fcdPtr->parent,
+			    "TkFontchooserFontChanged");
+		}
+		break;
+	    }
+	    case FontchooserCmd:
+		if (fcdPtr->cmdObj) {
+		    Tcl_DecrRefCount(fcdPtr->cmdObj);
+		}
+		Tcl_GetStringFromObj(objv[i+1], &len);
+		if (len) {
+		    fcdPtr->cmdObj = objv[i+1];
+		    if (Tcl_IsShared(fcdPtr->cmdObj)) {
+			fcdPtr->cmdObj = Tcl_DuplicateObj(fcdPtr->cmdObj);
+		    }
+		    Tcl_IncrRefCount(fcdPtr->cmdObj);
+		} else {
+		    fcdPtr->cmdObj = NULL;
+		}
+		break;
+	}
+    }
+    return TCL_OK;
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * FontchooserShowCmd --
+ *
+ *	Implements the 'tk fontchooser show' ensemble command. The
+ *	per-interp configuration data for the dialog is held in an interp
+ *	associated structure.
+ *
+ * Results:
+ *	See the user documentation.
+ *
+ * Side effects:
+ *	Font Panel may be shown.
+ *
+ * ----------------------------------------------------------------------
+ */
+
+static int
+FontchooserShowCmd(
+    ClientData clientData,	/* Main window */
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[])
+{
+    FontchooserData *fcdPtr = Tcl_GetAssocData(interp, "::tk::fontchooser",
+	    NULL);
+
+    if (fcdPtr->parent == None) {
+	fcdPtr->parent = (Tk_Window) clientData;
+	Tk_CreateEventHandler(fcdPtr->parent, StructureNotifyMask,
+		FontchooserParentEventHandler, fcdPtr);
+    }
+    if (!FPIsFontPanelVisible()) {
+	ChkErr(FPShowHideFontPanel);
+	TkSendVirtualEvent(fcdPtr->parent, "TkFontchooserVisibility");
+    }
+    fontchooserInterp = interp;
+
+    return TCL_OK;
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * FontchooserHideCmd --
+ *
+ *	Implementation of the 'tk fontchooser hide' ensemble. See the
+ *	user documentation for details.
+ *
+ * Results:
+ *	See the user documentation.
+ *
+ * Side effects:
+ *	Font Panel may be hidden.
+ *
+ * ----------------------------------------------------------------------
+ */
+
+static int
+FontchooserHideCmd(
+    ClientData clientData,	/* Main window */
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[])
+{
+    if (FPIsFontPanelVisible()) {
+	ChkErr(FPShowHideFontPanel);
+    }
+    return TCL_OK;
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * FontchooserParentEventHandler --
+ *
+ *	Event handler for StructureNotify events on the font chooser's
+ *	parent window.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Font chooser parent info is cleared and font panel is hidden.
+ *
+ * ----------------------------------------------------------------------
+ */
+
+static void
+FontchooserParentEventHandler(
+    ClientData clientData,
+    XEvent *eventPtr)
+{
+    FontchooserData *fcdPtr = clientData;
+
+    if (eventPtr->type == DestroyNotify) {
+	Tk_DeleteEventHandler(fcdPtr->parent, StructureNotifyMask,
+		FontchooserParentEventHandler, fcdPtr);
+	fcdPtr->parent = None;
+	if (FPIsFontPanelVisible()) {
+	    ChkErr(FPShowHideFontPanel);
+	}
+    }
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * DeleteFontchooserData --
+ *
+ *	Clean up the font chooser configuration data when the interp
+ *	is destroyed.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	per-interp configuration data is destroyed.
+ *
+ * ----------------------------------------------------------------------
+ */
+
+static void
+DeleteFontchooserData(
+    ClientData clientData,
+    Tcl_Interp *interp)
+{
+    FontchooserData *fcdPtr = clientData;
+
+    if (fcdPtr->titleObj) {
+	Tcl_DecrRefCount(fcdPtr->titleObj);
+    }
+    if (fcdPtr->cmdObj) {
+	Tcl_DecrRefCount(fcdPtr->cmdObj);
+    }
+    ckfree((char *)fcdPtr);
+
+    if (fontchooserInterp == interp) {
+	fontchooserInterp = NULL;
+    }
+}
+
+/*
+ * ----------------------------------------------------------------------
+ *
+ * TkInitFontchooser --
+ *
+ *	Associate the font chooser configuration data with the Tcl
+ *	interpreter. There is one font chooser per interp.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	per-interp configuration data is destroyed.
+ *
+ * ----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE int
+TkInitFontchooser(
+    Tcl_Interp *interp,
+    ClientData clientData)
+{
+    FontchooserData *fcdPtr = (FontchooserData*)
+	    ckalloc(sizeof(FontchooserData));
+
+    bzero(fcdPtr, sizeof(FontchooserData));
+    Tcl_SetAssocData(interp, "::tk::fontchooser", DeleteFontchooserData,
+	    fcdPtr);
+    return TCL_OK;
+}
+
+/*
+ * Local Variables:
+ * mode: c
+ * c-basic-offset: 4
+ * fill-column: 79
+ * coding: utf-8
+ * End:
+ */

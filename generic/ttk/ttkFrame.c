@@ -1,4 +1,4 @@
-/* $Id: ttkFrame.c,v 1.12.2.1 2009/02/06 08:13:23 das Exp $
+/* $Id: ttkFrame.c,v 1.13 2008/11/09 23:53:09 jenglish Exp $
  * Copyright (c) 2004, Joe English
  *
  * ttk::frame and ttk::labelframe widgets.
@@ -515,7 +515,7 @@ static Ttk_ManagerSpec LabelframeManagerSpec = {
 /* LabelframeInitialize --
  * 	Initialization hook.
  */
-static int LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
+static void LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
 {
     Labelframe *lframe = recordPtr;
 
@@ -524,8 +524,6 @@ static int LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
     lframe->label.labelWidget = 0;
     lframe->label.labelLayout = 0;
     lframe->label.labelParcel = Ttk_MakeBox(-1,-1,-1,-1);
-
-    return TCL_OK;
 }
 
 /* LabelframeCleanup --
@@ -535,9 +533,6 @@ static void LabelframeCleanup(void *recordPtr)
 {
     Labelframe *lframe = recordPtr;
     Ttk_DeleteManager(lframe->label.mgr);
-    if (lframe->label.labelLayout) {
-	Ttk_FreeLayout(lframe->label.labelLayout);
-    }
 }
 
 /* RaiseLabelWidget --

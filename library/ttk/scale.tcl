@@ -2,7 +2,7 @@
 #
 # Bindings for the TScale widget
 #
-# $Id: scale.tcl,v 1.1.4.1 2008/10/17 12:44:04 patthoyts Exp $
+# $Id: scale.tcl,v 1.2 2008/10/17 12:29:25 patthoyts Exp $
 
 namespace eval ttk::scale {
     variable State

@@ -1,4 +1,4 @@
-/* $Id: ttkScroll.c,v 1.5.4.1 2008/08/19 14:48:00 jenglish Exp $
+/* $Id: ttkScroll.c,v 1.6 2008/08/19 14:47:55 jenglish Exp $
  *
  * Copyright 2004, Joe English
  *

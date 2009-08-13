@@ -1,4 +1,4 @@
-/* $Id: ttkElements.c,v 1.10.2.1 2008/07/04 19:06:03 jenglish Exp $
+/* $Id: ttkElements.c,v 1.11 2008/07/04 19:05:04 jenglish Exp $
  *
  * Copyright (c) 2003, Joe English
  *

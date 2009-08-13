@@ -1,4 +1,4 @@
-/* $Id: ttkScrollbar.c,v 1.7 2007/12/13 15:26:26 dgp Exp $
+/* $Id: ttkScrollbar.c,v 1.9 2008/11/09 23:53:09 jenglish Exp $
  * Copyright (c) 2003, Joe English
  *
  * ttk::scrollbar widget.
@@ -49,7 +49,7 @@ static Tk_OptionSpec ScrollbarOptionSpecs[] =
  * +++ Widget hooks.
  */
 
-static int 
+static void 
 ScrollbarInitialize(Tcl_Interp *interp, void *recordPtr)
 {
     Scrollbar *sb = recordPtr;
@@ -57,8 +57,6 @@ ScrollbarInitialize(Tcl_Interp *interp, void *recordPtr)
     sb->scrollbar.last = 1.0;
 
     TtkTrackElementState(&sb->core);
-
-    return TCL_OK;
 }
 
 static Ttk_Layout ScrollbarGetLayout(
@@ -132,7 +130,7 @@ static void ScrollbarDoLayout(void *recordPtr)
  */
 static int
 ScrollbarSetCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Scrollbar *scrollbar = recordPtr;
     Tcl_Obj *firstObj, *lastObj;
@@ -183,7 +181,7 @@ ScrollbarSetCommand(
  */
 static int
 ScrollbarGetCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Scrollbar *scrollbar = recordPtr;
     Tcl_Obj *result[2];
@@ -206,7 +204,7 @@ ScrollbarGetCommand(
  */
 static int
 ScrollbarDeltaCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Scrollbar *sb = recordPtr;
     double dx, dy;
@@ -246,7 +244,7 @@ ScrollbarDeltaCommand(
  */
 static int
 ScrollbarFractionCommand(
-    Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], void *recordPtr)
+    Tcl_Interp *interp, int objc, Tcl_Obj *const objv[], void *recordPtr)
 {
     Scrollbar *sb = recordPtr;
     Ttk_Box b = sb->scrollbar.troughBox;

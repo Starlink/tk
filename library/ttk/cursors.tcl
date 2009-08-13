@@ -1,5 +1,5 @@
 #
-# $Id: cursors.tcl,v 1.1.4.1 2009/04/10 16:39:47 das Exp $
+# $Id: cursors.tcl,v 1.2 2008/10/28 20:02:03 jenglish Exp $
 #
 # Map symbolic cursor names to platform-appropriate cursors.
 #

@@ -9,7 +9,7 @@
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkWinButton.c,v 1.34 2007/12/14 15:56:09 patthoyts Exp $
+ * RCS: @(#) $Id: tkWinButton.c,v 1.36 2008/12/09 21:22:56 dgp Exp $
  */
 
 #define OEMRESOURCE
@@ -258,7 +258,7 @@ CreateProc(
 {
     Window window;
     HWND parent;
-    char *class;
+    const char *class;
     WinButton *butPtr = (WinButton *)instanceData;
 
     parent = Tk_GetHWND(parentWin);
@@ -1287,7 +1287,7 @@ ButtonProc(
 	    if (code != TCL_OK && code != TCL_CONTINUE
 		    && code != TCL_BREAK) {
 		Tcl_AddErrorInfo(interp, "\n    (button invoke)");
-		Tcl_BackgroundError(interp);
+		Tcl_BackgroundException(interp, code);
 	    }
 	    Tcl_Release((ClientData)interp);
 	}

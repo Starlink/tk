@@ -4,7 +4,7 @@
 # "autoconf" program (constructs like "@foo@" will get replaced in the
 # actual Makefile.
 #
-# RCS: @(#) $Id: Makefile.in,v 1.78.2.2 2009/04/10 11:07:32 dkf Exp $
+# RCS: @(#) $Id: Makefile.in,v 1.82 2008/12/05 10:48:52 dkf Exp $
 
 TCLVERSION		= @TCL_VERSION@
 TCLPATCHL		= @TCL_PATCH_LEVEL@
@@ -282,6 +282,7 @@ TK_OBJS = \
 	tkAtom.$(OBJEXT) \
 	tkBind.$(OBJEXT) \
 	tkBitmap.$(OBJEXT) \
+	tkBusy.$(OBJEXT) \
 	tkButton.$(OBJEXT) \
 	tkCanvArc.$(OBJEXT) \
 	tkCanvBmap.$(OBJEXT) \
@@ -315,6 +316,7 @@ TK_OBJS = \
 	tkImgGIF.$(OBJEXT) \
 	tkImgPPM.$(OBJEXT) \
 	tkImgPhoto.$(OBJEXT) \
+	tkImgPhInstance.$(OBJEXT) \
 	tkImgUtil.$(OBJEXT) \
 	tkListbox.$(OBJEXT) \
 	tkMacWinMenu.$(OBJEXT) \
@@ -348,7 +350,6 @@ TK_OBJS = \
 	tkUtil.$(OBJEXT) \
 	tkVisual.$(OBJEXT) \
 	tkStubInit.$(OBJEXT) \
-	tkStubLib.$(OBJEXT) \
 	tkWindow.$(OBJEXT) \
 	$(TTK_OBJS)
 
@@ -479,7 +480,8 @@ install-binaries: binaries
 	@echo "Creating package index $(PKG_INDEX)"; 
 	@$(RM) $(PKG_INDEX);
 	@(\
-	echo "if {[catch {package present Tcl 8.5.0-8.6}]} { return }";\
+	echo "if {[catch {package present Tcl\
+		$(TCLVERSION)$(TCLPATCHL)}]} { return }";\
 	echo "package ifneeded Tk $(VERSION)$(PATCH_LEVEL)\
 		[list load [file join \$$dir .. .. bin $(TK_DLL_FILE)] Tk]";\
 	) > $(PKG_INDEX);
@@ -515,8 +517,8 @@ install-libraries: libraries
 	    $(INSTALL_DATA) $$i $(INCLUDE_INSTALL_DIR)/X11; \
 	    done;
 	@echo "Installing library files to $(SCRIPT_INSTALL_DIR)";
-	@for i in $(ROOT_DIR)/library/*.tcl \
-	        $(ROOT_DIR)/library/tclIndex $(UNIX_DIR)/tkAppInit.c; \
+	@for i in $(ROOT_DIR)/library/*.tcl $(ROOT_DIR)/library/tclIndex \
+		$(UNIX_DIR)/tkAppInit.c; \
 	    do \
 	    $(INSTALL_DATA) $$i $(SCRIPT_INSTALL_DIR); \
 	    done;

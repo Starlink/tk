@@ -2,7 +2,7 @@
 '\" Copyright (c) 1998-2000 by Scriptics Corporation.
 '\" All rights reserved.
 '\" 
-'\" RCS: @(#) $Id: keysyms.n,v 1.4 2004/08/20 14:15:29 dkf Exp $
+'\" RCS: @(#) $Id: keysyms.n,v 1.7 2008/09/23 13:36:40 dkf Exp $
 '\" 
 '\"
 .so man.macros
@@ -12,7 +12,6 @@
 .SH NAME
 keysyms \- keysyms recognized by Tk
 .BE
-
 .SH DESCRIPTION
 .PP
 Tk recognizes many keysyms when specifying key bindings (e.g. 
@@ -922,9 +921,10 @@ Hyper_L                          65517     0xffed
 Hyper_R                          65518     0xffee
 Delete                           65535     0xffff
 .CE
-
 .SH "SEE ALSO"
 bind
-
 .SH KEYWORDS
 keysym, bind, binding
+'\" Local Variables:
+'\" mode: nroff
+'\" End:

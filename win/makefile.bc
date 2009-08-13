@@ -13,7 +13,7 @@
 # Copyright (c) 1995-1997 Sun Microsystems, Inc.
 # Copyright (c) 1998-2000 Ajuba Solutions.
 #
-# RCS: @(#) $Id: makefile.bc,v 1.14 2007/05/14 20:58:31 dgp Exp $
+# RCS: @(#) $Id: makefile.bc,v 1.17 2008/10/18 14:22:22 dkf Exp $
 
 # Does not depend on the presence of any environment variables in
 # order to compile tcl; all needed information is derived from
@@ -163,6 +163,7 @@ TKOBJS = \
 	$(TMPDIR)\tkAtom.obj \
 	$(TMPDIR)\tkBind.obj \
 	$(TMPDIR)\tkBitmap.obj \
+	$(TMPDIR)\tkBusy.obj \
 	$(TMPDIR)\tkButton.obj \
 	$(TMPDIR)\tkCanvArc.obj \
 	$(TMPDIR)\tkCanvBmap.obj \
@@ -196,6 +197,7 @@ TKOBJS = \
 	$(TMPDIR)\tkImgGIF.obj \
 	$(TMPDIR)\tkImgPPM.obj \
 	$(TMPDIR)\tkImgPhoto.obj \
+	$(TMPDIR)\tkImgPhInstance.obj \
 	$(TMPDIR)\tkImgUtil.obj \
 	$(TMPDIR)\tkListbox.obj \
 	$(TMPDIR)\tkMacWinMenu.obj \
@@ -227,7 +229,6 @@ TKOBJS = \
 	$(TMPDIR)\tkUtil.obj \
 	$(TMPDIR)\tkVisual.obj \
 	$(TMPDIR)\tkStubInit.obj \
-	$(TMPDIR)\tkStubLib.obj \
 	$(TMPDIR)\tkWindow.obj
 
 # Maintenance hint: Please have multiple members of TKSTUBOBJS be separated
