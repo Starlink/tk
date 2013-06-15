@@ -782,7 +782,7 @@ Tk_PostscriptImage(
 
 	return TCL_OK;
     }
-    result = TkPostscriptImage(interp, tkwin, psinfo, ximage, x, y,
+    result = TkPostscriptImage(interp, tkwin, psinfo, ximage, 0, 0,
 	    width, height);
 
     XDestroyImage(ximage);

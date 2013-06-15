@@ -132,6 +132,13 @@ Tk_ItemType tkImageType = {
     NULL,			/* dTextProc */
     NULL,			/* nextPtr */
 };
+
+/*  External access to tkImageType. Usually hidden if possible. */
+Tk_ItemType *getTkImageType()
+{
+    return &tkImageType;
+}
+
 
 /*
  *--------------------------------------------------------------
