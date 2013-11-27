@@ -10,8 +10,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkFrame.c,v 1.31.2.1 2008/11/15 00:37:30 patthoyts Exp $
  */
 
 #include "default.h"
@@ -183,6 +181,10 @@ static const Tk_OptionSpec commonOptSpec[] = {
     {TK_OPTION_STRING, "-colormap", "colormap", "Colormap",
 	DEF_FRAME_COLORMAP, -1, Tk_Offset(Frame, colormapName),
 	TK_OPTION_NULL_OK, 0, 0},
+    /*
+     * Having -container is useless in a labelframe since a container has
+     * no border. It should be deprecated.
+     */
     {TK_OPTION_BOOLEAN, "-container", "container", "Container",
 	DEF_FRAME_CONTAINER, -1, Tk_Offset(Frame, isContainer), 0, 0, 0},
     {TK_OPTION_CURSOR, "-cursor", "cursor", "Cursor",

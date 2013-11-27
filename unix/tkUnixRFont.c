@@ -7,8 +7,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkUnixRFont.c,v 1.24.2.4 2010/01/02 18:41:14 dkf Exp $
  */
 
 #include "tkUnixInt.h"
@@ -93,7 +91,7 @@ GetFont(
 	    ftFont = XftFontOpen(fontPtr->display, fontPtr->screen,
 			FC_FAMILY, FcTypeString, "sans",
 			FC_SIZE, FcTypeDouble, 12.0,
-			NULL);
+			(void *) NULL);
 	}
 	if (!ftFont) {
 	    /*

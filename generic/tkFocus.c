@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkFocus.c,v 1.16.2.1 2009/07/22 07:46:42 dkf Exp $
  */
 
 #include "tkInt.h"
@@ -1077,11 +1075,10 @@ TkFocusSplit(winPtr)
 				* must be moved to this new toplevel */
 {
     ToplevelFocusInfo *tlFocusPtr;
-    DisplayFocusInfo *displayFocusPtr;
     TkWindow *topLevelPtr;
     TkWindow *subWinPtr;
 
-    displayFocusPtr = FindDisplayFocusInfo(winPtr->mainPtr, winPtr->dispPtr);
+    FindDisplayFocusInfo(winPtr->mainPtr, winPtr->dispPtr);
 
     /*
      * Find the top-level window for winPtr, then find (or create)

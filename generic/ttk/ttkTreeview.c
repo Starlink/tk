@@ -1,4 +1,4 @@
-/* $Id: ttkTreeview.c,v 1.23.2.2 2010/08/26 02:06:10 hobbs Exp $
+/*
  * Copyright (c) 2004, Joe English
  *
  * ttk::treeview widget implementation.
@@ -2830,6 +2830,7 @@ static int TreeviewSeeCommand(
 	    parent->openObj = unshare(parent->openObj);
 	    Tcl_SetBooleanObj(parent->openObj, 1);
 	    parent->state |= TTK_STATE_OPEN;
+	    TtkRedisplayWidget(&tv->core);
 	}
     }
 
@@ -3139,7 +3140,7 @@ static int TreeviewTagNamesCommand(
 static void AddTag(TreeItem *item, Ttk_Tag tag)
 {
     if (Ttk_TagSetAdd(item->tagset, tag)) {
-	Tcl_DecrRefCount(item->tagsObj);
+	if (item->tagsObj) Tcl_DecrRefCount(item->tagsObj);
 	item->tagsObj = Ttk_NewTagSetObj(item->tagset);
 	Tcl_IncrRefCount(item->tagsObj);
     }
@@ -3172,12 +3173,12 @@ static int TreeviewTagAddCommand(
     return TCL_OK;
 }
 
-/* + $tv tag remove $tag $items
+/* + $tv tag remove $tag ?$items?
  */
 static void RemoveTag(TreeItem *item, Ttk_Tag tag)
 {
     if (Ttk_TagSetRemove(item->tagset, tag)) {
-	Tcl_DecrRefCount(item->tagsObj);
+	if (item->tagsObj) Tcl_DecrRefCount(item->tagsObj);
 	item->tagsObj = Ttk_NewTagSetObj(item->tagset);
 	Tcl_IncrRefCount(item->tagsObj);
     }

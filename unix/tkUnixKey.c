@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkUnixKey.c,v 1.13.2.2 2010/01/02 10:43:26 dkf Exp $
  */
 
 #include "tkInt.h"
@@ -66,10 +64,10 @@ Tk_SetCaretPos(
 
 	spot.x = dispPtr->caret.x;
 	spot.y = dispPtr->caret.y + dispPtr->caret.height;
-	preedit_attr = XVaCreateNestedList(0, XNSpotLocation, &spot, NULL);
+	preedit_attr = XVaCreateNestedList(0, XNSpotLocation, &spot, (void *) NULL);
 	XSetICValues(winPtr->inputContext,
 		XNPreeditAttributes, preedit_attr,
-		NULL);
+		(void *) NULL);
 	XFree(preedit_attr);
     }
 #endif

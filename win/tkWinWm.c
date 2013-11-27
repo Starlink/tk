@@ -11,8 +11,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkWinWm.c,v 1.124.2.9 2010/03/12 13:02:36 nijtmans Exp $
  */
 
 #include "tkWinInt.h"
@@ -3706,9 +3704,8 @@ WmForgetCmd(tkwin, winPtr, interp, objc, objv)
     if (Tk_IsTopLevel(frameWin)) {
 	Tk_UnmapWindow(frameWin);
 	winPtr->flags &= ~(TK_TOP_HIERARCHY|TK_TOP_LEVEL|TK_HAS_WRAPPER|TK_WIN_MANAGED);
-	if (Tk_IsMapped(Tk_Parent(frameWin))) {
-	    RemapWindows(winPtr, Tk_GetHWND(winPtr->parentPtr->window));
-	}
+	Tk_MakeWindowExist((Tk_Window)winPtr->parentPtr);
+	RemapWindows(winPtr, Tk_GetHWND(winPtr->parentPtr->window));
 	TkWmDeadWindow(winPtr);
 	/* flags (above) must be cleared before calling */
 	/* TkMapTopFrame (below) */
@@ -5005,7 +5002,7 @@ WmProtocolCmd(
 	protPtr->nextPtr = wmPtr->protPtr;
 	wmPtr->protPtr = protPtr;
 	protPtr->interp = interp;
-	strcpy(protPtr->command, cmd);
+	memcpy(protPtr->command, cmd, cmdLength + 1);
     }
     return TCL_OK;
 }
@@ -8635,9 +8632,10 @@ RemapWindows(winPtr, parentHWND)
      HWND parentHWND;
 {
     TkWindow *childPtr;
+    const char *className = Tk_Class(winPtr);
 
     /* Skip Menus as they are handled differently */
-    if (strcmp(Tk_Class(winPtr), "Menu") == 0) {
+    if (className != NULL && strcmp(className, "Menu") == 0) {
 	return;
     }
     if (winPtr->window) {

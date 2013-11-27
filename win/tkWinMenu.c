@@ -9,8 +9,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkWinMenu.c,v 1.59.2.6 2010/03/12 13:02:36 nijtmans Exp $
  */
 
 #define WINVER        0x0500   /* Requires Windows 2K definitions */
@@ -973,7 +971,7 @@ TkWinEmbeddedMenuProc(
 	break;
 
     case WM_SETTINGCHANGE:
-	if (wParam == SPI_SETNONCLIENTMETRICS 
+	if (wParam == SPI_SETNONCLIENTMETRICS
 		|| wParam == SPI_SETKEYBOARDCUES) {
 	    SetDefaults(0);
 	}
@@ -2624,7 +2622,7 @@ TkpDrawMenuEntry(
 		    fmPtr, adjustedX, adjustedY, width, adjustedHeight);
 	}
     }
-    
+
     /*
      * Copy the entry contents from the temporary bitmap to the menu.
      */
@@ -3194,7 +3192,14 @@ SetDefaults(
     TEXTMETRIC tm;
     int pointSize;
     HFONT menuFont;
-    NONCLIENTMETRICS ncMetrics;
+    /* See: [Bug #3239768] tk8.4.19 (and later) WIN32 menu font support */
+    struct {
+        NONCLIENTMETRICS metrics;
+#if (WINVER < 0x0600)
+        int padding;
+#endif
+    } nc;
+    OSVERSIONINFO os;
 
     /*
      * Set all of the default options. The loop will terminate when we run out
@@ -3212,10 +3217,17 @@ SetDefaults(
     }
     Tcl_DStringInit(&menuFontDString);
 
-    ncMetrics.cbSize = sizeof(ncMetrics);
-    SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncMetrics),
-	    &ncMetrics, 0);
-    menuFont = CreateFontIndirect(&ncMetrics.lfMenuFont);
+    nc.metrics.cbSize = sizeof(nc);
+
+    os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+    GetVersionEx(&os);
+    if (os.dwMajorVersion < 6) {
+	nc.metrics.cbSize -= sizeof(int);
+    }
+
+    SystemParametersInfo(SPI_GETNONCLIENTMETRICS, nc.metrics.cbSize,
+	    &nc.metrics, 0);
+    menuFont = CreateFontIndirect(&nc.metrics.lfMenuFont);
     SelectObject(scratchDC, menuFont);
     GetTextMetrics(scratchDC, &tm);
     GetTextFace(scratchDC, LF_FACESIZE, faceName);

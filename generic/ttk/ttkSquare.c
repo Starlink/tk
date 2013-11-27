@@ -1,8 +1,6 @@
 /* square.c - Copyright (C) 2004 Pat Thoyts <patthoyts@users.sourceforge.net>
  *
  * Minimal sample ttk widget.
- *
- * $Id: ttkSquare.c,v 1.6.2.1 2010/08/26 02:06:09 hobbs Exp $
  */
 
 #include <tk.h>
@@ -222,10 +220,9 @@ static void SquareElementDraw(
     Drawable d, Ttk_Box b, unsigned int state)
 {
     SquareElement *square = elementRecord;
-    Tk_3DBorder border = NULL, foreground = NULL;
+    Tk_3DBorder foreground = NULL;
     int borderWidth = 1, relief = TK_RELIEF_FLAT;
 
-    border = Tk_Get3DBorderFromObj(tkwin, square->borderObj);
     foreground = Tk_Get3DBorderFromObj(tkwin, square->foregroundObj);
     Tcl_GetIntFromObj(NULL, square->borderWidthObj, &borderWidth);
     Tk_GetReliefFromObj(NULL, square->reliefObj, &relief);

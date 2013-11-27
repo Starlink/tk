@@ -1,6 +1,4 @@
 /*
- * $Id: ttkEntry.c,v 1.9.4.1 2010/08/26 02:06:09 hobbs Exp $
- *
  * DERIVED FROM: tk/generic/tkEntry.c r1.35.
  *
  * Copyright (c) 1990-1994 The Regents of the University of California.
@@ -1790,6 +1788,7 @@ static const Ttk_Ensemble ComboboxCommands[] = {
     { "selection", 	0,EntrySelectionCommands },
     { "state",  	TtkWidgetStateCommand,0 },
     { "set", 		EntrySetCommand,0 },
+    { "validate",	EntryValidateCommand,0 },
     { "xview", 		EntryXViewCommand,0 },
     { 0,0,0 }
 };
