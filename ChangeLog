@@ -1,3 +1,346 @@
+2012-07-17  Don Porter  <dgp@users.sourceforge.net>
+
+	*** 8.5.12 TAGGED FOR RELEASE ***
+
+	* generic/tk.h:		Bump to 8.5.12 for release.
+	* library/tk.tcl:
+	* unix/configure.in:
+	* unix/tk.spec:
+	* win/configure.in:
+	* README:
+
+	* unix/configure:	autoconf-2.59
+	* win/configure:
+
+	* changes:	Updated for 8.5.12 release.
+
+2012-07-17  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/makefile.vc: [Bug 3544932]: Visual studio compiler check fails
+
+2012-07-08  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkIntXlibDecls.h: [Bug 3541305]: Xfree/Xsync...
+	should not be macros
+
+2012-07-05  Donal K. Fellows  <dkf@users.sf.net>
+
+	* doc/wm.n (geometry): [Bug 3538401]: Better description of the key
+	difference between [wm geometry] and [winfo geometry]; the former
+	represents the window manager's understanding, not Tk's.
+
+2012-07-04  Donal K. Fellows  <dkf@users.sf.net>
+
+	* win/tkWinDialog.c (GetFileNameW): [Bug 3540127]: Clean up the tables
+	of options for the file dialogs so that options are listed in error
+	messages in alphabetical order.
+
+2012-07-02  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkWinDialog.c: [Bug 3540127]: filebox.test fails on win32
+
+2012-06-26  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* unix/configure.in:  Link cygwin wish.exe with win32 tk.dll, only
+	* unix/Makefile.in:   in combination with --enable-shared.
+	* unix/tcl.m4:
+	* unix/configure:     autoconf-2.59
+
+2012-06-22  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/Makefile.in:    [Bug 1844430]: cygwin make fails in 8.4.14-8.5b3
+	* unix/tcl.m4:        Sync with Tcl version.
+	* unix/configure:     autoconf-2.59
+
+2012-06-15  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/ttk/ttkTreeview.c (unshareObj): [Bug 3535362]: Changed name
+	of 'unshare' internal function to avoid clash with some libc versions.
+
+2012-06-12  Donal K. Fellows  <dkf@users.sf.net>
+
+	* unix/tkUnixRFont.c (Tk_DrawChars, TkUnixSetXftClipRegion): Add some
+	* generic/ttk/ttkEntry.c (EntryDisplay): special magic to make the
+	* generic/ttk/ttkLabel.c (TextDraw): text clipping work right with the
+	Xft-based renderer (which doesn't use the standard Tk GC except to
+	supply the color).
+
+2012-06-11  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/ttk/ttkLabel.c (TextDraw): [Bug 3294450]: Get the clipping
+	* generic/ttk/ttkEntry.c (EntryDisplay): of text in Ttk various text
+	elements (e.g., buttons, entries, etc.) correct. Stops a whole range
+	of visual problems, including loss of the second and subsequent lines
+	of a label when the first line doesn't entirely fit, and failing to
+	draw the last character of an entry at all if it doesn't all exactly
+	fit in the space available (a problem I've noticed in tkchat, and been
+	very frustrated with).
+
+2012-06-10  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* library/*.tcl:      [Bug 3534137]: $tcl_platform(platform) !=
+	[tk windowingsystem]
+
+2012-06-08  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkMain.c:   Implement TkCygwinMainEx for loading
+	* generic/tkWindow.c: Cygwin's Tk_MainEx from the Tk dll.
+
+2012-06-07  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkInt.decls:   Change XChangeWindowAttributes signature and
+	* generic/tkIntXlibDeclsDecls.h: many others to match Xorg, needed for
+	Cygwin.
+
+2012-06-06  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* unix/Makefile.in:      [Bug 3532186] pkgIndex.tcl file complexity
+	* win/Makefile.in:
+
+2012-06-02  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkInt.decls:   Change XSetDashes signature and many others
+	* generic/tkIntDecls.h:  to match Xorg, needed for Cygwin.
+	* generic/tkIntXlibDeclsDecls.h
+	* win/Makefile.in:       Generate same pkgIndex.tcl file for win32 and
+	* unix/Makefile.in:      cygwin, one that is equally useable for both.
+
+2012-05-30  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkWindow.c:	Simplify determination whether we are running
+	* generic/tkStubInit.c:	on cygwin.  Export Tk_GetHINSTANCE,
+	* generic/tkInt.decls:	TkSetPixmapColormap and TkpPrintWindowId on the
+	Cygwin dll, sync stub table with Tk 8.6 win32 version.
+	* generic/tk*Decls.h:    re-generated
+	* win/Makefile.in:       "make genstubs" when cross-compiling on UNIX
+
+2012-05-28  Francois Vogel  <fvogelnew1@free.fr>
+
+	* doc/text.n:  [Bug 1630251]: Doc for -endline option was wrong
+
+2012-05-28  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkTextDisp.c: [Bug 1630254]: missing scrolling of text widget
+	when from a -startline == -endline initial state it is configured to
+	display a non-empty part of it
+
+2012-05-24  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/stubs.c:          Change XSetCommand signature to match Xorg,
+	* win/tkWinWm.c:        needed for Cygwin.
+	* generic/tkInt.decls
+	* generic/tk*Decls.h:   re-generated
+
+2012-05-09  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkWinWm.c:           Change TkpWmSetState signature to match Xorg,
+	* generic/tkInt.decls:     needed for Cygwin. (not needed for Mac)
+	* generic/tkIntPlatDeclsDecls.h:
+	* generic/tkWindow.c:      Don't check for cygwin in win32 static build.
+	* unix/tkUnixPort.h:       Some more useful #defines for Cygwin
+
+2012-05-05  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* xlib/xcolors.c:      Single "const" addition
+	* generic/tkWindow.c:  If tk.dll loaded in cygwin, don't use the
+	win32 file dialogs
+
+2012-05-04  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* library/menu.tcl: [Bug 2768586]: Menu posting on dual monitors
+
+2012-05-02  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* library/tk.tcl: [Bug 533519]: Window placement with multiple screens
+	* generic/tkBind.c:
+	* generic/tkFocus.c:
+	* generic/tkMenuDraw.c:
+	* generic/tkWinWm.c:
+
+2012-04-26  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkStubInit.c (Tk_GetHINSTANCE): Ensure that this is defined
+	for OSX.
+
+2012-04-26  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tk.decls:	[Bug 3508771]: Implement TkClipBox, Tk*Region
+	* generic/tkInt.decls:	and Tk_GetHINSTANCE for Cygwin
+	* generic/tkPlatDecls.h:
+	* generic/tkintDecls.h:
+	* generic/tkStubInit.c:
+	* unix/Makefile.in:   [Bug 3519917]: Snow Leopard unix/Makefile
+	`make test` fail
+
+2012-04-22  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkBind.c (ExpandPercents): [Bug 3520202]: Ensure that the
+	%k, %K and %N substitutions use dummy tokens with <MouseWheel> events
+	and that the %D subsitution is a dummy with <Key>/<KeyRelease>. This
+	was causing significant indigestion (and a read of goodness knows what
+	memory) to Tkinter/Python because of the way they map events between
+	languages.
+
+2012-04-20  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tk.tcl: Use vroot size in stead of screen size for
+	clipping window coordinates in ::tk::PlaceWindow.
+	* generic/dialog.tcl: Use ::tk::PlaceWindow in dialog.tcl, in
+	stead of dumplicating the code there.
+	(harmless part of [Bug 533519])
+
+2012-04-13  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/rules.vc: [Bug 3517448] TclKit build fails (unresolved
+	__strtoi64)
+
+2012-04-07  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkBind.c: [Bug 3176239] control-MouseWheel causes segv
+
+2012-03-30  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* unix/tcl.m4:        [Bug 3511806] Compiler checks too early
+	* unix/configure.in:  This change allows to build the cygwin
+	* unix/configure      and mingw32 ports of Tcl/Tk to build
+	* win/tcl.m4:         out-of-the-box using a native or cross-
+	* win/configure.in:   compiler.
+	* win/configure
+
+2012-03-21  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkColor.c:  [Bug 2809525] Abort on overlong color name.
+	* unix/tkUnixColor.c:
+
+2012-03-18  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* xlib/xcolors.c:   [RFE 3503317]: XParseColor speedup
+	* xlib/rgb.txt:     List of all colors accepted by Tk in Xorg format
+	* tests/color.test: Added test case for all colors in rgb.txt
+
+2012-03-07  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkObj.c (GetPixelsFromObjEx): [Bug 3497848]: Better rounding
+	of pixel values to integers.
+
+2012-03-04  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* unix/tcl.m4:    Patch from the cygwin folks
+	* unix/configure: (re-generated)
+
+2012-02-28  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkText.c:      [Bug 1630262, Bug 1615425]: segfault
+	* generic/tkTextBTree.c  when deleting lines or tagging outside of
+	* generic/tkTextDisp.c   the -startline/-endline range with peer
+	* generic/tkTextMark.c   text widgets.
+	* tests/text.test        [Bug 3487407]: Weird text indices.
+	* tests/textMark.test
+
+2012-02-28  Donal K. Fellows  <dkf@users.sf.net>
+
+	* doc/canvas.n: [Bug 3495198]: Corrected types of bitmap options.
+
+2012-02-26  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* xlib/xcolors.c: Provide fallback for _strtoi64
+	* win/configure.in: Detect whether _strtoi64 is available
+	* win/configure: (regenerated)
+
+2012-02-15  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* xlib/xcolors.c: [Bug 3486474]: Inconsistent color scaling
+	* generic/tkColor.c: new internal function TkParseColor
+	* generic/tkInt.h:
+	* generic/tk*.c:   Change XParseColor() to TkParseColor() everywhere.
+
+2012-02-10  Donal K. Fellows  <dkf@users.sf.net>
+
+	* win/tkWinDialog.c (GetFileNameW): Ensure that we do not convert a
+	result list to a string inadvertently, as this causes problems with
+	Tkinter's handling of multiple filename results. Issue was reported
+	via StackOverflow: http://stackoverflow.com/q/9227859/301832
+
+2012-01-30  Joe English  <jenglish@users.sourceforge.net>
+
+	* library/ttk/combobox.tcl: [Bug 2925561] Don't take focus in
+	disabled state.
+
+2012-01-29  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkImgPhoto.c: [Bug 3480634]: PNG Images missing in menus on Mac
+
+2012-01-27  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkWinDialog.c: [Bug 3480471]: tk_getOpenFile crashes on Win64
+
+2012-01-26  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkTextDisp.c: [Bug-1754043] and [Bug-2321450]: When
+	-blockcursor is true, the cursor appears as a blinking bar which
+	expands to the right edge of the widget.
+
+2012-01-25  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkImgPhoto.c: [Bug 2433260]: non-critical error in
+	Tk_PhotoPutBlock
+
+2012-01-25  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkText.c: Don't increase the epoch twice
+
+2012-01-25  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkText.c:      [Bug-1630271]: segfault/infinite loop
+	* generic/tkTextMark.c:  when a mark is before -startline
+	* tests/textMark.test:
+
+2012-01-25  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkText.c: [Bug-3475627]: Test text-31.11 fails
+
+2012-01-22  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkTextMark.c: [Bug-3288113,3288121]: Missing marks/endless
+	* tests/textMark.test:  loop in text mark prev/next
+
+2012-01-19  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkText.c: [Bug-3021557]: Moving the cursor in
+	* tests/text.test:  elided text freezes Tk
+
+2011-12-22  Don Porter  <dgp@users.sourceforge.net>
+
+	* win/tkWinMenu.c: [Bug 3235256] Keep menu entry IDs out of system
+	values. Thanks Colin McDonald. 
+
+2011-11-22  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* doc/wish.1: Use the same shebang comment everywhere.
+	* library/demos/hello
+	* library/demos/rmt
+	* library/demos/square
+	* library/demos/tcolor
+	* library/demos/timer
+	* library/demos/widget
+	* unix/Makefile.in: [Bug 1945073]: Demo square.tcl
+	* win/Makefile.in: cannot run; need package tktest
+
+2011-11-17  Alexandre Ferrieux  <ferrieux@users.sourceforge.net>
+
+	* generic/tkCanvas.c: [Bug 3437816]: Missing TCL_ERROR return
+	in [canvas lower].
+
+2011-11-08  Reinhard Max  <max@suse.de>
+
+	* unix/Makefile.in: Add square to DEMOPROGS. It contains a shebang
+	and hence should get installed with executable bits.
+
+	* doc/label.n:         Fix the escaping of leading dots in lines that
+	* doc/text.n:          start with a widget name, so that nroff
+	* doc/ttk_notebook.n:  doesn't mistake it as a non-existing macro
+	* doc/pack.n:          and skips the entire line.
+
 2011-11-04  Don Porter  <dgp@users.sourceforge.net>
 
 	*** 8.5.11 TAGGED FOR RELEASE ***

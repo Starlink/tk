@@ -592,7 +592,7 @@ GetFileNameW(
     OFNData ofnData;
     int cdlgerr;
     int filterIndex = 0, result = TCL_ERROR, winCode, oldMode, i, multi = 0;
-    int inValue, confirmOverwrite = 1;
+    int confirmOverwrite = 1;
     char *extension = NULL, *title = NULL;
     Tk_Window tkwin = (Tk_Window) clientData;
     HWND hWnd;
@@ -602,52 +602,63 @@ GetFileNameW(
     Tcl_Encoding unicodeEncoding = TkWinGetUnicodeEncoding();
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
-    static CONST char *saveOptionStrings[] = {
-	"-defaultextension", "-filetypes", "-initialdir", "-initialfile",
-	"-parent", "-title", "-typevariable",
-	"-confirmoverwrite",
-	NULL
-    };
-    static CONST char *openOptionStrings[] = {
-	"-defaultextension", "-filetypes", "-initialdir", "-initialfile",
-	"-parent", "-title", "-typevariable",
-	"-multiple",
-	NULL
-    };
     enum options {
-	FILE_DEFAULT,	FILE_TYPES,	FILE_INITDIR, FILE_INITFILE,
-	FILE_PARENT,	FILE_TITLE, FILE_TYPEVARIABLE,
-	FILE_MULTIPLE_OR_CONFIRMOW
+	FILE_DEFAULT, FILE_TYPES, FILE_INITDIR, FILE_INITFILE, FILE_PARENT,
+	FILE_TITLE, FILE_TYPEVARIABLE, FILE_MULTIPLE, FILE_CONFIRMOW
     };
+    struct Options {
+	CONST char *name;
+	enum options value;
+    };
+    static CONST struct Options saveOptions[] = {
+	{"-confirmoverwrite",	FILE_CONFIRMOW},
+	{"-defaultextension",	FILE_DEFAULT},
+	{"-filetypes",		FILE_TYPES},
+	{"-initialdir",		FILE_INITDIR},
+	{"-initialfile",	FILE_INITFILE},
+	{"-parent",		FILE_PARENT},
+	{"-title",		FILE_TITLE},
+	{"-typevariable",	FILE_TYPEVARIABLE},
+	{NULL,			FILE_DEFAULT/*ignored*/ }
+    };
+    static CONST struct Options openOptions[] = {
+	{"-defaultextension",	FILE_DEFAULT},
+	{"-filetypes",		FILE_TYPES},
+	{"-initialdir",		FILE_INITDIR},
+	{"-initialfile",	FILE_INITFILE},
+	{"-multiple",		FILE_MULTIPLE},
+	{"-parent",		FILE_PARENT},
+	{"-title",		FILE_TITLE},
+	{"-typevariable",	FILE_TYPEVARIABLE},
+	{NULL,			FILE_DEFAULT/*ignored*/ }
+    };
+    CONST struct Options *options = open ? openOptions : saveOptions;
 
     file[0] = '\0';
     ZeroMemory(&ofnData, sizeof(OFNData));
     Tcl_DStringInit(&utfFilterString);
     Tcl_DStringInit(&utfDirString);
 
+    /*
+     * Parse the arguments.
+     */
+
     for (i = 1; i < objc; i += 2) {
 	int index;
 	char *string;
-	Tcl_Obj *optionPtr, *valuePtr;
+	Tcl_Obj *valuePtr = objv[i + 1];
 
-	optionPtr = objv[i];
-	valuePtr = objv[i + 1];
-
-	if (Tcl_GetIndexFromObj(interp, optionPtr,
-		open ? openOptionStrings : saveOptionStrings,
-		"option", 0, &index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[i], options,
+		sizeof(struct Options), "option", 0, &index) != TCL_OK) {
 	    goto end;
-	}
-
-	if (i + 1 == objc) {
-	    string = Tcl_GetString(optionPtr);
-	    Tcl_AppendResult(interp, "value for \"", string, "\" missing",
-		    NULL);
+	} else if (i + 1 == objc) {
+	    Tcl_AppendResult(interp, "value for \"", options[index].name,
+		    "\" missing", NULL);
 	    goto end;
 	}
 
 	string = Tcl_GetString(valuePtr);
-	switch ((enum options) index) {
+	switch (options[index].value) {
 	case FILE_DEFAULT:
 	    if (string[0] == '.') {
 		string++;
@@ -687,14 +698,15 @@ GetFileNameW(
 	    initialTypeObj = Tcl_ObjGetVar2(interp, typeVariableObj, NULL,
 		    TCL_GLOBAL_ONLY);
 	    break;
-	case FILE_MULTIPLE_OR_CONFIRMOW:
-	    if (Tcl_GetBooleanFromObj(interp, valuePtr, &inValue) != TCL_OK) {
+	case FILE_MULTIPLE:
+	    if (Tcl_GetBooleanFromObj(interp, valuePtr, &multi) != TCL_OK) {
 		return TCL_ERROR;
 	    }
-	    if (open) {
-		multi = inValue;
-	    } else {
-		confirmOverwrite = inValue;
+	    break;
+	case FILE_CONFIRMOW:
+	    if (Tcl_GetBooleanFromObj(interp, valuePtr,
+		    &confirmOverwrite) != TCL_OK) {
+		return TCL_ERROR;
 	    }
 	    break;
 	}
@@ -834,6 +846,11 @@ GetFileNameW(
     if ((winCode != 0)
 	    || ((cdlgerr == FNERR_BUFFERTOOSMALL)
 		    && (ofn.Flags & OFN_ALLOWMULTISELECT))) {
+	int gotFilename = 0;	/* Flag for tracking whether we have any
+				 * filename at all. For details, see
+				 * http://stackoverflow.com/q/9227859/301832
+				 */
+
 	if (ofn.Flags & OFN_ALLOWMULTISELECT) {
 	    /*
 	     * The result in dynFileBuffer contains many items, separated by
@@ -870,6 +887,7 @@ GetFileNameW(
 		    Tcl_AppendToObj(fullnameObj, "/", -1);
 		    Tcl_AppendToObj(fullnameObj, Tcl_DStringValue(&filenameBuf),
 			    Tcl_DStringLength(&filenameBuf));
+		    gotFilename = 1;
 		    Tcl_DStringFree(&filenameBuf);
 		    Tcl_ListObjAppendElement(NULL, returnList, fullnameObj);
 		}
@@ -883,18 +901,19 @@ GetFileNameW(
 		Tcl_ListObjAppendElement(NULL, returnList,
 			Tcl_NewStringObj(Tcl_DStringValue(&ds),
 				Tcl_DStringLength(&ds)));
+		gotFilename |= (Tcl_DStringLength(&ds) > 0);
 	    }
 	    Tcl_SetObjResult(interp, returnList);
 	    Tcl_DStringFree(&ds);
 	} else {
 	    Tcl_AppendResult(interp, ConvertExternalFilename(unicodeEncoding,
 		    (char *) ofn.lpstrFile, &ds), NULL);
+	    gotFilename = (Tcl_DStringLength(&ds) > 0);
 	    Tcl_DStringFree(&ds);
 	}
 	result = TCL_OK;
-	if ((ofn.nFilterIndex > 0) &&
-		Tcl_GetCharLength(Tcl_GetObjResult(interp)) > 0 &&
-		typeVariableObj && filterObj) {
+	if ((ofn.nFilterIndex > 0) && gotFilename && typeVariableObj
+		&& filterObj) {
 	    int listObjc, count;
 	    Tcl_Obj **listObjv = NULL;
 	    Tcl_Obj **typeInfo = NULL;
@@ -1017,10 +1036,10 @@ OFNHookProcW(
 		    ofnData->dynFileBuffer = (char *) buffer;
 		}
 
-		SendMessageW(hdlg, CDM_GETFOLDERPATH, dirsize, PTR2INT(buffer));
+		SendMessageW(hdlg, CDM_GETFOLDERPATH, dirsize, (LPARAM) buffer);
 		buffer += dirsize;
 
-		SendMessageW(hdlg, CDM_GETSPEC, selsize, PTR2INT(buffer));
+		SendMessageW(hdlg, CDM_GETSPEC, selsize, (LPARAM) buffer);
 
 		/*
 		 * If there are multiple files, delete the quotes and change
@@ -1565,9 +1584,9 @@ OFNHookProcA(
 		    ofnData->dynFileBuffer = buffer;
 		}
 
-		SendMessage(hdlg, CDM_GETFOLDERPATH, dirsize, PTR2INT(buffer));
+		SendMessage(hdlg, CDM_GETFOLDERPATH, dirsize, (LPARAM) buffer);
 		buffer += dirsize;
-		SendMessage(hdlg, CDM_GETSPEC, selsize, PTR2INT(buffer));
+		SendMessage(hdlg, CDM_GETSPEC, selsize, (LPARAM) buffer);
 
 		/*
 		 * If there are multiple files, delete the quotes and change

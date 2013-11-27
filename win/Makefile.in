@@ -388,8 +388,8 @@ TTK_OBJS = \
 STUB_OBJS = \
 	tkStubLib.$(OBJEXT) ttkStubLib.$(OBJEXT)
 
-TCL_DOCS = "$(TCL_SRC_DIR_NATIVE)"/doc/*.[13n]
-TK_DOCS = "$(ROOT_DIR_NATIVE)"/doc/*.[13n]
+TCL_DOCS = "$(TCL_SRC_DIR_NATIVE)/doc/*.[13n]"
+TK_DOCS = "$(ROOT_DIR_NATIVE)/doc/*.[13n]"
 CORE_DOCS = $(TCL_DOCS) $(TK_DOCS)
 
 DEMOPROGS = browse hello ixset rmt rolodex square tcolor timer widget
@@ -413,14 +413,14 @@ $(ROOT_DIR)/doc/man.macros:
 
 doc: $(ROOT_DIR)/doc/man.macros
 
-winhelp: $(TCL_SRC_DIR_NATIVE)/tools/man2help.tcl $(MAN2TCL)
+winhelp: $(TCL_SRC_DIR)/tools/man2help.tcl $(MAN2TCL)
 	$(TCL_EXE) "$(TCL_SRC_DIR_NATIVE)/tools/man2help.tcl" tcl "$(VER)" $(CORE_DOCS)
-	$(COPY) "$(TCL_BIN_DIR)"/tcl.hpj ./
+	$(COPY) "$(TCL_BIN_DIR)/tcl.hpj" ./
 	hcw /c /e tcl.hpj
-	$(COPY) ./tcl$(VER).cnt ./TCL$(VER).HLP "$(TCL_SRC_DIR_NATIVE)"/tools/
+	$(COPY) ./tcl$(VER).cnt ./TCL$(VER).HLP "$(TCL_SRC_DIR_NATIVE)/tools/"
 
-$(MAN2TCL): $(TCL_SRC_DIR_NATIVE)/tools/man2tcl.c
-	$(CC) $(CFLAGS_OPTIMIZE) $(MAN2TCLFLAGS) -o $(MAN2TCL) "$(TCL_SRC_DIR_NATIVE)"/tools/man2tcl.c
+$(MAN2TCL): $(TCL_SRC_DIR)/tools/man2tcl.c
+	$(CC) $(CFLAGS_OPTIMIZE) $(MAN2TCLFLAGS) -o $(MAN2TCL) "$(TCL_SRC_DIR_NATIVE)/tools/man2tcl.c"
 
 # Specifying TESTFLAGS on the command line is the standard way to pass
 # args to tcltest, ie:
@@ -478,8 +478,12 @@ install-binaries: binaries
 	@$(RM) $(PKG_INDEX);
 	@(\
 	echo "if {[catch {package present Tcl 8.5.0}]} { return }";\
-	echo "package ifneeded Tk $(VERSION)$(PATCH_LEVEL)\
-		[list load [file join \$$dir .. .. bin $(TK_DLL_FILE)] Tk]";\
+	echo "if {(\$$::tcl_platform(platform) eq \"unix\") && ([info exists ::env(DISPLAY)]";\
+	echo "	|| ([info exists ::argv] && (\"-display\" in \$$::argv)))} {";\
+	echo "    package ifneeded Tk $(VERSION)$(PATCH_LEVEL) [list load [file join \$$dir .. .. bin libtk$(VERSION).dll] Tk]";\
+	echo "} else {";\
+	echo "    package ifneeded Tk $(VERSION)$(PATCH_LEVEL) [list load [file join \$$dir .. .. bin $(TK_DLL_FILE)] Tk]";\
+	echo "}";\
 	) > $(PKG_INDEX);
 	@for i in tkConfig.sh $(TK_LIB_FILE) $(TK_STUB_LIB_FILE); \
 	    do \
@@ -556,13 +560,17 @@ install-demos:
 	@for i in $(ROOT_DIR)/library/demos/*; \
 	    do \
 	    if [ -f $$i ] ; then \
-		sed -e '3 s|exec $(WISH)|exec $(WISH)|' \
+		sed -e '3 s|exec wish|exec wish$(VER)|' \
 			$$i > $(SCRIPT_INSTALL_DIR)/demos/`basename $$i`; \
 	    fi; \
 	    done;
 	@for i in $(DEMOPROGS); \
 	    do \
+	    if test $$i = "square"; then \
+	    rm -f  $(SCRIPT_INSTALL_DIR)/demos/$$i; \
+	    else \
 	    chmod 755 $(SCRIPT_INSTALL_DIR)/demos/$$i; \
+	    fi; \
 	    done;
 	@echo "Installing demo images";
 	@for i in $(ROOT_DIR)/library/demos/images/*; \
@@ -598,7 +606,7 @@ $(WISH): $(TK_LIB_FILE) $(TK_STUB_LIB_FILE) $(WISH_OBJS) wish.$(RES)
 	wish.$(RES) $(CC_EXENAME) $(LDFLAGS_WINDOW)
 	@VC_MANIFEST_EMBED_EXE@
 
-tktest : $(TKTEST)
+tktest: $(TKTEST)
 
 $(TKTEST): $(TK_LIB_FILE) $(TKTEST_OBJS) wish.$(RES) $(CAT32)
 	$(CC) $(CFLAGS) $(TKTEST_OBJS) $(TCL_LIB_FILE) \
@@ -665,7 +673,7 @@ tkWindow.$(OBJEXT): configure Makefile
 .SUFFIXES: .$(RES)
 .SUFFIXES: .rc
 
-# Implicit rule for all object files that will end up in the Tcl library
+# Implicit rule for all object files that will end up in the Tk library
 
 %.$(OBJEXT): %.c
 	$(CC) -c $(STUB_CC_SWITCHES) -DBUILD_tk -DBUILD_ttk @DEPARG@ $(CC_OBJNAME)
@@ -701,7 +709,19 @@ $(GENERIC_DIR)/tkStubInit.c: $(GENERIC_DIR)/tk.decls \
 	@echo "This warning can be safely ignored, do not report as a bug!"
 
 genstubs:
-	$(TCL_EXE) "$(TCL_TOOL_DIR)\genStubs.tcl" \
+	$(TCL_EXE) "$(TCL_TOOL_DIR)/genStubs.tcl" \
 	    "$(GENERIC_DIR_NATIVE)" \
-	    "$(GENERIC_DIR_NATIVE)\tk.decls" \
-            "$(GENERIC_DIR_NATIVE)\tkInt.decls"
+	    "$(GENERIC_DIR_NATIVE)/tk.decls" \
+	    "$(GENERIC_DIR_NATIVE)/tkInt.decls"
+#
+# The list of all the targets that do not correspond to real files. This stops
+# 'make' from getting confused when someone makes an error in a rule.
+#
+
+.PHONY: all binaries libraries doc tkLibObjs objs tktest-real test test-classic
+.PHONY: test-ttk testlang runtest shell demo gdb install install-strip
+.PHONY: install-binaries install-libraries install-demos install-doc
+.PHONY: install-private-headers clean distclean depend genstubs checkstubs
+.PHONY: checkuchar checkexports rpm dist alldist allpatch html html-tcl html-tk
+
+# DO NOT DELETE THIS LINE -- make depend depends on it.
