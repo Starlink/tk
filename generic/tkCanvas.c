@@ -12,7 +12,7 @@
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
  *
- * RCS: @(#) $Id: tkCanvas.c,v 1.46.2.2 2008/10/11 06:55:03 dkf Exp $
+ * RCS: @(#) $Id: tkCanvas.c,v 1.46.2.4 2010/01/19 22:02:43 dkf Exp $
  */
 
 /* #define USE_OLD_TAG_SEARCH 1 */
@@ -1886,6 +1886,7 @@ ConfigureCanvas(
 {
     XGCValues gcValues;
     GC newGC;
+    Tk_State old_canvas_state=canvasPtr->canvas_state;
 
     if (Tk_ConfigureWidget(interp, canvasPtr->tkwin, configSpecs,
 	    objc, (CONST char **) objv, (char *) canvasPtr,
@@ -1914,6 +1915,27 @@ ConfigureCanvas(
 	Tk_FreeGC(canvasPtr->display, canvasPtr->pixmapGC);
     }
     canvasPtr->pixmapGC = newGC;
+
+    /*
+     * Reconfigure items to reflect changed state disabled/normal.
+     */
+
+    if ( old_canvas_state != canvasPtr->canvas_state ) {
+	Tk_Item *itemPtr;
+	int result;
+
+	for ( itemPtr = canvasPtr->firstItemPtr; itemPtr != NULL;
+	    	    	    itemPtr = itemPtr->nextPtr) {
+	    if ( itemPtr->state == TK_STATE_NULL ) {
+		result = (*itemPtr->typePtr->configProc)(canvasPtr->interp,
+			(Tk_Canvas) canvasPtr, itemPtr, 0, NULL,
+			TK_CONFIG_ARGV_ONLY);
+		if (result != TCL_OK) {
+		    Tcl_ResetResult(canvasPtr->interp);
+		}
+	    }
+	}
+    }
 
     /*
      * Reset the desired dimensions for the window.
@@ -3211,7 +3233,11 @@ TagSearchScanExpr(
     while (searchPtr->stringIndex < searchPtr->stringLength) {
 	c = searchPtr->string[searchPtr->stringIndex++];
 
-	if (expr->allocated == expr->index) {
+	/*
+	 * Need two slots free at this point, not one. [Bug 2931374]
+	 */
+
+	if (expr->index >= expr->allocated-1) {
 	    expr->allocated += 15;
 	    if (expr->uids) {
 		expr->uids = (Tk_Uid *)
