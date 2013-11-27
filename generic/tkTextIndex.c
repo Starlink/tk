@@ -9,8 +9,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkTextIndex.c,v 1.28.2.1 2009/02/06 08:13:23 das Exp $
  */
 
 #include "default.h"
@@ -760,14 +758,24 @@ GetIndex(
 
     /*
      *---------------------------------------------------------------------
-     * Stage 1: check to see if the index consists of nothing but a mark name.
-     * We do this check now even though it's also done later, in order to
-     * allow mark names that include funny characters such as spaces or "+1c".
+     * Stage 1: check to see if the index consists of nothing but a mark
+     * name, an embedded window or an embedded image.  We do this check
+     * now even though it's also done later, in order to allow mark names,
+     * embedded window names or image names that include funny characters
+     * such as spaces or "+1c".
      *---------------------------------------------------------------------
      */
 
     if (TkTextMarkNameToIndex(textPtr, string, indexPtr) == TCL_OK) {
 	goto done;
+    }
+
+    if (TkTextWindowIndex(textPtr, string, indexPtr) != 0) {
+	return TCL_OK;
+    }
+
+    if (TkTextImageIndex(textPtr, string, indexPtr) != 0) {
+	return TCL_OK;
     }
 
     /*

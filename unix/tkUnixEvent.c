@@ -8,12 +8,15 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkUnixEvent.c,v 1.27 2008/03/26 19:04:10 jenglish Exp $
  */
 
 #include "tkUnixInt.h"
 #include <signal.h>
+#ifdef HAVE_XKBKEYCODETOKEYSYM
+#  include <X11/XKBlib.h>
+#else
+#  define XkbOpenDisplay(D,V,E,M,m,R) (V),(E),(M),(m),(R),(NULL)
+#endif
 
 /*
  * The following static indicates whether this module has been initialized in
@@ -118,7 +121,33 @@ TkpOpenDisplay(
     CONST char *displayNameStr)
 {
     TkDisplay *dispPtr;
-    Display *display = XOpenDisplay(displayNameStr);
+    Display *display;
+    int event = 0;
+    int error = 0;
+    int major = 1;
+    int minor = 0;
+    int reason = 0;
+    unsigned int use_xkb = 0;
+
+    /*
+    ** Bug [3607830]: Before using Xkb, it must be initialized and confirmed
+    **                that the serve supports it.  The XkbOpenDisplay call
+    **                will perform this check and return NULL if the extension
+    **                is not supported.
+    **
+    ** Work around un-const-ified Xkb headers using (char *) cast.
+    */
+    display = XkbOpenDisplay((char *)displayNameStr, &event, &error, &major,
+	    &minor, &reason);
+
+    if (display == NULL) {
+	/*fprintf(stderr,"event=%d error=%d major=%d minor=%d reason=%d\nDisabling xkb\n",
+	event, error, major, minor, reason);*/
+	display  = XOpenDisplay(displayNameStr);
+    } else {
+	use_xkb = TK_DISPLAY_USE_XKB;
+	/*fprintf(stderr, "Using xkb %d.%d\n", major, minor);*/
+    }
 
     if (display == NULL) {
 	return NULL;
@@ -126,6 +155,7 @@ TkpOpenDisplay(
     dispPtr = (TkDisplay *) ckalloc(sizeof(TkDisplay));
     memset(dispPtr, 0, sizeof(TkDisplay));
     dispPtr->display = display;
+    dispPtr->flags |= use_xkb;
 #ifdef TK_USE_INPUT_METHODS
     OpenIM(dispPtr);
 #endif
@@ -278,23 +308,69 @@ static void
 TransferXEventsToTcl(
     Display *display)
 {
-    XEvent event;
+    union {
+	int type;
+	XEvent x;
+	TkKeyEvent k;
+    } event;
+    Window w;
+    TkDisplay *dispPtr = NULL;
 
     /*
      * Transfer events from the X event queue to the Tk event queue after XIM
-     * event filtering. KeyPress and KeyRelease events are filtered in
-     * Tk_HandleEvent instead of here, so that Tk's focus management code can
-     * redirect them.
+     * event filtering. KeyPress and KeyRelease events need special treatment
+     * so that they get directed according to Tk's focus rules during XIM
+     * handling. Theoretically they can go to the wrong place still (if
+     * there's a focus change in the queue) but if we push the handling off
+     * until Tk_HandleEvent then many input methods actually cease to work
+     * correctly. Most of the time, Tk processes its event queue fast enough
+     * for this to not be an issue anyway. [Bug 1924761]
      */
 
     while (QLength(display) > 0) {
-	XNextEvent(display, &event);
-	if (event.type != KeyPress && event.type != KeyRelease) {
-	    if (XFilterEvent(&event, None)) {
-		continue;
+	XNextEvent(display, &event.x);
+	w = None;
+	if (event.type == KeyPress || event.type == KeyRelease) {
+	    for (dispPtr = TkGetDisplayList(); ; dispPtr = dispPtr->nextPtr) {
+		if (dispPtr == NULL) {
+		    break;
+		} else if (dispPtr->display == event.x.xany.display) {
+		    if (dispPtr->focusPtr != NULL) {
+			w = dispPtr->focusPtr->window;
+		    }
+		    break;
+		}
 	    }
 	}
-	Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
+	if (XFilterEvent(&event.x, w)) {
+	    continue;
+	}
+	if (event.type == KeyPress || event.type == KeyRelease) {
+	    event.k.charValuePtr = NULL;
+	    event.k.charValueLen = 0;
+	    event.k.keysym = NoSymbol;
+
+	    /*
+	     * Force the calling of the input method engine now. The results
+	     * from it will be cached in the event so that they don't get lost
+	     * (to a race condition with other XIM-handled key events) between
+	     * entering the event queue and getting serviced. [Bug 1924761]
+	     */
+
+#ifdef TK_USE_INPUT_METHODS
+	    if (event.type == KeyPress && dispPtr &&
+		    (dispPtr->flags & TK_DISPLAY_USE_IM)) {
+		if (dispPtr->focusPtr && dispPtr->focusPtr->inputContext) {
+		    Tcl_DString ds;
+
+		    Tcl_DStringInit(&ds);
+		    (void) TkpGetString(dispPtr->focusPtr, &event.x, &ds);
+		    Tcl_DStringFree(&ds);
+		}
+	    }
+#endif
+	}
+	Tk_QueueWindowEvent(&event.x, TCL_QUEUE_TAIL);
     }
 }
 

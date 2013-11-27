@@ -5,8 +5,6 @@
 # Copyright (c) 1994 Sun Microsystems, Inc.
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
-#
-# RCS: @(#) $Id: clipboard.test,v 1.9 2004/06/24 12:45:42 dkf Exp $
 
 #
 # Note: Multiple display clipboard handling will only be tested if the
@@ -170,7 +168,7 @@ test clipboard-6.2 {Tk_ClipboardAppend procedure} unix {
     set result [dobg {clipboard get TEST}]
     cleanupbg
     set result
-} {0x10}
+} {0x10 }
 test clipboard-6.3 {Tk_ClipboardAppend procedure} {
     clipboard clear
     clipboard append -f INTEGER -t TEST "16"

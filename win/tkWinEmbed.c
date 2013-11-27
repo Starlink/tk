@@ -10,8 +10,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkWinEmbed.c,v 1.33 2007/12/13 15:28:55 dgp Exp $
  */
 
 #include "tkWinInt.h"
@@ -44,8 +42,6 @@ typedef struct ThreadSpecificData {
 static Tcl_ThreadDataKey dataKey;
 
 static void		ContainerEventProc(ClientData clientData,
-			    XEvent *eventPtr);
-static void		EmbeddedEventProc(ClientData clientData,
 			    XEvent *eventPtr);
 static void		EmbedGeometryRequest(Container *containerPtr,
 			    int width, int height);
@@ -263,7 +259,7 @@ TkpUseWindow(
     if (Tcl_GetInt(interp, string, &id) != TCL_OK) {
 	return TCL_ERROR;
     }
-    hwnd = (HWND) id;
+    hwnd = (HWND) INT2PTR(id);
     if ((HWND)winPtr->privatePtr == hwnd) {
 	return TCL_OK;
     }
@@ -283,12 +279,12 @@ TkpUseWindow(
     }
 
     id = SendMessage(hwnd, TK_INFO, TK_CONTAINER_VERIFY, 0);
-    if (id == (long)hwnd) {
+    if (id == PTR2INT(hwnd)) {
 	if (!SendMessage(hwnd, TK_INFO, TK_CONTAINER_ISAVAILABLE, 0)) {
     	    Tcl_AppendResult(interp, "The container is already in use", NULL);
 	    return TCL_ERROR;
 	}
-    } else if (id == -(long)hwnd) {
+    } else if (id == -PTR2INT(hwnd)) {
 	Tcl_AppendResult(interp, "the window to use is not a Tk container",
 		NULL);
 	return TCL_ERROR;
@@ -389,39 +385,6 @@ TkpMakeContainer(
 	    ContainerEventProc, (ClientData) containerPtr);
 }
 
-#if 0
-/*
- *----------------------------------------------------------------------
- *
- * EmbeddedEventProc --
- *
- *	This procedure is invoked by the Tk event dispatcher when various
- *	useful events are received for a window that is embedded in another
- *	application.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Our internal state gets cleaned up when an embedded window is
- *	destroyed.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-EmbeddedEventProc(
-    ClientData clientData,	/* Token for container window. */
-    XEvent *eventPtr)		/* ResizeRequest event. */
-{
-    TkWindow *winPtr = (TkWindow *) clientData;
-
-    if (eventPtr->type == DestroyNotify) {
-	EmbedWindowDeleted(winPtr);
-    }
-}
-#endif
-
 /*
  *----------------------------------------------------------------------
  *
@@ -494,7 +457,7 @@ TkWinEmbeddedEventProc(
 		result = containerPtr->embeddedHWnd == NULL? 1:0;
 		break;
 	    case TK_CONTAINER_VERIFY:
-		result = (long)containerPtr->parentHWnd;
+		result = PTR2INT(containerPtr->parentHWnd);
 		break;
 	    default:
 		result = 0;
@@ -532,7 +495,7 @@ TkWinEmbeddedEventProc(
 		    }
 		    containerPtr->embeddedHWnd = (HWND)wParam;
 		}
-		result = (long)containerPtr->parentHWnd;
+		result = PTR2INT(containerPtr->parentHWnd);
 	    } else {
 		result = 0;
 	    }
@@ -605,14 +568,14 @@ TkWinEmbeddedEventProc(
 	     * returned.
 	     */
 	    if (topwinPtr) {
-		result = (long)GetParent(containerPtr->parentHWnd);
+		result = PTR2INT(GetParent(containerPtr->parentHWnd));
 	    } else {
 		topwinPtr = containerPtr->parentPtr;
 		while (!(topwinPtr->flags & TK_TOP_HIERARCHY)) {
 		    topwinPtr = topwinPtr->parentPtr;
 		}
 		if (topwinPtr && topwinPtr->window) {
-		    result = (long)GetParent(Tk_GetHWND(topwinPtr->window));
+		    result = PTR2INT(GetParent(Tk_GetHWND(topwinPtr->window)));
 		} else {
 		    result = 0;
 		}
@@ -773,7 +736,7 @@ TkWinEmbeddedEventProc(
 	     */
 
 	    if (topwinPtr) {
-		if (wParam >= 0 && wParam <= 3) {
+		if (wParam <= 3) {
 		    TkpWmSetState(topwinPtr, wParam);
 		}
 		result = 1+TkpWmGetState(topwinPtr);
@@ -796,7 +759,7 @@ TkWinEmbeddedEventProc(
 	     * Reply the message sender: this is not a Tk container
 	     */
 
-	    return -(long)hwnd;
+	    return -PTR2INT(hwnd);
 	} else {
 	    result = 0;
 	}

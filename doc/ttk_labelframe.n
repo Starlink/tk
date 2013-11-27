@@ -4,8 +4,6 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: ttk_labelframe.n,v 1.9.2.1 2008/05/11 00:31:03 patthoyts Exp $
-'\" 
 .so man.macros
 .TH ttk::labelframe n 8.5 Tk "Tk Themed Widget"
 .BS
@@ -15,6 +13,7 @@ ttk::labelframe \- Container widget with optional label
 \fBttk::labelframe\fR \fIpathName \fR?\fIoptions\fR?
 .BE
 .SH DESCRIPTION
+.PP
 A \fBttk::labelframe\fR widget is a container used to group other widgets
 together.  It has an optional label, which may be a plain text string or
 another widget.
@@ -64,6 +63,7 @@ If specified, the widget's requested height in pixels.
 (See \fIttk::frame(n)\fR for further notes on \fB\-width\fR and
 \fB\-height\fR).
 .SH "WIDGET COMMAND"
+.PP
 Supports the standard widget commands
 \fBconfigure\fR, \fBcget\fR, \fBidentify\fR, \fBinstate\fR, and \fBstate\fR;
 see \fIttk::widget(n)\fR.
@@ -71,3 +71,6 @@ see \fIttk::widget(n)\fR.
 ttk::widget(n), ttk::frame(n), labelframe(n)
 .SH "KEYWORDS"
 widget, frame, container, label, groupbox
+'\" Local Variables:
+'\" mode: nroff
+'\" End:

@@ -1,4 +1,4 @@
-/* $Id: ttkFrame.c,v 1.12.2.1 2009/02/06 08:13:23 das Exp $
+/*
  * Copyright (c) 2004, Joe English
  *
  * ttk::frame and ttk::labelframe widgets.
@@ -44,16 +44,17 @@ static Tk_OptionSpec FrameOptionSpecs[] = {
 	Tk_Offset(Frame,frame.heightObj), -1,
 	0,0,GEOMETRY_CHANGED },
 
+    WIDGET_TAKEFOCUS_FALSE,
     WIDGET_INHERIT_OPTIONS(ttkCoreOptionSpecs)
 };
 
-static WidgetCommandSpec FrameCommands[] = {
-    { "configure",	TtkWidgetConfigureCommand },
-    { "cget",		TtkWidgetCgetCommand },
-    { "instate",	TtkWidgetInstateCommand },
-    { "state",  	TtkWidgetStateCommand },
-    { "identify",   TtkWidgetIdentifyCommand },
-    { NULL, NULL }
+static const Ttk_Ensemble FrameCommands[] = {
+    { "configure",	TtkWidgetConfigureCommand,0 },
+    { "cget",   	TtkWidgetCgetCommand,0 },
+    { "instate",	TtkWidgetInstateCommand,0 },
+    { "state",  	TtkWidgetStateCommand,0 },
+    { "identify",	TtkWidgetIdentifyCommand,0 },
+    { 0,0,0 }
 };
 
 /*
@@ -515,7 +516,7 @@ static Ttk_ManagerSpec LabelframeManagerSpec = {
 /* LabelframeInitialize --
  * 	Initialization hook.
  */
-static int LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
+static void LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
 {
     Labelframe *lframe = recordPtr;
 
@@ -524,8 +525,6 @@ static int LabelframeInitialize(Tcl_Interp *interp, void *recordPtr)
     lframe->label.labelWidget = 0;
     lframe->label.labelLayout = 0;
     lframe->label.labelParcel = Ttk_MakeBox(-1,-1,-1,-1);
-
-    return TCL_OK;
 }
 
 /* LabelframeCleanup --

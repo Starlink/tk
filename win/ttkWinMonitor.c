@@ -1,6 +1,3 @@
-/* $Id: ttkWinMonitor.c,v 1.16 2007/12/13 15:28:56 dgp Exp $
- */
-
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -75,8 +72,8 @@ CreateThemeMonitorWindow(HINSTANCE hinst, Tcl_Interp *interp)
 {
     WNDCLASSEX wc;
     HWND       hwnd = NULL;
-    CHAR       title[32] = "TtkMonitorWindow";
-    CHAR       name[32] = "TtkMonitorClass";
+    TCHAR      title[32] = TEXT("TtkMonitorWindow");
+    TCHAR      name[32] = TEXT("TtkMonitorClass");
     
     wc.cbSize        = sizeof(WNDCLASSEX);
     wc.style         = CS_HREDRAW | CS_VREDRAW;
@@ -95,7 +92,7 @@ CreateThemeMonitorWindow(HINSTANCE hinst, Tcl_Interp *interp)
 	hwnd = CreateWindow( name, title, WS_OVERLAPPEDWINDOW,
 	    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 	    NULL, NULL, hinst, NULL );
-	SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG)interp);
+	SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)interp);
 	ShowWindow(hwnd, SW_HIDE);
 	UpdateWindow(hwnd);
     }

@@ -11,8 +11,6 @@
 #	files by clicking on the file icons or by entering a filename
 #	in the "Filename:" entry.
 #
-# RCS: @(#) $Id: tkfbox.tcl,v 1.68.2.1 2008/08/25 17:22:40 tmh Exp $
-#
 # Copyright (c) 1994-1998 Sun Microsystems, Inc.
 #
 # See the file "license.terms" for information on usage and redistribution
@@ -20,7 +18,7 @@
 #
 
 package require Ttk
-
+
 #----------------------------------------------------------------------
 #
 #		      I C O N   L I S T
@@ -227,7 +225,7 @@ proc ::tk::IconList_Create {w} {
     upvar ::tk::$w data
 
     ttk::frame $w
-    ttk::entry $w.cHull -takefocus 0
+    ttk::entry $w.cHull -takefocus 0 -cursor {}
     set data(sbar)   [ttk::scrollbar $w.cHull.sbar -orient horizontal -takefocus 0]
     catch {$data(sbar) configure -highlightthickness 0}
     set data(canvas) [canvas $w.cHull.canvas -highlightthick 0 \
@@ -788,7 +786,7 @@ proc ::tk::IconList_Reset {w} {
 
     unset -nocomplain Priv(ILAccel,$w)
 }
-
+
 #----------------------------------------------------------------------
 #
 #		      F I L E   D I A L O G
@@ -888,9 +886,11 @@ proc ::tk::dialog::file:: {type args} {
 	# Default type and name to first entry
 	set initialtype     [lindex $data(-filetypes) 0]
 	set initialTypeName [lindex $initialtype 0]
-	if {($data(-typevariable) ne "")
-	    && [uplevel 2 [list info exists $data(-typevariable)]]} {
-	    set initialTypeName [uplevel 2 [list set $data(-typevariable)]]
+	if {$data(-typevariable) ne ""} {
+	    upvar #0 $data(-typevariable) typeVariable
+	    if {[info exists typeVariable]} {
+		set initialTypeName $typeVariable
+	    }
 	}
 	foreach type $data(-filetypes) {
 	    set title  [lindex $type 0]
@@ -914,7 +914,7 @@ proc ::tk::dialog::file:: {type args} {
 
     # Withdraw the window, then update all the geometry information
     # so we know how big it wants to be, then center the window in the
-    # display and de-iconify it.
+    # display (Motif style) and de-iconify it.
 
     ::tk::PlaceWindow $w widget $data(-parent)
     wm title $w $data(-title)
@@ -983,6 +983,12 @@ proc ::tk::dialog::file::Config {dataName type argList} {
 	lappend specs {-multiple "" "" "0"}
     }
 
+    # The "-confirmoverwrite" option is only for the "save" file dialog.
+    #
+    if {$type eq "save"} {
+	lappend specs {-confirmoverwrite "" "" "1"}
+    }
+
     # 2: default values depending on the type of the dialog
     #
     if {![info exists data(selectPath)]} {
@@ -1045,6 +1051,7 @@ proc ::tk::dialog::file::Create {w class} {
     global tk_library
 
     toplevel $w -class $class
+    if {[tk windowingsystem] eq "x11"} {wm attributes $w -type dialog}
     pack [ttk::frame $w.contents] -expand 1 -fill both
     #set w $w.contents
 
@@ -1319,36 +1326,16 @@ rSASvJTGhnhcV3EJlo3kh53ltF5nAhQAOw==}]
 
     set showHidden $::tk::dialog::file::showHiddenVar
 
-    # Make the dir list
-    # Using -directory [pwd] is better in some VFS cases.
-    set cmd [list glob -tails -directory [pwd] -type d -nocomplain *]
-    if {$showHidden} { lappend cmd .* }
-    set dirs [lsort -dictionary -unique [eval $cmd]]
-    set dirList {}
-    foreach d $dirs {
-	if {$d eq "." || $d eq ".."} {
-	    continue
-	}
-	lappend dirList $d
-    }
-    ::tk::IconList_Add $data(icons) $folder $dirList
+    # Make the dir list. Note that using an explicit [pwd] (instead of '.') is
+    # better in some VFS cases.
+    ::tk::IconList_Add $data(icons) $folder [GlobFiltered [pwd] d 1]
 
     if {$class eq "TkFDialog"} {
-	# Make the file list if this is a File Dialog, selecting all
-	# but 'd'irectory type files.
+	# Make the file list if this is a File Dialog, selecting all but
+	# 'd'irectory type files.
 	#
-	set cmd [list glob -tails -directory [pwd] \
-		-type {f b c l p s} -nocomplain]
-	if {$data(filter) eq "*"} {
-	    lappend cmd *
-	    if {$showHidden} {
-		lappend cmd .*
-	    }
-	} else {
-	    eval [list lappend cmd] $data(filter)
-	}
-	set fileList [lsort -dictionary -unique [eval $cmd]]
-	::tk::IconList_Add $data(icons) $file $fileList
+	::tk::IconList_Add $data(icons) $file \
+	    [GlobFiltered [pwd] {f b c l p s}]
     }
 
     ::tk::IconList_Arrange $data(icons)
@@ -1817,7 +1804,7 @@ proc ::tk::dialog::file::ListInvoke {w filenames} {
     if {$class eq "TkChooseDir" || [file isdirectory $file]} {
 	set appPWD [pwd]
 	if {[catch {cd $file}]} {
-	    tk_messageBox -type ok -parent $w -message -icon warning \
+	    tk_messageBox -type ok -parent $w -icon warning -message \
 		    [mc "Cannot change to the directory \"%1\$s\".\nPermission denied." $file]
 	} else {
 	    cd $appPWD
@@ -1858,7 +1845,7 @@ proc ::tk::dialog::file::Done {w {selectFilePath ""}} {
 	set Priv(selectFile) $data(selectFile)
 	set Priv(selectPath) $data(selectPath)
 
-	if {($data(type) eq "save") && [file exists $selectFilePath]} {
+	if {($data(type) eq "save") && $data(-confirmoverwrite) && [file exists $selectFilePath]} {
 	    set reply [tk_messageBox -icon warning -type yesno -parent $w \
 		    -message [mc "File \"%1\$s\" already exists.\nDo you want\
 		    to overwrite it?" $selectFilePath]]
@@ -1867,59 +1854,70 @@ proc ::tk::dialog::file::Done {w {selectFilePath ""}} {
 	    }
 	}
 	if {[info exists data(-typevariable)] && $data(-typevariable) ne ""
-	    && [info exists data(-filetypes)] && [llength $data(-filetypes)]
-	    && [info exists data(filterType)] && $data(filterType) ne ""} {
-	    upvar 4 $data(-typevariable) initialTypeName
-	    set initialTypeName [lindex $data(filterType) 0]
+		&& [info exists data(-filetypes)] && [llength $data(-filetypes)]
+		&& [info exists data(filterType)] && $data(filterType) ne ""} {
+	    upvar #0 $data(-typevariable) typeVariable
+	    set typeVariable [lindex $data(filterType) 0]
 	}
     }
     bind $data(okBtn) <Destroy> {}
     set Priv(selectFilePath) $selectFilePath
 }
 
+proc ::tk::dialog::file::GlobFiltered {dir type {overrideFilter 0}} {
+    # $dir == where to search
+    # $type == what to look for ('d' or 'f b c l p s')
+    # $overrideFilter == whether to ignore the filter
+
+    variable showHiddenVar
+    upvar 1 data(filter) filter
+
+    if {$filter eq "*" || $overrideFilter} {
+	set patterns [list *]
+	if {$showHiddenVar} {
+	    lappend patterns .*
+	}
+    } elseif {[string is list $filter]} {
+	set patterns $filter
+    } else {
+	# Invalid list; assume we can use non-whitespace sequences as words
+	set patterns [regexp -inline -all {\S+} $filter]
+    }
+
+    set opts [list -tails -directory $dir -type $type -nocomplain]
+
+    set result {}
+    catch {
+	# We have a catch because we might have a really bad pattern (e.g.,
+	# with an unbalanced brace); even [glob -nocomplain] doesn't like it.
+	# Using a catch ensures that it just means we match nothing instead of
+	# throwing a nasty error at the user...
+	foreach f [glob {*}$opts -- {*}$patterns] {
+	    if {$f eq "." || $f eq ".."} {
+		continue
+	    }
+	    lappend result $f
+	}
+    }
+    return [lsort -dictionary -unique $result]
+}
+
 proc ::tk::dialog::file::CompleteEnt {w} {
     upvar ::tk::dialog::file::[winfo name $w] data
     set f [$data(ent) get]
     if {$data(-multiple)} {
-	if {[catch {llength $f} len] || $len != 1} {
+	if {![string is list $f] || [llength $f] != 1} {
 	    return -code break
 	}
 	set f [lindex $f 0]
     }
 
     # Get list of matching filenames and dirnames
-    set globF [list glob -tails -directory $data(selectPath) \
-		-type {f b c l p s} -nocomplain]
-    set globD [list glob -tails -directory $data(selectPath) -type d \
-		       -nocomplain *]
-    if {$data(filter) eq "*"} {
-	lappend globF *
-	if {$::tk::dialog::file::showHiddenVar} {
-	    lappend globF .*
-	    lappend globD .*
-	}
-	if {[winfo class $w] eq "TkFDialog"} {
-	    set files [lsort -dictionary -unique [{*}$globF]]
-	} else {
-	    set files {}
-	}
-	set dirs [lsort -dictionary -unique [{*}$globD]]
-    } else {
-	if {$::tk::dialog::file::showHiddenVar} {
-	    lappend globD .*
-	}
-	if {[winfo class $w] eq "TkFDialog"} {
-	    set files [lsort -dictionary -unique [{*}$globF {*}$data(filter)]]
-	} else {
-	    set files {}
-	}
-	set dirs [lsort -dictionary -unique [{*}$globD]]
-    }
-    # Filter specials
-    set dirs [lsearch -all -not -exact -inline $dirs .]
-    set dirs [lsearch -all -not -exact -inline $dirs ..]
+    set files [if {[winfo class $w] eq "TkFDialog"} {
+	GlobFiltered $data(selectPath) {f b c l p s}
+    }]
     set dirs2 {}
-    foreach d $dirs {lappend dirs2 $d/}
+    foreach d [GlobFiltered $data(selectPath) d] {lappend dirs2 $d/}
 
     set targets [concat \
 	    [lsearch -glob -all -inline $files $f*] \

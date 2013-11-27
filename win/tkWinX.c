@@ -9,8 +9,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkWinX.c,v 1.57 2007/12/13 15:28:56 dgp Exp $
  */
 
 /*
@@ -30,7 +28,7 @@
  */
 
 #ifndef _WIN32_IE
-#define _WIN32_IE 0x0300
+#define _WIN32_IE 0x0501 /* IE 5 */
 #endif
 
 #include <commctrl.h>
@@ -298,10 +296,10 @@ TkWinXInit(
      * Initialize input language info
      */
 
-    if (GetLocaleInfo(LANGIDFROMLCID(GetKeyboardLayout(0)),
+    if (GetLocaleInfo(LANGIDFROMLCID(PTR2INT(GetKeyboardLayout(0))),
 	       LOCALE_IDEFAULTANSICODEPAGE | LOCALE_RETURN_NUMBER,
 	       (LPTSTR) &lpCP, sizeof(lpCP)/sizeof(TCHAR))
-	    && TranslateCharsetInfo((DWORD *)lpCP, &lpCs, TCI_SRCCODEPAGE)) {
+	    && TranslateCharsetInfo(INT2PTR(lpCP), &lpCs, TCI_SRCCODEPAGE)) {
 	UpdateInputLanguage((int) lpCs.ciCharset);
     }
 
@@ -405,7 +403,7 @@ TkWinGetPlatformId(void)
 		    KEY_READ, &hKey) != ERROR_SUCCESS) {
 		tkWinTheme = TK_THEME_WIN_XP;
 	    } else {
-		RegQueryValueEx(hKey, szCurrent, NULL, NULL, pBuffer, &dwSize);
+		RegQueryValueEx(hKey, szCurrent, NULL, NULL, (LPBYTE) pBuffer, &dwSize);
 		RegCloseKey(hKey);
 		if (strcmp(pBuffer, "Windows Standard") == 0) {
 		    tkWinTheme = TK_THEME_WIN_CLASSIC;
@@ -521,8 +519,8 @@ TkWinDisplayChanged(
      * the HWND and we'll just get blank spots copied onto the screen.
      */
 
-    screen->ext_data = (XExtData *) GetDeviceCaps(dc, PLANES);
-    screen->root_depth = GetDeviceCaps(dc, BITSPIXEL) * (int) screen->ext_data;
+    screen->ext_data = INT2PTR(GetDeviceCaps(dc, PLANES));
+    screen->root_depth = GetDeviceCaps(dc, BITSPIXEL) * PTR2INT(screen->ext_data);
 
     if (screen->root_visual != NULL) {
 	ckfree((char *) screen->root_visual);
@@ -769,12 +767,13 @@ TkClipCleanup(
  *----------------------------------------------------------------------
  */
 
-void
+int
 XBell(
     Display *display,
     int percent)
 {
     MessageBeep(MB_OK);
+    return Success;
 }
 
 /*
@@ -1002,14 +1001,16 @@ GenerateXEvent(
     LPARAM lParam)
 {
     XEvent event;
-    TkWindow *winPtr = (TkWindow *)Tk_HWNDToWindow(hwnd);
+    TkWindow *winPtr;
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
+    winPtr = (TkWindow *)Tk_HWNDToWindow(hwnd);
     if (!winPtr || winPtr->window == None) {
 	return;
     }
 
+    memset(&event, 0, sizeof(XEvent));
     event.xany.serial = winPtr->display->request++;
     event.xany.send_event = False;
     event.xany.display = winPtr->display;
@@ -1117,17 +1118,15 @@ GenerateXEvent(
 	unsigned int state = GetState(message, wParam, lParam);
 	Time time = TkpGetMS();
 	POINT clientPoint;
-	POINTS rootPoint;	/* Note: POINT and POINTS are different */
-	DWORD msgPos;
+	union {DWORD msgpos; POINTS point;} root;	/* Note: POINT and POINTS are different */
 
 	/*
 	 * Compute the screen and window coordinates of the event.
 	 */
 
-	msgPos = GetMessagePos();
-	rootPoint = MAKEPOINTS(msgPos);
-	clientPoint.x = rootPoint.x;
-	clientPoint.y = rootPoint.y;
+	root.msgpos = GetMessagePos();
+	clientPoint.x = root.point.x;
+	clientPoint.y = root.point.y;
 	ScreenToClient(hwnd, &clientPoint);
 
 	/*
@@ -1138,8 +1137,8 @@ GenerateXEvent(
 	event.xbutton.subwindow = None;
 	event.xbutton.x = clientPoint.x;
 	event.xbutton.y = clientPoint.y;
-	event.xbutton.x_root = rootPoint.x;
-	event.xbutton.y_root = rootPoint.y;
+	event.xbutton.x_root = root.point.x;
+	event.xbutton.y_root = root.point.y;
 	event.xbutton.state = state;
 	event.xbutton.time = time;
 	event.xbutton.same_screen = True;
@@ -1454,7 +1453,7 @@ UpdateInputLanguage(
     if (keyInputCharset == charset) {
 	return;
     }
-    if (TranslateCharsetInfo((DWORD*)charset, &charsetInfo,
+    if (TranslateCharsetInfo(INT2PTR(charset), &charsetInfo,
 	    TCI_SRCCHARSET) == 0) {
 	/*
 	 * Some mysterious failure.
@@ -1627,10 +1626,14 @@ HandleIMEComposition(
 	 * We set send_event to the special value of -2, so that TkpGetString
 	 * in tkWinKey.c knows that trans_chars[] already contains a UNICODE
 	 * char and there's no need to do encoding conversion.
+	 *
+	 * Note that the event *must* be zeroed out first; Tk plays cunning
+	 * games with the overalls structure. [Bug 2992129]
 	 */
 
 	winPtr = (TkWindow *) Tk_HWNDToWindow(hwnd);
 
+	memset(&event, 0, sizeof(XEvent));
 	event.xkey.serial = winPtr->display->request++;
 	event.xkey.send_event = -2;
 	event.xkey.display = winPtr->display;
@@ -1993,7 +1996,7 @@ Tk_ResetUserInactiveTime(
     inp.mi.mouseData = 0;
     inp.mi.dwFlags = MOUSEEVENTF_MOVE;
     inp.mi.time = 0;
-    inp.mi.dwExtraInfo = (DWORD) NULL;
+    inp.mi.dwExtraInfo = (DWORD) 0;
 
     SendInput(1, &inp, sizeof(inp));
 }

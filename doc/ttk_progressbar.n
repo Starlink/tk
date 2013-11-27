@@ -4,8 +4,6 @@
 '\" See the file "license.terms" for information on usage and redistribution
 '\" of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 '\" 
-'\" RCS: @(#) $Id: ttk_progressbar.n,v 1.10.2.1 2008/05/11 00:31:03 patthoyts Exp $
-'\" 
 .so man.macros
 .TH ttk::progressbar n 8.5 Tk "Tk Themed Widget"
 .BS
@@ -15,6 +13,7 @@ ttk::progressbar \- Provide progress feedback
 \fBttk::progressbar\fR \fIpathName \fR?\fIoptions\fR?
 .BE
 .SH DESCRIPTION
+.PP
 A \fBttk::progressbar\fR widget shows the status of a long-running
 operation.  They can operate in two modes: \fIdeterminate\fR mode shows the
 amount completed relative to the total amount of work to be done, and
@@ -44,7 +43,7 @@ that is, the progress bar completes one
 .QW cycle
 when the \fB\-value\fR increases by \fB\-maximum\fR.
 .OP \-variable variable Variable
-The name of a Tcl variable which is linked to the \fB\-value\fR.
+The name of a global Tcl variable which is linked to the \fB\-value\fR.
 If specified, the \fB\-value\fR of the progress bar is 
 automatically set to the value of the variable whenever 
 the latter is modified.
@@ -56,6 +55,7 @@ in \fIdeterminate\fR mode, less than \fB\-maximum\fR.
 This option may be used by the current theme 
 to provide additional animation effects.
 .SH "WIDGET COMMAND"
+.PP
 .TP
 \fIpathName \fBcget\fR \fIoption\fR
 Returns the current value of the specified \fIoption\fR; see \fIttk::widget(n)\fR.
@@ -88,3 +88,6 @@ Stop autoincrement mode:
 cancels any recurring timer event initiated by \fIpathName \fBstart\fR.
 .SH "SEE ALSO"
 ttk::widget(n)
+'\" Local Variables:
+'\" mode: nroff
+'\" End:

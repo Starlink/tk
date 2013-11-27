@@ -9,8 +9,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkWinPort.h,v 1.10 2005/09/28 18:31:57 dgp Exp $
  */
 
 #ifndef _WINPORT
@@ -42,19 +40,31 @@
 #endif
 
 #include <time.h>
-#ifdef __CYGWIN__
-#    define _T(x) L##x
-#else
-#    include <tchar.h>
-#endif
 
 #ifdef _MSC_VER
-#    define hypot _hypot
+#   ifndef hypot
+#	define hypot _hypot
+#   endif
 #endif /* _MSC_VER */
 
+/*
+ *  Pull in the typedef of TCHAR for windows.
+ */
+#include <tchar.h>
+#ifndef _TCHAR_DEFINED
+    /* Borland seems to forget to set this. */
+    typedef _TCHAR TCHAR;
+#   define _TCHAR_DEFINED
+#endif
+#if defined(_MSC_VER) && defined(__STDC__)
+    /* VS2005 SP1 misses this. See [Bug #3110161] */
+    typedef _TCHAR TCHAR;
+#endif
+
+
 #ifndef __GNUC__
-#    define strncasecmp strnicmp
-#    define strcasecmp stricmp
+#    define strncasecmp _strnicmp
+#    define strcasecmp _stricmp
 #endif
 
 #define NBBY 8
@@ -87,21 +97,6 @@
 
 #define TkFreeWindowId(dispPtr,w)
 #define TkInitXId(dispPtr)
-#define TkpCmapStressed(tkwin,colormap) (0)
-#define XFlush(display)
-#define XGrabServer(display)
-#define XUngrabServer(display)
-#define TkpSync(display)
-
-/*
- * The following functions are implemented as macros under Windows.
- */
-
-#define XFree(data) {if ((data) != NULL) ckfree((char *) (data));}
-#define XNoOp(display) {display->request++;}
-#define XSynchronize(display, bool) {display->request++;}
-#define XSync(display, bool) {display->request++;}
-#define XVisualIDFromVisual(visual) (visual->visualid)
 
 /*
  * The following Tk functions are implemented as macros under Windows.
@@ -118,23 +113,5 @@
 #define TkpDefineNativeBitmaps()
 #define TkpCreateNativeBitmap(display, source) None
 #define TkpGetNativeAppBitmap(display, name, w, h) None
-
-/*
- * Define timezone for gettimeofday.
- */
-
-struct timezone {
-    int tz_minuteswest;
-    int tz_dsttime;
-};
-
-/*
- * Disabled inclusion of Tcl's private header in hope of discovering we
- * no longer need it.
- *
-#ifndef _TCLINT
-#include <tclInt.h>
-#endif
- */
 
 #endif /* _WINPORT */

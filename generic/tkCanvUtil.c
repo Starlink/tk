@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkCanvUtil.c,v 1.19.2.1 2008/12/21 23:52:45 ferrieux Exp $
  */
 
 #include "tkInt.h"
@@ -1136,12 +1134,10 @@ Tk_ConfigOutlineGC(
     if (mask && (dash->number != 0)) {
 	gcValues->line_style = LineOnOffDash;
 	gcValues->dash_offset = outline->offset;
-	if (dash->number >= 2) {
-	    gcValues->dashes = 4;
-	} else if (dash->number > 0) {
+	if (dash->number > 0) {
 	    gcValues->dashes = dash->pattern.array[0];
 	} else {
-	    gcValues->dashes = (char) (4 * width);
+	    gcValues->dashes = (char) (4 * width + 0.5);
 	}
 	mask |= GCLineStyle|GCDashList|GCDashOffset;
     }
@@ -1221,7 +1217,7 @@ Tk_ChangeOutlineGC(
     }
 
     if ((dash->number<-1) ||
-	    ((dash->number == -1) && (dash->pattern.array[1] != ','))) {
+	    ((dash->number == -1) && (dash->pattern.array[0] != ','))) {
 	char *q;
 	int i = -dash->number;
 
@@ -1341,13 +1337,11 @@ Tk_ResetOutlineGC(
 
     if ((dash->number > 2) || (dash->number < -1) || (dash->number==2 &&
 	    (dash->pattern.array[0] != dash->pattern.array[1])) ||
-	    ((dash->number == -1) && (dash->pattern.array[1] != ','))) {
-	if (dash->number < 0) {
-	    dashList = (int) (4 * width + 0.5);
-	} else if (dash->number<3) {
+	    ((dash->number == -1) && (dash->pattern.array[0] != ','))) {
+	if (dash->number > 0) {
 	    dashList = dash->pattern.array[0];
 	} else {
-	    dashList = 4;
+	    dashList = (char) (4 * width + 0.5);
 	}
 	XSetDashes(((TkCanvas *)canvas)->display, outline->gc,
 		outline->offset, &dashList , 1);
@@ -1666,8 +1660,10 @@ TkCanvTranslatePath(
     double *a, *b, *t;		/* Pointers to parts of the temporary
 				 * storage */
     int i, j;			/* Loop counters */
+#ifndef NDEBUG
     int maxOutput;		/* Maximum number of outputs that we will
 				 * allow */
+#endif
     double limit[4];		/* Boundries at which clipping occurs */
     double staticSpace[480];	/* Temp space from the stack */
 
@@ -1762,7 +1758,9 @@ TkCanvTranslatePath(
      * This is the loop that makes the four passes through the data.
      */
 
+#ifndef NDEBUG
     maxOutput = numVertex*3;
+#endif
     for (j=0; j<4; j++){
 	double xClip = limit[j];
 	int inside = a[0]<xClip;

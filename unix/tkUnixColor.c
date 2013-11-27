@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkUnixColor.c,v 1.6 2007/12/13 15:28:50 dgp Exp $
  */
 
 #include "tkInt.h"
@@ -138,8 +136,22 @@ TkpGetColor(
     if (*name != '#') {
 	XColor screen;
 
-	if (XAllocNamedColor(display, colormap, name, &screen,
-		&color) != 0) {
+	if (((*name - 'A') & 0xdf) < sizeof(tkWebColors)/sizeof(tkWebColors[0])) {
+	    const char *p = tkWebColors[((*name - 'A') & 0x1f)];
+	    if (p) {
+		const char *q = name;
+		while (!((*p - *(++q)) & 0xdf)) {
+		    if (!*p++) {
+			name = p;
+			goto gotWebColor;
+		    }
+		}
+	    }
+	}
+	if (strlen(name) > 99) {
+	/* Don't bother to parse this. [Bug 2809525]*/
+	return (TkColor *) NULL;
+    } else if (XAllocNamedColor(display, colormap, name, &screen, &color) != 0) {
 	    DeleteStressedCmap(display, colormap);
 	} else {
 	    /*
@@ -155,7 +167,8 @@ TkpGetColor(
 	    FindClosestColor(tkwin, &screen, &color);
 	}
     } else {
-	if (XParseColor(display, colormap, name, &color) == 0) {
+    gotWebColor:
+	if (TkParseColor(display, colormap, name, &color) == 0) {
 	    return NULL;
 	}
 	if (XAllocColor(display, colormap, &color) != 0) {

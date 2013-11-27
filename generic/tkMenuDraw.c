@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkMenuDraw.c,v 1.10 2007/12/13 15:24:16 dgp Exp $
  */
 
 #include "tkInt.h"
@@ -846,7 +844,7 @@ TkPostTearoffMenu(
 				 * posting */
 {
     int vRootX, vRootY, vRootWidth, vRootHeight;
-    int tmp, result;
+    int result;
 
     TkActivateMenuEntry(menuPtr, -1);
     TkRecomputeMenu(menuPtr);
@@ -879,31 +877,23 @@ TkPostTearoffMenu(
      * 2. The menu may not have been mapped yet, so its current size might be
      *    the default 1x1. To compute how much space it needs, use its
      *    requested size, not its actual size.
-     *
-     * Note that this code assumes square screen regions and all positive
-     * coordinates. This does not work on a Mac with multiple monitors. But
-     * then again, Tk has other problems with this.
      */
 
     Tk_GetVRootGeometry(Tk_Parent(menuPtr->tkwin), &vRootX, &vRootY,
 	&vRootWidth, &vRootHeight);
-    x += vRootX;
-    y += vRootY;
-    tmp = WidthOfScreen(Tk_Screen(menuPtr->tkwin))
-	- Tk_ReqWidth(menuPtr->tkwin);
-    if (x > tmp) {
-	x = tmp;
+    vRootWidth -= Tk_ReqWidth(menuPtr->tkwin);
+    if (x > vRootX + vRootWidth) {
+	x = vRootX + vRootWidth;
     }
-    if (x < 0) {
-	x = 0;
+    if (x < vRootX) {
+	x = vRootX;
     }
-    tmp = HeightOfScreen(Tk_Screen(menuPtr->tkwin))
-	- Tk_ReqHeight(menuPtr->tkwin);
-    if (y > tmp) {
-	y = tmp;
+    vRootHeight -= Tk_ReqHeight(menuPtr->tkwin);
+    if (y > vRootY + vRootHeight) {
+	y = vRootY + vRootHeight;
     }
-    if (y < 0) {
-	y = 0;
+    if (y < vRootY) {
+	y = vRootY;
     }
     Tk_MoveToplevelWindow(menuPtr->tkwin, x, y);
     if (!Tk_IsMapped(menuPtr->tkwin)) {
@@ -984,11 +974,15 @@ TkPostSubmenu(
 	 * attempt to match Motif behavior).
 	 *
 	 * The menu has to redrawn so that the entry can change relief.
+	 *
+	 * Set postedCascade early to ensure tear-off submenus work on
+	 * Windows. [Bug 873613]
 	 */
 
 	Tk_GetRootCoords(menuPtr->tkwin, &x, &y);
 	AdjustMenuCoords(menuPtr, mePtr, &x, &y);
 
+	menuPtr->postedCascade = mePtr;
 	subary[0] = mePtr->namePtr;
 	subary[1] = Tcl_NewStringObj("post", -1);
 	subary[2] = Tcl_NewIntObj(x);
@@ -1001,9 +995,9 @@ TkPostSubmenu(
 	Tcl_DecrRefCount(subary[2]);
 	Tcl_DecrRefCount(subary[3]);
 	if (result != TCL_OK) {
+	    menuPtr->postedCascade = NULL;
 	    return result;
 	}
-	menuPtr->postedCascade = mePtr;
 	TkEventuallyRedrawMenu(menuPtr, mePtr);
     }
     return TCL_OK;

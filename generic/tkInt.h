@@ -10,8 +10,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: $Id: tkInt.h,v 1.82.2.2 2008/12/21 23:52:45 ferrieux Exp $
  */
 
 #ifndef _TKINT
@@ -313,8 +311,9 @@ typedef struct TkDisplay {
 				 * multiple applications on the display have
 				 * the focus, this will refer to the innermost
 				 * window in the innermost application. This
-				 * information isn't used under Unix or
-				 * Windows, but it's needed on the Mac. */
+				 * information isn't used on Windows, but it's
+				 * needed on the Mac, and also on X11 when XIM
+				 * processing is being done. */
 
     /*
      * Information used by tkGC.c only:
@@ -571,6 +570,7 @@ typedef struct TkDisplay {
 #define TK_DISPLAY_USE_IM			(1 << 1)
 #define TK_DISPLAY_WM_TRACING			(1 << 3)
 #define TK_DISPLAY_IN_WARP			(1 << 4)
+#define TK_DISPLAY_USE_XKB			(1 << 5)
 
 /*
  * One of the following structures exists for each error handler created by a
@@ -852,6 +852,24 @@ typedef struct TkWindow {
 } TkWindow;
 
 /*
+ * Real definition of some events. Note that these events come from outside
+ * but have internally generated pieces added to them.
+ */
+
+typedef struct {
+    XKeyEvent keyEvent;		/* The real event from X11. */
+    char *charValuePtr;		/* A pointer to a string that holds the key's
+				 * %A substitution text (before backslash
+				 * adding), or NULL if that has not been
+				 * computed yet. If non-NULL, this string was
+				 * allocated with ckalloc(). */
+    int charValueLen;		/* Length of string in charValuePtr when that
+				 * is non-NULL. */
+    KeySym keysym;		/* Key symbol computed after input methods
+				 * have been invoked */
+} TkKeyEvent;
+
+/*
  * The following structure is used as a two way map between integers and
  * strings, usually to map between an internal C representation and the
  * strings used in Tcl.
@@ -953,6 +971,8 @@ MODULE_SCOPE Tk_PhotoImageFormat tkImgFmtPPM;
 MODULE_SCOPE TkMainInfo		*tkMainWindowList;
 MODULE_SCOPE Tk_ImageType	tkPhotoImageType;
 MODULE_SCOPE Tcl_HashTable	tkPredefBitmapTable;
+
+MODULE_SCOPE CONST char *const tkWebColors[20];
 
 #include "tkIntDecls.h"
 
@@ -1112,9 +1132,8 @@ MODULE_SCOPE int	Tk_WmObjCmd(ClientData clientData, Tcl_Interp *interp,
 			    int objc, Tcl_Obj *const objv[]);
 
 MODULE_SCOPE int	Tk_GetDoublePixelsFromObj(Tcl_Interp *interp,
-						  Tk_Window tkwin,
-						  Tcl_Obj *objPtr,
-						  double *doublePtr);
+			    Tk_Window tkwin, Tcl_Obj *objPtr,
+			    double *doublePtr);
 
 MODULE_SCOPE void	TkEventInit(void);
 MODULE_SCOPE void	TkRegisterObjTypes(void);
@@ -1124,53 +1143,11 @@ MODULE_SCOPE int	TkDeadAppCmd(ClientData clientData,
 MODULE_SCOPE int	TkCanvasGetCoordObj(Tcl_Interp *interp,
 			    Tk_Canvas canvas, Tcl_Obj *obj,
 			    double *doublePtr);
-MODULE_SCOPE int	TkCanvasDashParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkCanvasDashPrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
 MODULE_SCOPE int	TkGetDoublePixels(Tcl_Interp *interp, Tk_Window tkwin,
 			    const char *string, double *doublePtr);
-MODULE_SCOPE int	TkOffsetParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkOffsetPrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
-MODULE_SCOPE int	TkOrientParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkOrientPrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
-MODULE_SCOPE int	TkPixelParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkPixelPrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
 MODULE_SCOPE int	TkPostscriptImage(Tcl_Interp *interp, Tk_Window tkwin,
 			    Tk_PostscriptInfo psInfo, XImage *ximage,
 			    int x, int y, int width, int height);
-MODULE_SCOPE int	TkSmoothParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *recordPtr, int offset);
-MODULE_SCOPE char *	TkSmoothPrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *recordPtr, int offset,
-			    Tcl_FreeProc **freeProcPtr);
-MODULE_SCOPE int	TkStateParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkStatePrintProc(ClientData clientData,
-			    Tk_Window tkwin, char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
-MODULE_SCOPE int	TkTileParseProc(ClientData clientData,
-			    Tcl_Interp *interp, Tk_Window tkwin,
-			    const char *value, char *widgRec, int offset);
-MODULE_SCOPE char *	TkTilePrintProc(ClientData clientData, Tk_Window tkwin,
-			    char *widgRec, int offset,
-			    Tcl_FreeProc **freeProcPtr);
 MODULE_SCOPE void       TkMapTopFrame(Tk_Window tkwin);
 MODULE_SCOPE XEvent *	TkpGetBindingXEvent(Tcl_Interp *interp);
 MODULE_SCOPE void	TkCreateExitHandler(Tcl_ExitProc *proc,
@@ -1205,6 +1182,16 @@ MODULE_SCOPE void	TkUnderlineCharsInContext(Display *display,
 			    int firstByte, int lastByte);
 MODULE_SCOPE void	TkpGetFontAttrsForChar(Tk_Window tkwin, Tk_Font tkfont,
 			    Tcl_UniChar c, struct TkFontAttributes *faPtr);
+#ifdef __WIN32__
+#define TkParseColor XParseColor
+#else
+MODULE_SCOPE Status TkParseColor (Display * display,
+				Colormap map, CONST char* spec,
+				XColor * colorPtr);
+#endif
+#ifdef HAVE_XFT
+MODULE_SCOPE void	TkUnixSetXftClipRegion(TkRegion clipRegion);
+#endif
 
 MODULE_SCOPE void	TkDrawAngledTextLayout(Display *display,
 			    Drawable drawable, GC gc, Tk_TextLayout layout,
@@ -1231,7 +1218,7 @@ MODULE_SCOPE int	TkUnsupported1ObjCmd(ClientData clientData,
 #define TCL_STORAGE_CLASS DLLIMPORT
 
 #endif /* _TKINT */
-
+
 /*
  * Local Variables:
  * mode: c
