@@ -24,3 +24,7 @@ configure-output.log.err
 make.log
 make.log.err
 compile
+unix/Tk-Info.plist
+unix/Wish-Info.plist
+unix/libtk8.5.dylib.E
+unix/tk.pc
