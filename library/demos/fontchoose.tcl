@@ -1,8 +1,6 @@
 # fontchoose.tcl --
 #
 # Show off the stock font selector dialog
-#
-# RCS: @(#) $Id: fontchoose.tcl,v 1.1 2008/12/12 02:02:35 patthoyts Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
@@ -10,7 +8,7 @@ if {![info exists widgetDemo]} {
 
 package require Tk
 
-set w .fontchoice
+set w .fontchoose
 catch {destroy $w}
 toplevel $w
 wm title $w "Font Selection Dialog"

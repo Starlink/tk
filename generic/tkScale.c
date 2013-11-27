@@ -15,8 +15,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkScale.c,v 1.33 2008/11/08 22:52:29 dkf Exp $
  */
 
 #include "default.h"
@@ -44,17 +42,17 @@ static const char *const stateStrings[] = {
 static const Tk_OptionSpec optionSpecs[] = {
     {TK_OPTION_BORDER, "-activebackground", "activeBackground", "Foreground",
 	DEF_SCALE_ACTIVE_BG_COLOR, -1, Tk_Offset(TkScale, activeBorder),
-	0, (ClientData) DEF_SCALE_ACTIVE_BG_MONO, 0},
+	0, DEF_SCALE_ACTIVE_BG_MONO, 0},
     {TK_OPTION_BORDER, "-background", "background", "Background",
 	DEF_SCALE_BG_COLOR, -1, Tk_Offset(TkScale, bgBorder),
-	0, (ClientData) DEF_SCALE_BG_MONO, 0},
+	0, DEF_SCALE_BG_MONO, 0},
     {TK_OPTION_DOUBLE, "-bigincrement", "bigIncrement", "BigIncrement",
 	DEF_SCALE_BIG_INCREMENT, -1, Tk_Offset(TkScale, bigIncrement),
 	0, 0, 0},
     {TK_OPTION_SYNONYM, "-bd", NULL, NULL,
-	NULL, 0, -1, 0, (ClientData) "-borderwidth", 0},
+	NULL, 0, -1, 0, "-borderwidth", 0},
     {TK_OPTION_SYNONYM, "-bg", NULL, NULL,
-	NULL, 0, -1, 0, (ClientData) "-background", 0},
+	NULL, 0, -1, 0, "-background", 0},
     {TK_OPTION_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
 	DEF_SCALE_BORDER_WIDTH, -1, Tk_Offset(TkScale, borderWidth),
 	0, 0, 0},
@@ -68,7 +66,7 @@ static const Tk_OptionSpec optionSpecs[] = {
 	DEF_SCALE_DIGITS, -1, Tk_Offset(TkScale, digits),
 	0, 0, 0},
     {TK_OPTION_SYNONYM, "-fg", "foreground", NULL,
-	NULL, 0, -1, 0, (ClientData) "-foreground", 0},
+	NULL, 0, -1, 0, "-foreground", 0},
     {TK_OPTION_FONT, "-font", "font", "Font",
 	DEF_SCALE_FONT, -1, Tk_Offset(TkScale, tkfont), 0, 0, 0},
     {TK_OPTION_COLOR, "-foreground", "foreground", "Foreground",
@@ -79,7 +77,7 @@ static const Tk_OptionSpec optionSpecs[] = {
     {TK_OPTION_BORDER, "-highlightbackground", "highlightBackground",
 	"HighlightBackground", DEF_SCALE_HIGHLIGHT_BG_COLOR,
 	-1, Tk_Offset(TkScale, highlightBorder),
-	0, (ClientData) DEF_SCALE_HIGHLIGHT_BG_MONO, 0},
+	0, DEF_SCALE_HIGHLIGHT_BG_MONO, 0},
     {TK_OPTION_COLOR, "-highlightcolor", "highlightColor", "HighlightColor",
 	DEF_SCALE_HIGHLIGHT, -1, Tk_Offset(TkScale, highlightColorPtr),
 	0, 0, 0},
@@ -93,7 +91,7 @@ static const Tk_OptionSpec optionSpecs[] = {
 	DEF_SCALE_LENGTH, -1, Tk_Offset(TkScale, length), 0, 0, 0},
     {TK_OPTION_STRING_TABLE, "-orient", "orient", "Orient",
 	DEF_SCALE_ORIENT, -1, Tk_Offset(TkScale, orient),
-	0, (ClientData) orientStrings, 0},
+	0, orientStrings, 0},
     {TK_OPTION_RELIEF, "-relief", "relief", "Relief",
 	DEF_SCALE_RELIEF, -1, Tk_Offset(TkScale, relief), 0, 0, 0},
     {TK_OPTION_INT, "-repeatdelay", "repeatDelay", "RepeatDelay",
@@ -116,7 +114,7 @@ static const Tk_OptionSpec optionSpecs[] = {
 	0, 0, 0},
     {TK_OPTION_STRING_TABLE, "-state", "state", "State",
 	DEF_SCALE_STATE, -1, Tk_Offset(TkScale, state),
-	0, (ClientData) stateStrings, 0},
+	0, stateStrings, 0},
     {TK_OPTION_STRING, "-takefocus", "takeFocus", "TakeFocus",
 	DEF_SCALE_TAKE_FOCUS, Tk_Offset(TkScale, takeFocusPtr), -1,
 	TK_OPTION_NULL_OK, 0, 0},
@@ -127,7 +125,7 @@ static const Tk_OptionSpec optionSpecs[] = {
 	DEF_SCALE_TO, -1, Tk_Offset(TkScale, toValue), 0, 0, 0},
     {TK_OPTION_COLOR, "-troughcolor", "troughColor", "Background",
 	DEF_SCALE_TROUGH_COLOR, -1, Tk_Offset(TkScale, troughColorPtr),
-	0, (ClientData) DEF_SCALE_TROUGH_MONO, 0},
+	0, DEF_SCALE_TROUGH_MONO, 0},
     {TK_OPTION_STRING, "-variable", "variable", "Variable",
 	DEF_SCALE_VARIABLE, Tk_Offset(TkScale, varNamePtr), -1,
 	TK_OPTION_NULL_OK, 0, 0},
@@ -177,9 +175,11 @@ static void		ScaleSetVariable(TkScale *scalePtr);
  * that can be invoked from generic window code.
  */
 
-static Tk_ClassProcs scaleClass = {
+static const Tk_ClassProcs scaleClass = {
     sizeof(Tk_ClassProcs),	/* size */
     ScaleWorldChanged,		/* worldChangedProc */
+    NULL,					/* createProc */
+    NULL					/* modalProc */
 };
 
 /*
@@ -376,6 +376,7 @@ ScaleWidgetObjCmd(
     case COMMAND_COORDS: {
 	int x, y;
 	double value;
+	Tcl_Obj *coords[2];
 
 	if ((objc != 2) && (objc != 3)) {
 	    Tcl_WrongNumArgs(interp, 1, objv, "coords ?value?");
@@ -397,7 +398,9 @@ ScaleWidgetObjCmd(
 	    y = scalePtr->horizTroughY + scalePtr->width/2
 		    + scalePtr->borderWidth;
 	}
-	Tcl_SetObjResult(interp, Tcl_ObjPrintf("%d %d", x, y));
+	coords[0] = Tcl_NewIntObj(x);
+	coords[1] = Tcl_NewIntObj(y);
+	Tcl_SetObjResult(interp, Tcl_NewListObj(2, coords));
 	break;
     }
     case COMMAND_GET: {
@@ -421,7 +424,8 @@ ScaleWidgetObjCmd(
 	break;
     }
     case COMMAND_IDENTIFY: {
-	int x, y, thing;
+	int x, y;
+	const char *zone = "";
 
 	if (objc != 4) {
 	    Tcl_WrongNumArgs(interp, 1, objv, "identify x y");
@@ -431,18 +435,12 @@ ScaleWidgetObjCmd(
 		|| (Tcl_GetIntFromObj(interp, objv[3], &y) != TCL_OK)) {
 	    goto error;
 	}
-	thing = TkpScaleElement(scalePtr, x,y);
-	switch (thing) {
-	case TROUGH1:
-	    Tcl_SetResult(interp, "trough1", TCL_STATIC);
-	    break;
-	case SLIDER:
-	    Tcl_SetResult(interp, "slider", TCL_STATIC);
-	    break;
-	case TROUGH2:
-	    Tcl_SetResult(interp, "trough2", TCL_STATIC);
-	    break;
+	switch (TkpScaleElement(scalePtr, x, y)) {
+	case TROUGH1:	zone = "trough1"; break;
+	case SLIDER:	zone = "slider";  break;
+	case TROUGH2:	zone = "trough2"; break;
 	}
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(zone, -1));
 	break;
     }
     case COMMAND_SET: {
@@ -1004,7 +1002,7 @@ ScaleEventProc(
     if ((eventPtr->type == Expose) && (eventPtr->xexpose.count == 0)) {
 	TkEventuallyRedrawScale(scalePtr, REDRAW_ALL);
     } else if (eventPtr->type == DestroyNotify) {
-	DestroyScale((char *) clientData);
+	DestroyScale(clientData);
     } else if (eventPtr->type == ConfigureNotify) {
 	ComputeScaleGeometry(scalePtr);
 	TkEventuallyRedrawScale(scalePtr, REDRAW_ALL);

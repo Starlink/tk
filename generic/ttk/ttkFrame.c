@@ -1,4 +1,4 @@
-/* $Id: ttkFrame.c,v 1.13 2008/11/09 23:53:09 jenglish Exp $
+/*
  * Copyright (c) 2004, Joe English
  *
  * ttk::frame and ttk::labelframe widgets.
@@ -44,16 +44,17 @@ static Tk_OptionSpec FrameOptionSpecs[] = {
 	Tk_Offset(Frame,frame.heightObj), -1,
 	0,0,GEOMETRY_CHANGED },
 
+    WIDGET_TAKEFOCUS_FALSE,
     WIDGET_INHERIT_OPTIONS(ttkCoreOptionSpecs)
 };
 
-static WidgetCommandSpec FrameCommands[] = {
-    { "configure",	TtkWidgetConfigureCommand },
-    { "cget",		TtkWidgetCgetCommand },
-    { "instate",	TtkWidgetInstateCommand },
-    { "state",  	TtkWidgetStateCommand },
-    { "identify",   TtkWidgetIdentifyCommand },
-    { NULL, NULL }
+static const Ttk_Ensemble FrameCommands[] = {
+    { "configure",	TtkWidgetConfigureCommand,0 },
+    { "cget",   	TtkWidgetCgetCommand,0 },
+    { "instate",	TtkWidgetInstateCommand,0 },
+    { "state",  	TtkWidgetStateCommand,0 },
+    { "identify",	TtkWidgetIdentifyCommand,0 },
+    { 0,0,0 }
 };
 
 /*
@@ -205,10 +206,9 @@ int TtkGetLabelAnchorFromObj(
 
 error:
     if (interp) {
-	Tcl_ResetResult(interp);
-	Tcl_AppendResult(interp,
-	    "Bad label anchor specification ", Tcl_GetString(objPtr),
-	    NULL);
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+		"Bad label anchor specification %s", Tcl_GetString(objPtr)));
+	Tcl_SetErrorCode(interp, "TTK", "LABEL", "ANCHOR", NULL);
     }
     return TCL_ERROR;
 }
@@ -533,6 +533,9 @@ static void LabelframeCleanup(void *recordPtr)
 {
     Labelframe *lframe = recordPtr;
     Ttk_DeleteManager(lframe->label.mgr);
+    if (lframe->label.labelLayout) {
+	Ttk_FreeLayout(lframe->label.labelLayout);
+    }
 }
 
 /* RaiseLabelWidget --

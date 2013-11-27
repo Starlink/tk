@@ -8,8 +8,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkUnixEvent.c,v 1.31 2008/10/22 16:30:16 das Exp $
  */
 
 #include "tkUnixInt.h"
@@ -123,14 +121,14 @@ TkpOpenDisplay(
     if (display == NULL) {
 	return NULL;
     }
-    dispPtr = (TkDisplay *) ckalloc(sizeof(TkDisplay));
+    dispPtr = ckalloc(sizeof(TkDisplay));
     memset(dispPtr, 0, sizeof(TkDisplay));
     dispPtr->display = display;
 #ifdef TK_USE_INPUT_METHODS
     OpenIM(dispPtr);
 #endif
     Tcl_CreateFileHandler(ConnectionNumber(display), TCL_READABLE,
-	    DisplayFileProc, (ClientData) dispPtr);
+	    DisplayFileProc, dispPtr);
     return dispPtr;
 }
 
@@ -204,7 +202,7 @@ TkClipCleanup(
 		dispPtr->windowAtom);
 
 	Tk_DestroyWindow(dispPtr->clipWindow);
-	Tcl_Release((ClientData) dispPtr->clipWindow);
+	Tcl_Release(dispPtr->clipWindow);
 	dispPtr->clipWindow = NULL;
     }
 }
@@ -276,31 +274,78 @@ static void
 TransferXEventsToTcl(
     Display *display)
 {
-    XEvent event;
+    union {
+	int type;
+	XEvent x;
+	TkKeyEvent k;
+#ifdef GenericEvent
+	xGenericEvent xge;
+#endif
+    } event;
+    Window w;
+    TkDisplay *dispPtr = NULL;
 
     /*
      * Transfer events from the X event queue to the Tk event queue after XIM
-     * event filtering. KeyPress and KeyRelease events are filtered in
-     * Tk_HandleEvent instead of here, so that Tk's focus management code can
-     * redirect them.
+     * event filtering. KeyPress and KeyRelease events need special treatment
+     * so that they get directed according to Tk's focus rules during XIM
+     * handling. Theoretically they can go to the wrong place still (if
+     * there's a focus change in the queue) but if we push the handling off
+     * until Tk_HandleEvent then many input methods actually cease to work
+     * correctly. Most of the time, Tk processes its event queue fast enough
+     * for this to not be an issue anyway. [Bug 1924761]
      */
 
     while (QLength(display) > 0) {
-	XNextEvent(display, &event);
+	XNextEvent(display, &event.x);
 #ifdef GenericEvent
 	if (event.type == GenericEvent) {
-	    xGenericEvent *xgePtr = (xGenericEvent *) &event;
-
 	    Tcl_Panic("Wild GenericEvent; panic! (extension=%d,evtype=%d)",
-		    xgePtr->extension, xgePtr->evtype);
+		    event.xge.extension, event.xge.evtype);
 	}
 #endif
-	if (event.type != KeyPress && event.type != KeyRelease) {
-	    if (XFilterEvent(&event, None)) {
-		continue;
+	w = None;
+	if (event.type == KeyPress || event.type == KeyRelease) {
+	    for (dispPtr = TkGetDisplayList(); ; dispPtr = dispPtr->nextPtr) {
+		if (dispPtr == NULL) {
+		    break;
+		} else if (dispPtr->display == event.x.xany.display) {
+		    if (dispPtr->focusPtr != NULL) {
+			w = dispPtr->focusPtr->window;
+		    }
+		    break;
+		}
 	    }
 	}
-	Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
+	if (XFilterEvent(&event.x, w)) {
+	    continue;
+	}
+	if (event.type == KeyPress || event.type == KeyRelease) {
+	    event.k.charValuePtr = NULL;
+	    event.k.charValueLen = 0;
+	    event.k.keysym = NoSymbol;
+
+	    /*
+	     * Force the calling of the input method engine now. The results
+	     * from it will be cached in the event so that they don't get lost
+	     * (to a race condition with other XIM-handled key events) between
+	     * entering the event queue and getting serviced. [Bug 1924761]
+	     */
+
+#ifdef TK_USE_INPUT_METHODS
+	    if (event.type == KeyPress && dispPtr &&
+		    (dispPtr->flags & TK_DISPLAY_USE_IM)) {
+		if (dispPtr->focusPtr && dispPtr->focusPtr->inputContext) {
+		    Tcl_DString ds;
+
+		    Tcl_DStringInit(&ds);
+		    (void) TkpGetString(dispPtr->focusPtr, &event.x, &ds);
+		    Tcl_DStringFree(&ds);
+		}
+	    }
+#endif
+	}
+	Tk_QueueWindowEvent(&event.x, TCL_QUEUE_TAIL);
     }
 }
 
@@ -507,7 +552,7 @@ TkUnixDoOneXEvent(
 	index = fd/(NBBY*sizeof(fd_mask));
 	bit = ((fd_mask)1) << (fd%(NBBY*sizeof(fd_mask)));
 	if ((readMask[index] & bit) || (QLength(dispPtr->display) > 0)) {
-	    DisplayFileProc((ClientData)dispPtr, TCL_READABLE);
+	    DisplayFileProc(dispPtr, TCL_READABLE);
 	}
     }
     if (Tcl_ServiceEvent(TCL_WINDOW_EVENTS)) {
@@ -649,6 +694,22 @@ error:
     }
 }
 #endif /* TK_USE_INPUT_METHODS */
+
+void
+TkpWarpPointer(
+    TkDisplay *dispPtr)
+{
+    Window w;			/* Which window to warp relative to. */
+
+    if (dispPtr->warpWindow != NULL) {
+	w = Tk_WindowId(dispPtr->warpWindow);
+    } else {
+	w = RootWindow(dispPtr->display,
+		Tk_ScreenNumber(dispPtr->warpMainwin));
+    }
+    XWarpPointer(dispPtr->display, None, w, 0, 0, 0, 0,
+	    (int) dispPtr->warpX, (int) dispPtr->warpY);
+}
 
 /*
  * Local Variables:

@@ -1,6 +1,4 @@
 #
-# $Id: xpTheme.tcl,v 1.12 2008/12/05 11:11:58 patthoyts Exp $
-#
 # Settings for 'xpnative' theme
 #
 
@@ -48,7 +46,10 @@ namespace eval ttk::theme::xpnative {
 	ttk::style map TCombobox \
 	    -selectbackground [list !focus SystemWindow] \
 	    -selectforeground [list !focus SystemWindowText] \
-	    -foreground	[list {readonly focus} SystemHighlightText] \
+	    -foreground	[list \
+		disabled		SystemGrayText \
+	    	{readonly focus}	SystemHighlightText \
+	    ] \
 	    -focusfill	[list {readonly focus} SystemHighlight] \
 	    ;
 

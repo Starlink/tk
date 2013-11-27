@@ -13,11 +13,15 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkOldTest.c,v 1.4 2008/11/03 22:20:22 nijtmans Exp $
  */
 
 #define USE_OLD_IMAGE
+#ifndef USE_TCL_STUBS
+#   define USE_TCL_STUBS
+#endif
+#ifndef USE_TK_STUBS
+#   define USE_TK_STUBS
+#endif
 #include "tkInt.h"
 
 /*
@@ -69,7 +73,8 @@ static Tk_ImageType imageType = {
     ImageFree,			/* freeProc */
     ImageDelete,		/* deleteProc */
     NULL,			/* postscriptPtr */
-    NULL			/* nextPtr */
+    NULL,			/* nextPtr */
+    NULL
 };
 
 /*
@@ -78,7 +83,6 @@ static Tk_ImageType imageType = {
 
 static int              ImageCmd(ClientData dummy,
                             Tcl_Interp *interp, int argc, const char **argv);
-MODULE_SCOPE int	TkOldTestInit(Tcl_Interp *interp);
 
 
 /*
@@ -162,14 +166,14 @@ ImageCreate(
 	varName = argv[i+1];
     }
 
-    timPtr = (TImageMaster *) ckalloc(sizeof(TImageMaster));
+    timPtr = ckalloc(sizeof(TImageMaster));
     timPtr->master = master;
     timPtr->interp = interp;
     timPtr->width = 30;
     timPtr->height = 15;
-    timPtr->imageName = (char *) ckalloc((unsigned) (strlen(name) + 1));
+    timPtr->imageName = ckalloc((unsigned) (strlen(name) + 1));
     strcpy(timPtr->imageName, name);
-    timPtr->varName = (char *) ckalloc((unsigned) (strlen(varName) + 1));
+    timPtr->varName = ckalloc((unsigned) (strlen(varName) + 1));
     strcpy(timPtr->varName, varName);
     Tcl_CreateCommand(interp, name, ImageCmd, timPtr, NULL);
     *clientDataPtr = timPtr;
@@ -267,7 +271,7 @@ ImageGet(
     Tcl_SetVar(timPtr->interp, timPtr->varName, buffer,
 	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
 
-    instPtr = (TImageInstance *) ckalloc(sizeof(TImageInstance));
+    instPtr = ckalloc(sizeof(TImageInstance));
     instPtr->masterPtr = timPtr;
     instPtr->fg = Tk_GetColor(timPtr->interp, tkwin, "#ff0000");
     gcValues.foreground = instPtr->fg->pixel;
@@ -358,7 +362,7 @@ ImageFree(
 	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
     Tk_FreeColor(instPtr->fg);
     Tk_FreeGC(display, instPtr->gc);
-    ckfree((char *) instPtr);
+    ckfree(instPtr);
 }
 
 /*
@@ -394,7 +398,7 @@ ImageDelete(
     Tcl_DeleteCommand(timPtr->interp, timPtr->imageName);
     ckfree(timPtr->imageName);
     ckfree(timPtr->varName);
-    ckfree((char *) timPtr);
+    ckfree(timPtr);
 }
 
 /*

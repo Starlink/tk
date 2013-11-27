@@ -10,8 +10,6 @@
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkBusy.c,v 1.6 2008/12/10 00:34:51 das Exp $
  */
 
 #include "tkInt.h"
@@ -23,13 +21,13 @@
  * OSX/Aqua, that's nothing at all.
  */
 
-static Tk_OptionSpec busyOptionSpecs[] = {
+static const Tk_OptionSpec busyOptionSpecs[] = {
 #ifndef MAC_OSX_TK
     {TK_OPTION_CURSOR, "-cursor", "cursor", "Cursor",
 	DEF_BUSY_CURSOR, -1, Tk_Offset(Busy, cursor),
 	TK_OPTION_NULL_OK, 0, 0},
 #endif
-    {TK_OPTION_END, NULL, NULL, NULL, NULL, 0, 0, 0, 0}
+    {TK_OPTION_END, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0}
 };
 
 /*
@@ -526,7 +524,7 @@ CreateBusy(
     Window parent;
     Tk_FakeWin *winPtr;
 
-    busyPtr = (Busy *) ckalloc(sizeof(Busy));
+    busyPtr = ckalloc(sizeof(Busy));
     x = y = 0;
     length = strlen(Tk_Name(tkRef));
     name = ckalloc(length + 6);
@@ -689,8 +687,10 @@ GetBusy(
     }
     hPtr = Tcl_FindHashEntry(busyTablePtr, (char *) tkwin);
     if (hPtr == NULL) {
-	Tcl_AppendResult(interp, "can't find busy window \"",
-		Tcl_GetString(windowObj), "\"", NULL);
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+		"can't find busy window \"%s\"", Tcl_GetString(windowObj)));
+	Tcl_SetErrorCode(interp, "TK", "LOOKUP", "BUSY",
+		Tcl_GetString(windowObj), NULL);
 	return NULL;
     }
     return Tcl_GetHashValue(hPtr);
@@ -791,7 +791,7 @@ Tk_BusyObjCmd(
     Busy *busyPtr;
     Tcl_Obj *objPtr;
     int index, result = TCL_OK;
-    static const char *optionStrings[] = {
+    static const char *const optionStrings[] = {
 	"cget", "configure", "current", "forget", "hold", "status", NULL
     };
     enum options {

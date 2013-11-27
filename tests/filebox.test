@@ -5,9 +5,6 @@
 # Copyright (c) 1996 Sun Microsystems, Inc.
 # Copyright (c) 1998-1999 by Scriptics Corporation.
 # All rights reserved.
-#
-# RCS: @(#) $Id: filebox.test,v 1.21 2007/12/13 15:27:54 dgp Exp $
-#
 
 package require tcltest 2.1
 eval tcltest::configure $argv
@@ -114,7 +111,7 @@ if {$tcl_platform(platform) == "unix"} {
 }
 
 set unknownOptionsMsg(tk_getOpenFile) {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, -title, or -typevariable}
-set unknownOptionsMsg(tk_getSaveFile) {bad option "-foo": must be -defaultextension, -filetypes, -initialdir, -initialfile, -parent, -title, or -typevariable}
+set unknownOptionsMsg(tk_getSaveFile) {bad option "-foo": must be -confirmoverwrite, -defaultextension, -filetypes, -initialdir, -initialfile, -parent, -title, or -typevariable}
 
 set tmpFile "filebox.tmp"
 makeFile {
@@ -212,7 +209,7 @@ foreach mode $modes {
     } ""
 
     set fileName $tmpFile
-    set fileDir [pwd]
+    set fileDir [tcltest::temporaryDirectory]
     set pathName [file join $fileDir $fileName]
 
     test filebox-2.2-$mode "tk_getOpenFile command" nonUnixUserInteraction {
@@ -226,6 +223,7 @@ foreach mode $modes {
 		-parent $parent -initialdir $fileDir]
     } $pathName
     test filebox-2.4-$mode "tk_getOpenFile command" nonUnixUserInteraction {
+        cd $fileDir
         ToPressButton $parent ok
         set choice [tk_getOpenFile -title "Enter \"$fileName\" and press Ok" \
 		-parent $parent -initialdir . -initialfile $fileName]

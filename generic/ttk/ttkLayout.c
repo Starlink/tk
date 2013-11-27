@@ -4,8 +4,6 @@
  * Generic layout processing.
  *
  * Copyright (c) 2003 Joe English.  Freely redistributable.
- *
- * $Id: ttkLayout.c,v 1.13 2008/12/07 16:34:56 das Exp $
  */
 
 #include <string.h>
@@ -328,8 +326,9 @@ int Ttk_GetPaddingFromObj(
 
     if (padc > 4) {
 	if (interp) {
-	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "Wrong #elements in padding spec", NULL);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		    "Wrong #elements in padding spec", -1));
+	    Tcl_SetErrorCode(interp, "TTK", "VALUE", "PADDING", NULL);
 	}
 	goto error;
     }
@@ -365,8 +364,9 @@ int Ttk_GetBorderFromObj(Tcl_Interp *interp, Tcl_Obj *objPtr, Ttk_Padding *pad)
 
     if (padc > 4) {
 	if (interp) {
-	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "Wrong #elements in border spec", NULL);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		    "Wrong #elements in padding spec", -1));
+	    Tcl_SetErrorCode(interp, "TTK", "VALUE", "BORDER", NULL);
 	}
 	goto error;
     }
@@ -478,11 +478,10 @@ int Ttk_GetStickyFromObj(
 	    case 's': case 'S': sticky |= TTK_STICK_S; break;
 	    default:
 	    	if (interp) {
-		    Tcl_ResetResult(interp);
-		    Tcl_AppendResult(interp,
-			"Bad -sticky specification ",
-			Tcl_GetString(objPtr),
-			NULL);
+		    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+			"Bad -sticky specification %s",
+			Tcl_GetString(objPtr)));
+		    Tcl_SetErrorCode(interp, "TTK", "VALUE", "STICKY", NULL);
 		}
 		return TCL_ERROR;
 	}
@@ -512,24 +511,27 @@ Tcl_Obj *Ttk_NewStickyObj(Ttk_Sticky sticky)
 /*------------------------------------------------------------------------
  * +++ Layout nodes.
  */
+
+typedef struct Ttk_LayoutNode_ Ttk_LayoutNode;
 struct Ttk_LayoutNode_
 {
     unsigned		flags;		/* Packing and sticky flags */
-    Ttk_ElementImpl 	element;	/* Element implementation */
+    Ttk_ElementClass 	*eclass;	/* Class record */
     Ttk_State 	 	state;		/* Current state */
     Ttk_Box 		parcel;		/* allocated parcel */
     Ttk_LayoutNode	*next, *child;
 };
 
-static Ttk_LayoutNode *Ttk_NewLayoutNode(unsigned flags, Ttk_ElementImpl element)
+static Ttk_LayoutNode *Ttk_NewLayoutNode(
+    unsigned flags, Ttk_ElementClass *elementClass)
 {
-    Ttk_LayoutNode *node = (Ttk_LayoutNode*)ckalloc(sizeof(Ttk_LayoutNode));
+    Ttk_LayoutNode *node = ckalloc(sizeof(*node));
 
     node->flags = flags;
-    node->element = element;
+    node->eclass = elementClass;
     node->state = 0u;
     node->next = node->child = 0;
-    /* parcel uninitialized */
+    node->parcel = Ttk_MakeBox(0,0,0,0);
 
     return node;
 }
@@ -539,7 +541,7 @@ static void Ttk_FreeLayoutNode(Ttk_LayoutNode *node)
     while (node) {
 	Ttk_LayoutNode *next = node->next;
 	Ttk_FreeLayoutNode(node->child);
-	ckfree((ClientData)node);
+	ckfree(node);
 	node = next;
     }
 }
@@ -556,7 +558,7 @@ struct Ttk_TemplateNode_ {
 
 static Ttk_TemplateNode *Ttk_NewTemplateNode(const char *name, unsigned flags)
 {
-    Ttk_TemplateNode *op = (Ttk_TemplateNode*)ckalloc(sizeof(*op));
+    Ttk_TemplateNode *op = ckalloc(sizeof(*op));
     op->name = ckalloc(strlen(name) + 1); strcpy(op->name, name);
     op->flags = flags;
     op->next = op->child = 0;
@@ -569,7 +571,7 @@ void Ttk_FreeLayoutTemplate(Ttk_LayoutTemplate op)
 	Ttk_LayoutTemplate next = op->next;
 	Ttk_FreeLayoutTemplate(op->child);
 	ckfree(op->name);
-	ckfree((ClientData)op);
+	ckfree(op);
 	op = next;
     }
 }
@@ -580,8 +582,8 @@ void Ttk_FreeLayoutTemplate(Ttk_LayoutTemplate op)
 static Ttk_LayoutNode *
 Ttk_InstantiateLayout(Ttk_Theme theme, Ttk_TemplateNode *op)
 {
-    Ttk_ElementImpl elementImpl = Ttk_GetElement(theme, op->name);
-    Ttk_LayoutNode *node = Ttk_NewLayoutNode(op->flags, elementImpl);
+    Ttk_ElementClass *elementClass = Ttk_GetElement(theme, op->name);
+    Ttk_LayoutNode *node = Ttk_NewLayoutNode(op->flags, elementClass);
 
     if (op->next) {
 	node->next = Ttk_InstantiateLayout(theme,op->next);
@@ -609,7 +611,7 @@ Ttk_LayoutTemplate Ttk_ParseLayoutTemplate(Tcl_Interp *interp, Tcl_Obj *objPtr)
 {
     enum {  OP_SIDE, OP_STICKY, OP_EXPAND, OP_BORDER, OP_UNIT, OP_CHILDREN };
     static const char *optStrings[] = {
-	    "-side", "-sticky", "-expand", "-border", "-unit", "-children", 0 };
+	"-side", "-sticky", "-expand", "-border", "-unit", "-children", 0 };
 
     int i = 0, objc;
     Tcl_Obj **objv;
@@ -619,7 +621,7 @@ Ttk_LayoutTemplate Ttk_ParseLayoutTemplate(Tcl_Interp *interp, Tcl_Obj *objPtr)
 	return 0;
 
     while (i < objc) {
-	char *elementName = Tcl_GetString(objv[i]);
+	const char *elementName = Tcl_GetString(objv[i]);
 	unsigned flags = 0x0, sticky = TTK_FILL_BOTH;
 	Tcl_Obj *childSpec = 0;
 
@@ -642,10 +644,10 @@ Ttk_LayoutTemplate Ttk_ParseLayoutTemplate(Tcl_Interp *interp, Tcl_Obj *objPtr)
 	    }
 
 	    if (++i >= objc) {
-		Tcl_ResetResult(interp);
-		Tcl_AppendResult(interp,
-			"Missing value for option ",Tcl_GetString(objv[i-1]),
-			NULL);
+		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+			"Missing value for option %s",
+			Tcl_GetString(objv[i-1])));
+		Tcl_SetErrorCode(interp, "TTK", "VALUE", "LAYOUT", NULL);
 		goto error;
 	    }
 
@@ -789,7 +791,7 @@ Tcl_Obj *Ttk_UnparseLayoutTemplate(Ttk_TemplateNode *node)
 		int side = 0;
 		unsigned sideFlags = flags & _TTK_MASK_PACK;
 
-		while ((sideFlags & TTK_PACK_LEFT) == 0) {
+		while (!(sideFlags & TTK_PACK_LEFT)) {
 		    ++side;
 		    sideFlags >>= 1;
 		}
@@ -798,9 +800,11 @@ Tcl_Obj *Ttk_UnparseLayoutTemplate(Ttk_TemplateNode *node)
 	    }
 	}
 
-	/* In Ttk_ParseLayoutTemplate, default -sticky is "nsew",
-	 * so always include this even if no sticky bits are set.
+	/*
+	 * In Ttk_ParseLayoutTemplate, default -sticky is "nsew", so always
+	 * include this even if no sticky bits are set.
 	 */
+
 	APPENDSTR("-sticky");
 	APPENDOBJ(Ttk_NewStickyObj(flags & _TTK_MASK_STICK));
 
@@ -838,7 +842,7 @@ static Ttk_Layout TTKNewLayout(
     void *recordPtr,Tk_OptionTable optionTable, Tk_Window tkwin,
     Ttk_LayoutNode *root)
 {
-    Ttk_Layout layout = (Ttk_Layout)ckalloc(sizeof(*layout));
+    Ttk_Layout layout = ckalloc(sizeof(*layout));
     layout->style = style;
     layout->recordPtr = recordPtr;
     layout->optionTable = optionTable;
@@ -850,7 +854,7 @@ static Ttk_Layout TTKNewLayout(
 void Ttk_FreeLayout(Ttk_Layout layout)
 {
     Ttk_FreeLayoutNode(layout->root);
-    ckfree((ClientData)layout);
+    ckfree(layout);
 }
 
 /*
@@ -870,12 +874,13 @@ Ttk_Layout Ttk_CreateLayout(
     Ttk_Style style = Ttk_GetStyle(themePtr, styleName);
     Ttk_LayoutTemplate layoutTemplate =
 	Ttk_FindLayoutTemplate(themePtr,styleName);
-    Ttk_ElementImpl bgelement = Ttk_GetElement(themePtr, "background");
+    Ttk_ElementClass *bgelement = Ttk_GetElement(themePtr, "background");
     Ttk_LayoutNode *bgnode;
 
     if (!layoutTemplate) {
-	Tcl_ResetResult(interp);
-	Tcl_AppendResult(interp, "Layout ", styleName, " not found", NULL);
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+		"Layout %s not found", styleName));
+	Tcl_SetErrorCode(interp, "TTK", "LOOKUP", "LAYOUT", styleName, NULL);
 	return 0;
     }
 
@@ -914,8 +919,9 @@ Ttk_CreateSublayout(
     layoutTemplate = Ttk_FindLayoutTemplate(themePtr, styleName);
 
     if (!layoutTemplate) {
-	Tcl_ResetResult(interp);
-	Tcl_AppendResult(interp, "Layout ", styleName, " not found", NULL);
+	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+		"Layout %s not found", styleName));
+	Tcl_SetErrorCode(interp, "TTK", "LOOKUP", "LAYOUT", styleName, NULL);
 	return 0;
     }
 
@@ -968,7 +974,7 @@ static void Ttk_NodeSize(
     int elementWidth, elementHeight, subWidth, subHeight;
     Ttk_Padding elementPadding;
 
-    Ttk_ElementSize(node->element,
+    Ttk_ElementSize(node->eclass,
 	layout->style, layout->recordPtr,layout->optionTable, layout->tkwin,
 	state|node->state,
 	&elementWidth, &elementHeight, &elementPadding);
@@ -1018,7 +1024,7 @@ Ttk_Padding Ttk_LayoutNodeInternalPadding(
 {
     int unused;
     Ttk_Padding padding;
-    Ttk_ElementSize(node->element,
+    Ttk_ElementSize(node->eclass,
 	layout->style, layout->recordPtr, layout->optionTable, layout->tkwin,
 	0/*state*/, &unused, &unused, &padding);
     return padding;
@@ -1112,7 +1118,7 @@ static void Ttk_DrawNodeList(
 	    Ttk_DrawNodeList(layout, substate, node->child, d);
 
 	Ttk_DrawElement(
-	    node->element,
+	    node->eclass,
 	    layout->style,layout->recordPtr,layout->optionTable,layout->tkwin,
 	    d, node->parcel, state | node->state);
 
@@ -1131,20 +1137,18 @@ void Ttk_DrawLayout(Ttk_Layout layout, Ttk_State state, Drawable d)
  */
 
 /*
- * Ttk_LayoutIdentify --
- * 	Find the layout node at the specified x,y coordinate.
+ * Ttk_IdentifyElement --
+ * 	Find the element at the specified x,y coordinate.
  */
-static Ttk_LayoutNode *
-Ttk_LayoutNodeIdentify(Ttk_LayoutNode *node, int x, int y)
+static Ttk_Element IdentifyNode(Ttk_Element node, int x, int y)
 {
-    Ttk_LayoutNode *closest = NULL;
+    Ttk_Element closest = NULL;
 
     for (; node; node = node->next) {
 	if (Ttk_BoxContains(node->parcel, x, y)) {
 	    closest = node;
 	    if (node->child && !(node->flags & TTK_UNIT)) {
-		Ttk_LayoutNode *childNode =
-			Ttk_LayoutNodeIdentify(node->child, x,y);
+		Ttk_Element childNode = IdentifyNode(node->child, x,y);
 		if (childNode) {
 		    closest = childNode;
 		}
@@ -1154,9 +1158,9 @@ Ttk_LayoutNodeIdentify(Ttk_LayoutNode *node, int x, int y)
     return closest;
 }
 
-Ttk_LayoutNode *Ttk_LayoutIdentify(Ttk_Layout layout, int x, int y)
+Ttk_Element Ttk_IdentifyElement(Ttk_Layout layout, int x, int y)
 {
-    return Ttk_LayoutNodeIdentify(layout->root, x, y);
+    return IdentifyNode(layout->root, x, y);
 }
 
 /*
@@ -1173,19 +1177,18 @@ static const char *tail(const char *elementName)
 }
 
 /*
- * Ttk_LayoutFindNode --
- * 	Look up a layout node by name.
+ * Ttk_FindElement --
+ * 	Look up an element by name
  */
-static Ttk_LayoutNode *
-Ttk_LayoutNodeFind(Ttk_LayoutNode *node, const char *nodeName)
+static Ttk_Element
+FindNode(Ttk_Element node, const char *nodeName)
 {
     for (; node ; node = node->next) {
-	if (!strcmp(tail(Ttk_LayoutNodeName(node)), nodeName))
+	if (!strcmp(tail(Ttk_ElementName(node)), nodeName))
 	    return node;
 
 	if (node->child) {
-	    Ttk_LayoutNode *childNode =
-		Ttk_LayoutNodeFind(node->child, nodeName);
+	    Ttk_Element childNode = FindNode(node->child, nodeName);
 	    if (childNode)
 		return childNode;
 	}
@@ -1193,22 +1196,48 @@ Ttk_LayoutNodeFind(Ttk_LayoutNode *node, const char *nodeName)
     return 0;
 }
 
-Ttk_LayoutNode *Ttk_LayoutFindNode(Ttk_Layout layout, const char *nodeName)
+Ttk_Element Ttk_FindElement(Ttk_Layout layout, const char *nodeName)
 {
-    return Ttk_LayoutNodeFind(layout->root, nodeName);
+    return FindNode(layout->root, nodeName);
 }
 
-const char *Ttk_LayoutNodeName(Ttk_LayoutNode *node)
+/*
+ * Ttk_ClientRegion --
+ * 	Find the internal parcel of a named element within a given layout.
+ * 	If the element is not present, use the entire window.
+ */
+Ttk_Box Ttk_ClientRegion(Ttk_Layout layout, const char *elementName)
 {
-    return Ttk_ElementName(node->element);
+    Ttk_Element element = Ttk_FindElement(layout, elementName);
+    return element
+	? Ttk_LayoutNodeInternalParcel(layout, element)
+	: Ttk_WinBox(layout->tkwin)
+	;
 }
 
-Ttk_Box Ttk_LayoutNodeParcel(Ttk_LayoutNode *node)
+/*
+ * Ttk_ElementName --
+ * 	Return the name (class name) of the element.
+ */
+const char *Ttk_ElementName(Ttk_Element node)
+{
+    return Ttk_ElementClassName(node->eclass);
+}
+
+/*
+ * Ttk_ElementParcel --
+ * 	Return the element's current parcel.
+ */
+Ttk_Box Ttk_ElementParcel(Ttk_Element node)
 {
     return node->parcel;
 }
 
-void Ttk_PlaceLayoutNode(Ttk_Layout layout, Ttk_LayoutNode *node, Ttk_Box b)
+/*
+ * Ttk_PlaceElement --
+ * 	Explicitly specify an element's parcel.
+ */
+void Ttk_PlaceElement(Ttk_Layout layout, Ttk_Element node, Ttk_Box b)
 {
     node->parcel = b;
     if (node->child) {
@@ -1217,6 +1246,9 @@ void Ttk_PlaceLayoutNode(Ttk_Layout layout, Ttk_LayoutNode *node, Ttk_Box b)
     }
 }
 
+/*
+ * Ttk_ChangeElementState --
+ */
 void Ttk_ChangeElementState(Ttk_LayoutNode *node,unsigned set,unsigned clr)
 {
     node->state = (node->state | set) & ~clr;

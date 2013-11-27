@@ -24,13 +24,11 @@
  *
  * Copyright (c) 1989-1994 The Regents of the University of California.
  * Copyright (c) 1994-1998 Sun Microsystems, Inc.
- * Copyright 2001, Apple Computer, Inc.
- * Copyright (c) 2005-2007 Daniel A. Steffen <das@users.sourceforge.net>
+ * Copyright 2001-2009, Apple Inc.
+ * Copyright (c) 2005-2009 Daniel A. Steffen <das@users.sourceforge.net>
  *
- * See the file "license.terms" for information on usage and redistribution of
- * this file, and for a DISCLAIMER OF ALL WARRANTIES.
- *
- * RCS: @(#) $Id: tkMacOSXSend.c,v 1.12 2008/12/07 16:36:26 das Exp $
+ * See the file "license.terms" for information on usage and redistribution
+ * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
 
 #include "tkMacOSXInt.h"
@@ -80,7 +78,7 @@ typedef struct NameRegistry {
 				 * XFree; zero means use ckfree. */
 } NameRegistry;
 
-static int initialized = false; /* A flag to denote if we have initialized
+static int initialized = 0; /* A flag to denote if we have initialized
 				 * yet. */
 
 static RegisteredInterp *interpListPtr = NULL;
@@ -283,7 +281,7 @@ Tk_SetAppName(
      * We have found a unique name. Now add it to the registry.
      */
 
-    riPtr = (RegisteredInterp *) ckalloc(sizeof(RegisteredInterp));
+    riPtr = ckalloc(sizeof(RegisteredInterp));
     riPtr->interp = interp;
     riPtr->name = ckalloc(strlen(actualName) + 1);
     riPtr->nextPtr = interpListPtr;
@@ -506,3 +504,12 @@ SendInit(
 {
     return TCL_OK;
 }
+
+/*
+ * Local Variables:
+ * mode: objc
+ * c-basic-offset: 4
+ * fill-column: 79
+ * coding: utf-8
+ * End:
+ */

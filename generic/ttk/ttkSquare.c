@@ -1,15 +1,13 @@
 /* square.c - Copyright (C) 2004 Pat Thoyts <patthoyts@users.sourceforge.net>
  *
  * Minimal sample ttk widget.
- *
- * $Id: ttkSquare.c,v 1.6 2007/12/13 15:26:26 dgp Exp $
  */
 
 #include <tk.h>
 #include "ttkTheme.h"
 #include "ttkWidget.h"
 
-#ifdef TTK_SQUARE_WIDGET
+#if defined(TTK_SQUARE_WIDGET) || 1
 
 #ifndef DEFAULT_BORDERWIDTH
 #define DEFAULT_BORDERWIDTH "2"
@@ -52,8 +50,6 @@ typedef struct
 
 static Tk_OptionSpec SquareOptionSpecs[] =
 {
-    WIDGET_TAKES_FOCUS,
-
     {TK_OPTION_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
      DEFAULT_BORDERWIDTH, Tk_Offset(Square,square.borderWidthObj), -1,
      0,0,GEOMETRY_CHANGED },
@@ -78,6 +74,7 @@ static Tk_OptionSpec SquareOptionSpecs[] =
     {TK_OPTION_ANCHOR, "-anchor", "anchor", "Anchor",
      NULL, Tk_Offset(Square,square.anchorObj), -1, TK_OPTION_NULL_OK, 0, 0},
     
+    WIDGET_TAKEFOCUS_TRUE,
     WIDGET_INHERIT_OPTIONS(ttkCoreOptionSpecs)
 };
 
@@ -100,9 +97,9 @@ SquareDoLayout(void *clientData)
 {
     WidgetCore *corePtr = (WidgetCore *)clientData;
     Ttk_Box winBox;
-    Ttk_LayoutNode *squareNode;
+    Ttk_Element squareNode;
 
-    squareNode = Ttk_LayoutFindNode(corePtr->layout, "square");
+    squareNode = Ttk_FindElement(corePtr->layout, "square");
     winBox = Ttk_WinBox(corePtr->tkwin);
     Ttk_PlaceLayout(corePtr->layout, corePtr->state, winBox);
 
@@ -116,12 +113,12 @@ SquareDoLayout(void *clientData)
 	Tk_Anchor anchor = TK_ANCHOR_CENTER;
 	Ttk_Box b;
 
-	b = Ttk_LayoutNodeParcel(squareNode);
+	b = Ttk_ElementParcel(squareNode);
 	if (squarePtr->square.anchorObj != NULL)
 	    Tk_GetAnchorFromObj(NULL, squarePtr->square.anchorObj, &anchor);
 	b = Ttk_AnchorBox(winBox, b.width, b.height, anchor);
 
-	Ttk_PlaceLayoutNode(corePtr->layout, squareNode, b);
+	Ttk_PlaceElement(corePtr->layout, squareNode, b);
     }
 }
 
@@ -131,14 +128,13 @@ SquareDoLayout(void *clientData)
  * that are sufficient for our needs.
  */
 
-static WidgetCommandSpec SquareCommands[] =
-{
-    { "configure",	TtkWidgetConfigureCommand },
-    { "cget",		TtkWidgetCgetCommand },
-    { "identify",	TtkWidgetIdentifyCommand },
-    { "instate",	TtkWidgetInstateCommand },
-    { "state",  	TtkWidgetStateCommand },
-    { NULL, NULL }
+static const Ttk_Ensemble SquareCommands[] = {
+    { "configure",	TtkWidgetConfigureCommand,0 },
+    { "cget",		TtkWidgetCgetCommand,0 },
+    { "identify",	TtkWidgetIdentifyCommand,0 },
+    { "instate",	TtkWidgetInstateCommand,0 },
+    { "state",  	TtkWidgetStateCommand,0 },
+    { 0,0,0 }
 };
 
 /*
@@ -192,7 +188,7 @@ static Ttk_ElementOptionSpec SquareElementOptions[] =
     	"raised" },
     { "-width",  TK_OPTION_PIXELS, Tk_Offset(SquareElement,widthObj), "20"},
     { "-height", TK_OPTION_PIXELS, Tk_Offset(SquareElement,heightObj), "20"},
-    { NULL }
+    { NULL, 0, 0, NULL }
 };
 
 /*
@@ -223,10 +219,9 @@ static void SquareElementDraw(
     Drawable d, Ttk_Box b, unsigned int state)
 {
     SquareElement *square = elementRecord;
-    Tk_3DBorder border = NULL, foreground = NULL;
+    Tk_3DBorder foreground = NULL;
     int borderWidth = 1, relief = TK_RELIEF_FLAT;
 
-    border = Tk_Get3DBorderFromObj(tkwin, square->borderObj);
     foreground = Tk_Get3DBorderFromObj(tkwin, square->foregroundObj);
     Tcl_GetIntFromObj(NULL, square->borderWidthObj, &borderWidth);
     Tk_GetReliefFromObj(NULL, square->reliefObj, &relief);

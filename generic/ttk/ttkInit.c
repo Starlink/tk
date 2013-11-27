@@ -1,4 +1,4 @@
-/* $Id: ttkInit.c,v 1.8 2008/04/27 22:41:12 dkf Exp $
+/*
  * Copyright (c) 2003, Joe English
  *
  * Ttk package: initialization routine and miscellaneous utilities.
@@ -114,17 +114,17 @@ void TtkCheckStateOption(WidgetCore *corePtr, Tcl_Obj *objPtr)
  */
 void TtkSendVirtualEvent(Tk_Window tgtWin, const char *eventName)
 {
-    XEvent event;
+    union {XEvent general; XVirtualEvent virtual;} event;
 
     memset(&event, 0, sizeof(event));
-    event.xany.type = VirtualEvent;
-    event.xany.serial = NextRequest(Tk_Display(tgtWin));
-    event.xany.send_event = False;
-    event.xany.window = Tk_WindowId(tgtWin);
-    event.xany.display = Tk_Display(tgtWin);
-    ((XVirtualEvent *) &event)->name = Tk_GetUid(eventName);
+    event.general.xany.type = VirtualEvent;
+    event.general.xany.serial = NextRequest(Tk_Display(tgtWin));
+    event.general.xany.send_event = False;
+    event.general.xany.window = Tk_WindowId(tgtWin);
+    event.general.xany.display = Tk_Display(tgtWin);
+    event.virtual.name = Tk_GetUid(eventName);
 
-    Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
+    Tk_QueueWindowEvent(&event.general, TCL_QUEUE_TAIL);
 }
 
 /* TtkEnumerateOptions, TtkGetOptionValue --
@@ -177,15 +177,13 @@ int TtkGetOptionValue(
 /* public */ 
 Tk_OptionSpec ttkCoreOptionSpecs[] =
 {
-    {TK_OPTION_STRING, "-takefocus", "takeFocus", "TakeFocus",
-	"", Tk_Offset(WidgetCore, takeFocusPtr), -1, 0,0,0 },
     {TK_OPTION_CURSOR, "-cursor", "cursor", "Cursor", NULL,
 	Tk_Offset(WidgetCore, cursorObj), -1, TK_OPTION_NULL_OK,0,0 },
     {TK_OPTION_STRING, "-style", "style", "Style", "",
 	Tk_Offset(WidgetCore,styleObj), -1, 0,0,STYLE_CHANGED},
     {TK_OPTION_STRING, "-class", "", "", NULL,
 	Tk_Offset(WidgetCore,classObj), -1, 0,0,READONLY_OPTION},
-    {TK_OPTION_END}
+    {TK_OPTION_END, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0}
 };
 
 /*------------------------------------------------------------------------
@@ -259,7 +257,7 @@ static void RegisterThemes(Tcl_Interp *interp)
  * Ttk initialization.
  */
 
-extern TtkStubs ttkStubs;
+extern const TtkStubs ttkStubs;
 
 MODULE_SCOPE int
 Ttk_Init(Tcl_Interp *interp)
@@ -276,7 +274,7 @@ Ttk_Init(Tcl_Interp *interp)
 
     Ttk_PlatformInit(interp);
 
-    Tcl_PkgProvideEx(interp, "Ttk", TTK_PATCH_LEVEL, (void*)&ttkStubs);
+    Tcl_PkgProvideEx(interp, "Ttk", TTK_PATCH_LEVEL, (ClientData)&ttkStubs);
 
     return TCL_OK;
 }

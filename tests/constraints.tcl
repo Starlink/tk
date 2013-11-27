@@ -138,6 +138,42 @@ namespace eval tk {
             focus -force .focus.e
             destroy .focus
 	}
+
+
+        namespace export imageInit imageFinish imageCleanup imageNames
+        variable ImageNames
+        proc imageInit {} {
+            variable ImageNames
+            if {![info exists ImageNames]} {
+                set ImageNames [lsort [image names]]
+            }
+            imageCleanup
+            if {[lsort [image names]] ne $ImageNames} {
+                return -code error "IMAGE NAMES mismatch: [image names] != $ImageNames"
+            }
+        }
+        proc imageFinish {} {
+            variable ImageNames
+            if {[lsort [image names]] ne $ImageNames} {
+                return -code error "images remaining: [image names] != $ImageNames"
+            }
+            imageCleanup
+        }
+        proc imageCleanup {} {
+            variable ImageNames
+            foreach img [image names] {
+                if {$img ni $ImageNames} {image delete $img}
+            }
+        }
+        proc imageNames {} {
+            variable ImageNames
+            set r {}
+            foreach img [image names] {
+                if {$img ni $ImageNames} {lappend r $img}
+            }
+            return $r
+        }
+
     }
 }
 
@@ -199,7 +235,7 @@ if {![string match {{22 3 6 15} {31 18 [34] 15}} $x]} {
     testConstraint fonts 0
 }
 testConstraint textfonts [expr {
-    [testConstraint fonts] || $tcl_platform(platform) eq "windows"
+    [testConstraint fonts] || [tk windowingsystem] eq "win32"
 }]
 
 # constraints for the visuals available..

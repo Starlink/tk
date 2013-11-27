@@ -1,6 +1,4 @@
 #
-# $Id: altTheme.tcl,v 1.9 2008/11/29 00:43:48 patthoyts Exp $
-#
 # Ttk widget set: Alternate theme
 #
 
@@ -11,6 +9,7 @@ namespace eval ttk::theme::alt {
 	-frame 		"#d9d9d9"
 	-window		"#ffffff"
 	-darker 	"#c3c3c3"
+	-border		"#414141"
 	-activebg 	"#ececec"
 	-disabledfg	"#a3a3a3"
 	-selectbg	"#4a6984"
@@ -23,6 +22,7 @@ namespace eval ttk::theme::alt {
 	    -background 	$colors(-frame) \
 	    -foreground 	black \
 	    -troughcolor	$colors(-darker) \
+	    -bordercolor	$colors(-border) \
 	    -selectbackground 	$colors(-selectbg) \
 	    -selectforeground 	$colors(-selectfg) \
 	    -font 		TkDefaultFont \

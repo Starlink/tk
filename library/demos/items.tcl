@@ -2,8 +2,6 @@
 #
 # This demonstration script creates a canvas that displays the
 # canvas item types.
-#
-# RCS: @(#) $Id: items.tcl,v 1.9 2008/11/22 22:38:52 dkf Exp $
 
 if {![info exists widgetDemo]} {
     error "This script should be run from the \"widget\" demo."
@@ -142,9 +140,13 @@ $c create arc 0.5c 20c 9.5c 24c -width 4m -style pieslice \
 $c create arc 5.5c 20.5c 9.5c 23.5c -width 4m -style chord \
 	-fill $blue -outline {} -start 45 -extent 270  -tags item
 
-$c create text 15c 16.2c -text Bitmaps -anchor n
-$c create bitmap 13c 20c -tags item \
-	-bitmap @[file join $tk_demoDirectory images face.xbm]
+image create photo items.ousterhout \
+    -file [file join $tk_demoDirectory images ouster.png]
+image create photo items.ousterhout.active -format "png -alpha 0.5" \
+    -file [file join $tk_demoDirectory images ouster.png]
+$c create text 15c 16.2c -text "Bitmaps and Images" -anchor n
+$c create image 13c 20c -tags item -image items.ousterhout \
+    -activeimage items.ousterhout.active
 $c create bitmap 17c 18.5c -tags item \
 	-bitmap @[file join $tk_demoDirectory images noletter.xbm]
 $c create bitmap 17c 21.5c -tags item \
@@ -171,7 +173,7 @@ bind $c <2> "$c scan mark %x %y"
 bind $c <B2-Motion> "$c scan dragto %x %y"
 bind $c <3> "itemMark $c %x %y"
 bind $c <B3-Motion> "itemStroke $c %x %y"
-bind $c <Control-f> "itemsUnderArea $c"
+bind $c <<NextChar>> "itemsUnderArea $c"
 bind $c <1> "itemStartDrag $c %x %y"
 bind $c <B1-Motion> "itemDrag $c %x %y"
 
@@ -185,14 +187,17 @@ proc itemEnter {c} {
 	return
     }
     set type [$c type current]
-    if {$type == "window"} {
+    if {$type == "window" || $type == "image"} {
 	set restoreCmd {}
 	return
-    }
-    if {$type == "bitmap"} {
+    } elseif {$type == "bitmap"} {
 	set bg [lindex [$c itemconf current -background] 4]
 	set restoreCmd [list $c itemconfig current -background $bg]
 	$c itemconfig current -background SteelBlue2
+	return
+    } elseif {$type == "image"} {
+	set restoreCmd [list $c itemconfig current -state normal]
+	$c itemconfig current -state active
 	return
     }
     set fill [lindex [$c itemconfig current -fill] 4]
@@ -281,6 +286,6 @@ proc itemDrag {c x y} {
 # is invoked.
 
 proc butPress {w color} {
-    set i [$w create text 25c 18.1c -text "Ouch!!" -fill $color -anchor n]
+    set i [$w create text 25c 18.1c -text "Oooohhh!!" -fill $color -anchor n]
     after 500 "$w delete $i"
 }
