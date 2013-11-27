@@ -1,3 +1,91 @@
+2011-11-04  Don Porter  <dgp@users.sourceforge.net>
+
+	*** 8.5.11 TAGGED FOR RELEASE ***
+
+	* generic/tk.h:		Bump to 8.5.11 for release.
+	* library/tk.tcl:
+	* unix/configure.in:
+	* unix/tk.spec:
+	* win/configure.in:
+	* README:
+
+	* unix/configure:	autoconf-2.59
+	* win/configure:
+
+	* changes:	Updated for 8.5.11 release.
+
+2011-11-01  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkObj.c (GetPixelsFromObjEx): [Bug 3431491]: Use a bit of
+	type hackery to allow numbers to be interpreted as coordinates (most
+	notably on a canvas) without reinterpreting via a string.
+
+2011-10-26  Don Porter  <dgp@users.sourceforge.net>
+
+	* changes:	Updates for 8.5.11.
+
+2011-10-01  Kevin B. Kenny  <kennykb@acm.org>
+
+	* generic/tkInt.h:	[Bug 3410609] Change the event mechanism
+	* unix/tkUnixEvent.c:	for <KeyPress> events to use the keysym
+	* unix/tkUnixKey.c:	returned by XLookupString in preference to
+	the one that appears in the raw X event at any level. This change
+	allows binding to ISO_Level3_Shift-ed characters, composed characters,
+	and similar beasts. KeyRelease events still work as they did before,
+	as does Tk with input methods disabled.
+
+2011-09-01  Donal K. Fellows  <dkf@users.sf.net>
+
+	* doc/photo.n: Correctly documented what the [$ph data] command
+	produces without the -format option.
+
+2011-08-16  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkWinDialog.c: [Bug 3388350] mingw64 compiler warnings
+	* win/tkWinDraw.c
+	* win/tkWinSend.c
+	* win/tkWinSendCom.c
+	* win/tkWinColor.c
+	* win/tkWinDialog.c
+	* win/tkWinEmbed.c
+	* win/tkWinMenu.c
+	* win/tkWinPixmap.c
+	* win/tkWinTest.c
+	* win/tkWinWindow.c
+	* win/tkWinWm.c
+	* win/tkWinX.c
+	* win/stubs.c
+	* generic/tkAtom.c
+	* generic/tkSelect.c
+
+2011-08-13  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkBitmap.c: [Bug 3388350] mingw64 compiler warnings
+	* generic/tkConsole.c
+	* unix/tkUnixMenubu.c
+	* win/tkWinButton.c
+	* win/tkWinEmbed.c
+	* win/tkWinFont.c
+	* win/tkWinImage.c
+	* win/tkWinKey.c
+	* win/tkWinTest.c
+	* win/tkWinWm.c
+
+2011-08-03  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/tkWinDialog.c: [Bug 3314770] regression - Windows file
+	dialogs not resizable
+
+2011-07-28  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* xlib/X11/Xutil.h: [Bug 3380684] XEmptyRegion prototype doesn't
+	match usage
+
+2011-06-29  Don Porter  <dgp@users.sourceforge.net>
+
+	* generic/ttk/ttkTrace.c: [Bug 3341056] Correct segfault due to flaw
+	* tests/ttk/ttk.test:	in the 2011-06-17 commit.
+
 2011-06-23  Don Porter  <dgp@users.sourceforge.net>
 
 	* changes:	Updated for 8.5.10 release.
