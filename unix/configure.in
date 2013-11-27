@@ -362,7 +362,7 @@ if test "`uname -s`" = "Darwin" ; then
     fi
 else
     tk_aqua=no
-dnl fi
+fi
 
 if test $tk_aqua = yes; then
     AC_DEFINE(MAC_OSX_TK, 1, [Are we building TkAqua?])
@@ -673,12 +673,12 @@ if test "$FRAMEWORK_BUILD" = "1" ; then
     # Construct a fake local framework structure to make linking with
     # '-framework Tk' and running of tktest work
     AC_CONFIG_COMMANDS([Tk.framework], [n=Tk &&
-	f=$n.framework && v=Versions/$VERSION &&
+        f=$n.framework && v=Versions/$VERSION &&
         rm -rf $f && mkdir -p $f/$v/Resources &&
-	ln -s $v/$n $v/Resources $f && ln -s ../../../$n $f/$v &&
-	ln -s ../../../../$n-Info.plist $f/$v/Resources/Info.plist &&
-	if test $tk_aqua = yes; then ln -s ../../../../$n.rsrc $f/$v/Resources; fi &&
-	unset n f v
+        ln -s $v/$n $v/Resources $f && ln -s ../../../$n $f/$v &&
+        ln -s ../../../../$n-Info.plist $f/$v/Resources/Info.plist &&
+        if test $tk_aqua = yes; then ln -s ../../../../$n.rsrc $f/$v/Resources; fi &&
+        unset n f v
     ], VERSION=${TK_VERSION} && tk_aqua=${tk_aqua})
     LD_LIBRARY_PATH_VAR="DYLD_FRAMEWORK_PATH"
     if test "${libdir}" = '${exec_prefix}/lib'; then

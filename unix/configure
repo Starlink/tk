@@ -9888,6 +9888,7 @@ _ACEOF
     fi
 else
     tk_aqua=no
+fi
 
 if test $tk_aqua = yes; then
 
