@@ -184,15 +184,18 @@ Tk_MainEx(
     InteractiveState is;
 
     /*
-     * Ensure that we are getting a compatible version of Tcl. This is really
-     * only an issue when Tk is loaded dynamically.
+     * Ensure that we are getting a compatible version of Tcl.
      */
 
-    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
-	abort();
+    if (Tcl_InitStubs(interp, "8.6", 0) == NULL) {
+	if (Tcl_InitStubs(interp, "8.1", 0) == NULL) {
+	    abort();
+	} else {
+	    Tcl_Panic("%s", Tcl_GetString(Tcl_GetObjResult(interp)));
+	}
     }
 
-#if defined(__WIN32__) && !defined(__WIN64__) && !defined(UNICODE) && !defined(STATIC_BUILD)
+#if defined(__WIN32__) && !defined(UNICODE) && !defined(STATIC_BUILD)
 
     if (tclStubsPtr->reserved9) {
 	/* We are running win32 Tk under Cygwin, so let's check
@@ -315,7 +318,7 @@ Tk_MainEx(
      */
 
     if (appInitProc(interp) != TCL_OK) {
-	TkpDisplayWarning(Tcl_GetStringResult(interp),
+	TkpDisplayWarning(Tcl_GetString(Tcl_GetObjResult(interp)),
 		"application-specific initialization failed");
     }
 
@@ -335,7 +338,7 @@ Tk_MainEx(
 	     */
 
 	    Tcl_AddErrorInfo(interp, "");
-	    TkpDisplayWarning(Tcl_GetVar(interp, "errorInfo",
+	    TkpDisplayWarning(Tcl_GetVar2(interp, "errorInfo", NULL,
 		    TCL_GLOBAL_ONLY), "Error in startup script");
 	    Tcl_DeleteInterp(interp);
 	    Tcl_Exit(1);
@@ -448,7 +451,7 @@ StdinProc(
 	Tcl_CreateChannelHandler(isPtr->input, TCL_READABLE, StdinProc, isPtr);
     }
     Tcl_DStringFree(&isPtr->command);
-    if (Tcl_GetStringResult(interp)[0] != '\0') {
+    if (Tcl_GetString(Tcl_GetObjResult(interp))[0] != '\0') {
 	if ((code != TCL_OK) || (isPtr->tty)) {
 	    chan = Tcl_GetStdChannel((code != TCL_OK) ? TCL_STDERR : TCL_STDOUT);
 	    if (chan) {
@@ -511,7 +514,7 @@ Prompt(
 	if (code != TCL_OK) {
 	    Tcl_AddErrorInfo(interp,
 		    "\n    (script that generates prompt)");
-	    if (Tcl_GetStringResult(interp)[0] != '\0') {
+	    if (Tcl_GetString(Tcl_GetObjResult(interp))[0] != '\0') {
 		chan = Tcl_GetStdChannel(TCL_STDERR);
 		if (chan != NULL) {
 		    Tcl_WriteObj(chan, Tcl_GetObjResult(interp));

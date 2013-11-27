@@ -109,8 +109,8 @@ Tk_BellObjCmd(
     }
 
     for (i = 1; i < objc; i++) {
-	if (Tcl_GetIndexFromObj(interp, objv[i], bellOptions, "option", 0,
-		&index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[i], bellOptions,
+		sizeof(char *), "option", 0, &index) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 	switch ((enum options) index) {
@@ -452,7 +452,7 @@ TkFreeBindingTags(
 	     * have to be freed.
 	     */
 
-	    ckfree(p);
+	    ckfree((char *)p);
 	}
     }
     ckfree(winPtr->tagPtr);
@@ -1018,8 +1018,8 @@ Tk_TkwaitObjCmd(
 
     switch ((enum options) index) {
     case TKWAIT_VARIABLE:
-	if (Tcl_TraceVar(interp, Tcl_GetString(objv[2]),
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	if (Tcl_TraceVar2(interp, Tcl_GetString(objv[2]),
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		WaitVariableProc, &done) != TCL_OK) {
 	    return TCL_ERROR;
 	}
@@ -1031,8 +1031,8 @@ Tk_TkwaitObjCmd(
 	    }
 	    Tcl_DoOneEvent(0);
 	}
-	Tcl_UntraceVar(interp, Tcl_GetString(objv[2]),
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_UntraceVar2(interp, Tcl_GetString(objv[2]),
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		WaitVariableProc, &done);
 	break;
 
@@ -2118,7 +2118,7 @@ TkDeadAppCmd(
     const char **argv)		/* Argument strings. */
 {
     Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-	    "can't invoke \"%s\" command: application has been destroyed", 
+	    "can't invoke \"%s\" command: application has been destroyed",
 	    argv[0]));
     return TCL_ERROR;
 }

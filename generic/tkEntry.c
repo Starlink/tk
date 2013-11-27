@@ -392,7 +392,7 @@ static const char *const selElementNames[] = {
 static int		ConfigureEntry(Tcl_Interp *interp, Entry *entryPtr,
 			    int objc, Tcl_Obj *const objv[], int flags);
 static void		DeleteChars(Entry *entryPtr, int index, int count);
-static void		DestroyEntry(char *memPtr);
+static void		DestroyEntry(void *memPtr);
 static void		DisplayEntry(ClientData clientData);
 static void		EntryBlinkProc(ClientData clientData);
 static void		EntryCmdDeletedProc(ClientData clientData);
@@ -1010,19 +1010,19 @@ EntryWidgetObjCmd(
 
 static void
 DestroyEntry(
-    char *memPtr)		/* Info about entry widget. */
+    void *memPtr)		/* Info about entry widget. */
 {
-    Entry *entryPtr = (Entry *) memPtr;
+    Entry *entryPtr = memPtr;
 
     /*
      * Free up all the stuff that requires special handling, then let
      * Tk_FreeOptions handle all the standard option-related stuff.
      */
 
-    ckfree(entryPtr->string);
+    ckfree((char *)entryPtr->string);
     if (entryPtr->textVarName != NULL) {
-	Tcl_UntraceVar(entryPtr->interp, entryPtr->textVarName,
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_UntraceVar2(entryPtr->interp, entryPtr->textVarName,
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		EntryTextVarProc, entryPtr);
 	entryPtr->flags &= ~ENTRY_VAR_TRACED;
     }
@@ -1034,7 +1034,7 @@ DestroyEntry(
     }
     Tcl_DeleteTimerHandler(entryPtr->insertBlinkHandler);
     if (entryPtr->displayString != entryPtr->string) {
-	ckfree(entryPtr->displayString);
+	ckfree((char *)entryPtr->displayString);
     }
     if (entryPtr->type == TK_SPINBOX) {
 	Spinbox *sbPtr = (Spinbox *) entryPtr;
@@ -1105,7 +1105,7 @@ ConfigureEntry(
 
     if ((entryPtr->textVarName != NULL)
 	    && (entryPtr->flags & ENTRY_VAR_TRACED)) {
-	Tcl_UntraceVar(interp, entryPtr->textVarName,
+	Tcl_UntraceVar2(interp, entryPtr->textVarName, NULL,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		EntryTextVarProc, entryPtr);
 	entryPtr->flags &= ~ENTRY_VAR_TRACED;
@@ -1303,7 +1303,7 @@ ConfigureEntry(
     if (entryPtr->textVarName != NULL) {
 	const char *value;
 
-	value = Tcl_GetVar(interp, entryPtr->textVarName, TCL_GLOBAL_ONLY);
+	value = Tcl_GetVar2(interp, entryPtr->textVarName, NULL, TCL_GLOBAL_ONLY);
 	if (value == NULL) {
 	    EntryValueChanged(entryPtr, NULL);
 	} else {
@@ -1357,8 +1357,8 @@ ConfigureEntry(
 
     if ((entryPtr->textVarName != NULL)
 	    && !(entryPtr->flags & ENTRY_VAR_TRACED)) {
-	Tcl_TraceVar(interp, entryPtr->textVarName,
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_TraceVar2(interp, entryPtr->textVarName,
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		EntryTextVarProc, entryPtr);
 	entryPtr->flags |= ENTRY_VAR_TRACED;
     }
@@ -1881,7 +1881,7 @@ EntryComputeGeometry(
     char *p;
 
     if (entryPtr->displayString != entryPtr->string) {
-	ckfree(entryPtr->displayString);
+	ckfree((char *)entryPtr->displayString);
 	entryPtr->displayString = entryPtr->string;
 	entryPtr->numDisplayBytes = entryPtr->numBytes;
     }
@@ -2037,7 +2037,7 @@ InsertChars(
 	return;
     }
 
-    ckfree(string);
+    ckfree((char *)string);
     entryPtr->string = newStr;
 
     /*
@@ -2142,7 +2142,7 @@ DeleteChars(
     }
 
     ckfree(toDelete);
-    ckfree(entryPtr->string);
+    ckfree((char *)entryPtr->string);
     entryPtr->string = newStr;
     entryPtr->numChars -= count;
     entryPtr->numBytes -= byteCount;
@@ -2231,8 +2231,8 @@ EntryValueChanged(
     if (entryPtr->textVarName == NULL) {
 	newValue = NULL;
     } else {
-	newValue = Tcl_SetVar(entryPtr->interp, entryPtr->textVarName,
-		entryPtr->string, TCL_GLOBAL_ONLY);
+	newValue = Tcl_SetVar2(entryPtr->interp, entryPtr->textVarName,
+		NULL, entryPtr->string, TCL_GLOBAL_ONLY);
     }
 
     if ((newValue != NULL) && (strcmp(newValue, entryPtr->string) != 0)) {
@@ -2318,13 +2318,13 @@ EntrySetValue(
 
 	if (entryPtr->flags & VALIDATE_ABORT) {
 	    entryPtr->flags &= ~VALIDATE_ABORT;
-	    ckfree(value);
+	    ckfree((char *)value);
 	    return;
 	}
     }
 
     oldSource = entryPtr->string;
-    ckfree(entryPtr->string);
+    ckfree((char *)entryPtr->string);
 
     if (malloced) {
 	entryPtr->string = value;
@@ -2429,7 +2429,7 @@ EntryEventProc(
 	    if (entryPtr->flags & REDRAW_PENDING) {
 		Tcl_CancelIdleCall(DisplayEntry, clientData);
 	    }
-	    Tcl_EventuallyFree(clientData, DestroyEntry);
+	    Tcl_EventuallyFree(clientData, (Tcl_FreeProc *) DestroyEntry);
 	}
 	break;
     case ConfigureNotify:
@@ -2560,7 +2560,7 @@ GetEntryIndex(
     case '@': {
 	int x, roundUp, maxWidth;
 
-	if (Tcl_GetInt(interp, string + 1, &x) != TCL_OK) {
+	if (Tcl_GetInt(NULL, string + 1, &x) != TCL_OK) {
 	    goto badIndex;
 	}
 	if (x < entryPtr->inset) {
@@ -2589,7 +2589,7 @@ GetEntryIndex(
 	break;
     }
     default:
-	if (Tcl_GetInt(interp, string, indexPtr) != TCL_OK) {
+	if (Tcl_GetInt(NULL, string, indexPtr) != TCL_OK) {
 	    goto badIndex;
 	}
 	if (*indexPtr < 0){
@@ -2939,6 +2939,7 @@ EntryUpdateScrollbar(
     int code;
     double first, last;
     Tcl_Interp *interp;
+    Tcl_DString buf;
 
     if (entryPtr->scrollCmd == NULL) {
 	return;
@@ -2949,8 +2950,14 @@ EntryUpdateScrollbar(
     EntryVisibleRange(entryPtr, &first, &last);
     Tcl_PrintDouble(NULL, first, firstStr);
     Tcl_PrintDouble(NULL, last, lastStr);
-    code = Tcl_VarEval(interp, entryPtr->scrollCmd, " ", firstStr, " ",
-	    lastStr, NULL);
+    Tcl_DStringInit(&buf);
+    Tcl_DStringAppend(&buf, entryPtr->scrollCmd, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, firstStr, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, lastStr, -1);
+    code = Tcl_EvalEx(interp, Tcl_DStringValue(&buf), -1, 0);
+    Tcl_DStringFree(&buf);
     if (code != TCL_OK) {
 	Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
 		"\n    (horizontal scrolling command executed by %s)",
@@ -3095,9 +3102,9 @@ EntryTextVarProc(
 
     if (flags & TCL_TRACE_UNSETS) {
 	if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
-	    Tcl_SetVar(interp, entryPtr->textVarName, entryPtr->string,
-		    TCL_GLOBAL_ONLY);
-	    Tcl_TraceVar(interp, entryPtr->textVarName,
+	    Tcl_SetVar2(interp, entryPtr->textVarName, NULL,
+		    entryPtr->string, TCL_GLOBAL_ONLY);
+	    Tcl_TraceVar2(interp, entryPtr->textVarName, NULL,
 		    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		    EntryTextVarProc, clientData);
 	    entryPtr->flags |= ENTRY_VAR_TRACED;
@@ -3111,7 +3118,7 @@ EntryTextVarProc(
      * value because we changed it because someone typed in the entry).
      */
 
-    value = Tcl_GetVar(interp, entryPtr->textVarName, TCL_GLOBAL_ONLY);
+    value = Tcl_GetVar2(interp, entryPtr->textVarName, NULL, TCL_GLOBAL_ONLY);
     if (value == NULL) {
 	value = "";
     }
@@ -3171,7 +3178,7 @@ EntryValidate(
 	    &bool) != TCL_OK) {
 	Tcl_AddErrorInfo(interp,
 		 "\n    (invalid boolean result from validation command)");
-	Tcl_BackgroundError(interp);
+	Tcl_BackgroundException(interp, TCL_ERROR);
 	Tcl_ResetResult(interp);
 	return TCL_ERROR;
     }

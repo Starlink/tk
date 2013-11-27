@@ -153,8 +153,8 @@ TkTextWindowCmd(
 	Tcl_WrongNumArgs(interp, 2, objv, "option ?arg ...?");
 	return TCL_ERROR;
     }
-    if (Tcl_GetIndexFromObj(interp, objv[2], windOptionStrings,
-	    "window option", 0, &optionIndex) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[2], windOptionStrings,
+	    sizeof(char *), "window option", 0, &optionIndex) != TCL_OK) {
 	return TCL_ERROR;
     }
     switch ((enum windOptions) optionIndex) {
@@ -911,10 +911,10 @@ EmbWinLayoutProc(
 
 	if (dsPtr != NULL) {
 	    Tcl_DStringAppend(dsPtr, before, (int) (string-before));
-	    code = Tcl_GlobalEval(textPtr->interp, Tcl_DStringValue(dsPtr));
+	    code = Tcl_EvalEx(textPtr->interp, Tcl_DStringValue(dsPtr), -1, TCL_EVAL_GLOBAL);
 	    Tcl_DStringFree(dsPtr);
 	} else {
-	    code = Tcl_GlobalEval(textPtr->interp, ewPtr->body.ew.create);
+	    code = Tcl_EvalEx(textPtr->interp, ewPtr->body.ew.create, -1, TCL_EVAL_GLOBAL);
 	}
 	if (code != TCL_OK) {
 	    Tcl_BackgroundException(textPtr->interp, code);
@@ -927,7 +927,7 @@ EmbWinLayoutProc(
 		Tcl_GetString(nameObj), textPtr->tkwin);
 	Tcl_DecrRefCount(nameObj);
 	if (ewPtr->body.ew.tkwin == NULL) {
-	    Tcl_BackgroundError(textPtr->interp);
+	    Tcl_BackgroundException(textPtr->interp, TCL_ERROR);
 	    goto gotWindow;
 	}
 
@@ -948,7 +948,7 @@ EmbWinLayoutProc(
 		    Tk_PathName(textPtr->tkwin)));
 	    Tcl_SetErrorCode(textPtr->interp, "TK", "GEOMETRY", "HIERARCHY",
 		    NULL);
-	    Tcl_BackgroundError(textPtr->interp);
+	    Tcl_BackgroundException(textPtr->interp, TCL_ERROR);
 	    ewPtr->body.ew.tkwin = NULL;
 	    goto gotWindow;
 	}

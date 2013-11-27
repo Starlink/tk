@@ -993,8 +993,8 @@ TkCreateMainWindow(
      * Set variables for the intepreter.
      */
 
-    Tcl_SetVar(interp, "tk_patchLevel", TK_PATCH_LEVEL, TCL_GLOBAL_ONLY);
-    Tcl_SetVar(interp, "tk_version",    TK_VERSION,     TCL_GLOBAL_ONLY);
+    Tcl_SetVar2(interp, "tk_patchLevel", NULL, TK_PATCH_LEVEL, TCL_GLOBAL_ONLY);
+    Tcl_SetVar2(interp, "tk_version",    NULL, TK_VERSION,     TCL_GLOBAL_ONLY);
 
     tsdPtr->numMainWindows++;
     return tkwin;
@@ -2852,7 +2852,7 @@ DeleteWindowsExitProc(
     tsdPtr->initialized = 0;
 }
 
-#if defined(__WIN32__) && !defined(__WIN64__)
+#if defined(__WIN32__)
 
 static HMODULE tkcygwindll = NULL;
 
@@ -2898,7 +2898,7 @@ TkCygwinMainEx(
     tkmainex(argc, argv, appInitProc, interp);
     return 1;
 }
-#endif /* __WIN32__ && !__WIN64__ */
+#endif /* __WIN32__ */
 
 /*
  *----------------------------------------------------------------------
@@ -2927,7 +2927,7 @@ int
 Tk_Init(
     Tcl_Interp *interp)		/* Interpreter to initialize. */
 {
-#if defined(__WIN32__) && !defined(__WIN64__)
+#if defined(__WIN32__)
     if (tkcygwindll) {
 	int (*tkinit)(Tcl_Interp *);
 
@@ -2936,7 +2936,7 @@ Tk_Init(
 	    return tkinit(interp);
 	}
     }
-#endif /* __WIN32__ && !__WIN64__ */
+#endif /* __WIN32__ */
     return Initialize(interp);
 }
 
@@ -3000,7 +3000,7 @@ Tk_SafeInit(
      * checked at several places to differentiate the two initialisations.
      */
 
-#if defined(__WIN32__) && !defined(__WIN64__)
+#if defined(__WIN32__)
     if (tkcygwindll) {
 	int (*tksafeinit)(Tcl_Interp *);
 
@@ -3010,7 +3010,7 @@ Tk_SafeInit(
 	    return tksafeinit(interp);
 	}
     }
-#endif /* __WIN32__ && !__WIN64__ */
+#endif /* __WIN32__ */
     return Initialize(interp);
 }
 
@@ -3047,11 +3047,10 @@ Initialize(
     ThreadSpecificData *tsdPtr;
 
     /*
-     * Ensure that we are getting a compatible version of Tcl. This is really
-     * only an issue when Tk is loaded dynamically.
+     * Ensure that we are getting a compatible version of Tcl.
      */
 
-    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+    if (Tcl_InitStubs(interp, "8.6", 0) == NULL) {
 	return TCL_ERROR;
     }
 
@@ -3136,14 +3135,14 @@ Initialize(
 
 	Tcl_DStringInit(&ds);
 	Tcl_DStringAppendElement(&ds, "::safe::TkInit");
-	Tcl_DStringAppendElement(&ds, Tcl_GetStringResult(master));
+	Tcl_DStringAppendElement(&ds, Tcl_GetString(Tcl_GetObjResult(master)));
 
 	/*
 	 * Step 2 : Eval in the master. The argument is the *reversed* interp
 	 * path of the slave.
 	 */
 
-	code = Tcl_Eval(master, Tcl_DStringValue(&ds));
+	code = Tcl_EvalEx(master, Tcl_DStringValue(&ds), -1, 0);
 	if (code != TCL_OK) {
 	    /*
 	     * We might want to transfer the error message or not. We don't.
@@ -3164,7 +3163,7 @@ Initialize(
 	 * changing the code below.
 	 */
 
-	argString = Tcl_GetStringResult(master);
+	argString = Tcl_GetString(Tcl_GetObjResult(master));
     } else {
 	/*
 	 * If there is an "argv" variable, get its value, extract out relevant
@@ -3279,17 +3278,18 @@ Initialize(
      */
 
     if (geometry != NULL) {
-	Tcl_SetVar(interp, "geometry", geometry, TCL_GLOBAL_ONLY);
-	code = Tcl_VarEval(interp, "wm geometry . ", geometry, NULL);
+	Tcl_DString buf;
+
+	Tcl_SetVar2(interp, "geometry", NULL, geometry, TCL_GLOBAL_ONLY);
+	Tcl_DStringInit(&buf);
+	Tcl_DStringAppend(&buf, "wm geometry . ", -1);
+	Tcl_DStringAppend(&buf, geometry, -1);
+	code = Tcl_EvalEx(interp, Tcl_DStringValue(&buf), -1, 0);
+	Tcl_DStringFree(&buf);
 	if (code != TCL_OK) {
 	    goto done;
 	}
 	geometry = NULL;
-    }
-
-    if (Tcl_PkgRequire(interp, "Tcl", TCL_VERSION, 0) == NULL) {
-	code = TCL_ERROR;
-	goto done;
     }
 
     /*
@@ -3343,7 +3343,7 @@ Initialize(
 	 * an alternate [tkInit] command before calling Tk_Init().
 	 */
 
-	code = Tcl_Eval(interp,
+	code = Tcl_EvalEx(interp,
 "if {[namespace which -command tkInit] eq \"\"} {\n\
   proc tkInit {} {\n\
     global tk_library tk_version tk_patchLevel\n\
@@ -3351,7 +3351,7 @@ Initialize(
     tcl_findLibrary tk $tk_version $tk_patchLevel tk.tcl TK_LIBRARY tk_library\n\
   }\n\
 }\n\
-tkInit");
+tkInit", -1, 0);
     }
     if (code == TCL_OK) {
 	/*
@@ -3397,7 +3397,7 @@ Tk_PkgInitStubsCheck(
     const char * version,
     int exact)
 {
-    const char *actualVersion = Tcl_PkgRequire(interp, "Tk", version, 0);
+    const char *actualVersion = Tcl_PkgRequireEx(interp, "Tk", version, 0, NULL);
 
     if (exact && actualVersion) {
 	const char *p = version;
@@ -3409,11 +3409,11 @@ Tk_PkgInitStubsCheck(
 	if (count == 1) {
 	    if (0 != strncmp(version, actualVersion, strlen(version))) {
 		/* Construct error message */
-		Tcl_PkgPresent(interp, "Tk", version, 1);
+		Tcl_PkgPresentEx(interp, "Tk", version, 1, NULL);
 		return NULL;
 	    }
 	} else {
-	    return Tcl_PkgPresent(interp, "Tk", version, 1);
+	    return Tcl_PkgPresentEx(interp, "Tk", version, 1, NULL);
 	}
     }
     return actualVersion;

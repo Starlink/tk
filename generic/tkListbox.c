@@ -392,7 +392,7 @@ static int		ConfigureListboxItem(Tcl_Interp *interp,
 			    Tcl_Obj *const objv[], int index);
 static int		ListboxDeleteSubCmd(Listbox *listPtr,
 			    int first, int last);
-static void		DestroyListbox(char *memPtr);
+static void		DestroyListbox(void *memPtr);
 static void		DestroyListboxOptionTables(ClientData clientData,
 			    Tcl_Interp *interp);
 static void		DisplayListbox(ClientData clientData);
@@ -1428,9 +1428,9 @@ ListboxGetItemAttributes(
 
 static void
 DestroyListbox(
-    char *memPtr)		/* Info about listbox widget. */
+    void *memPtr)		/* Info about listbox widget. */
 {
-    register Listbox *listPtr = (Listbox *) memPtr;
+    register Listbox *listPtr = memPtr;
     Tcl_HashEntry *entry;
     Tcl_HashSearch search;
 
@@ -1444,7 +1444,7 @@ DestroyListbox(
     }
 
     if (listPtr->listVarName != NULL) {
-	Tcl_UntraceVar(listPtr->interp, listPtr->listVarName,
+	Tcl_UntraceVar2(listPtr->interp, listPtr->listVarName, NULL,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ListboxListVarProc, listPtr);
     }
@@ -1552,7 +1552,7 @@ ConfigureListbox(
 
     oldExport = listPtr->exportSelection;
     if (listPtr->listVarName != NULL) {
-	Tcl_UntraceVar(interp, listPtr->listVarName,
+	Tcl_UntraceVar2(interp, listPtr->listVarName, NULL,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ListboxListVarProc, listPtr);
     }
@@ -1629,9 +1629,6 @@ ConfigureListbox(
 		if (Tcl_SetVar2Ex(interp, listPtr->listVarName, NULL,
 			listVarObj, TCL_GLOBAL_ONLY|TCL_LEAVE_ERR_MSG)
 			== NULL) {
-		    if (oldListObj == NULL) {
-			Tcl_DecrRefCount(listVarObj);
-		    }
 		    continue;
 		}
 	    }
@@ -1648,8 +1645,8 @@ ConfigureListbox(
 	    }
 
 	    listPtr->listObj = listVarObj;
-	    Tcl_TraceVar(listPtr->interp, listPtr->listVarName,
-		    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	    Tcl_TraceVar2(listPtr->interp, listPtr->listVarName,
+		    NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		    ListboxListVarProc, listPtr);
 	} else if (listPtr->listObj == NULL) {
 	    listPtr->listObj = Tcl_NewObj();
@@ -2601,7 +2598,7 @@ ListboxEventProc(
 	    if (listPtr->flags & REDRAW_PENDING) {
 		Tcl_CancelIdleCall(DisplayListbox, clientData);
 	    }
-	    Tcl_EventuallyFree(clientData, DestroyListbox);
+	    Tcl_EventuallyFree(clientData, (Tcl_FreeProc *) DestroyListbox);
 	}
     } else if (eventPtr->type == ConfigureNotify) {
 	int vertSpace;
@@ -3244,6 +3241,7 @@ ListboxUpdateVScrollbar(
     double first, last;
     int result;
     Tcl_Interp *interp;
+    Tcl_DString buf;
 
     if (listPtr->yScrollCmd == NULL) {
 	return;
@@ -3269,8 +3267,14 @@ ListboxUpdateVScrollbar(
 
     interp = listPtr->interp;
     Tcl_Preserve(interp);
-    result = Tcl_VarEval(interp, listPtr->yScrollCmd, " ", firstStr, " ",
-	    lastStr, NULL);
+    Tcl_DStringInit(&buf);
+    Tcl_DStringAppend(&buf, listPtr->yScrollCmd, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, firstStr, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, lastStr, -1);
+    result = Tcl_EvalEx(interp, Tcl_DStringValue(&buf), -1, 0);
+    Tcl_DStringFree(&buf);
     if (result != TCL_OK) {
 	Tcl_AddErrorInfo(interp,
 		"\n    (vertical scrolling command executed by listbox)");
@@ -3307,6 +3311,7 @@ ListboxUpdateHScrollbar(
     int result, windowWidth;
     double first, last;
     Tcl_Interp *interp;
+    Tcl_DString buf;
 
     if (listPtr->xScrollCmd == NULL) {
 	return;
@@ -3334,8 +3339,14 @@ ListboxUpdateHScrollbar(
 
     interp = listPtr->interp;
     Tcl_Preserve(interp);
-    result = Tcl_VarEval(interp, listPtr->xScrollCmd, " ", firstStr, " ",
-	    lastStr, NULL);
+    Tcl_DStringInit(&buf);
+    Tcl_DStringAppend(&buf, listPtr->xScrollCmd, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, firstStr, -1);
+    Tcl_DStringAppend(&buf, " ", -1);
+    Tcl_DStringAppend(&buf, lastStr, -1);
+    result = Tcl_EvalEx(interp, Tcl_DStringValue(&buf), -1, 0);
+    Tcl_DStringFree(&buf);
     if (result != TCL_OK) {
 	Tcl_AddErrorInfo(interp,
 		"\n    (horizontal scrolling command executed by listbox)");
@@ -3381,8 +3392,8 @@ ListboxListVarProc(
 	if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
 	    Tcl_SetVar2Ex(interp, listPtr->listVarName, NULL,
 		    listPtr->listObj, TCL_GLOBAL_ONLY);
-	    Tcl_TraceVar(interp, listPtr->listVarName,
-		    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	    Tcl_TraceVar2(interp, listPtr->listVarName,
+		    NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		    ListboxListVarProc, clientData);
 	    return NULL;
 	}

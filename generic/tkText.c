@@ -718,8 +718,8 @@ TextWidgetObjCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[1], optionStrings, "option", 0,
-	    &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[1], optionStrings,
+	    sizeof(char *), "option", 0, &index) != TCL_OK) {
 	return TCL_ERROR;
     }
     textPtr->refCount++;
@@ -859,9 +859,10 @@ TextWidgetObjCmd(
 
 	for (i = 2; i < objc-2; i++) {
 	    int value, length;
-	    const char *option = Tcl_GetStringFromObj(objv[i], &length);
+	    const char *option = Tcl_GetString(objv[i]);
 	    char c;
 
+	    length = objv[i]->length;
 	    if (length < 2 || option[0] != '-') {
 		goto badOption;
 	    }
@@ -1260,12 +1261,14 @@ TextWidgetObjCmd(
 
 	i = 2;
 	if (objc > 3) {
-	    name = Tcl_GetStringFromObj(objv[i], &length);
+	    name = Tcl_GetString(objv[i]);
+	    length = objv[i]->length;
 	    if (length > 1 && name[0] == '-') {
 		if (strncmp("-displaychars", name, (unsigned) length) == 0) {
 		    i++;
 		    visible = 1;
-		    name = Tcl_GetStringFromObj(objv[i], &length);
+		    name = Tcl_GetString(objv[i]);
+		    length = objv[i]->length;
 		}
 		if ((i < objc-1) && (length == 2) && !strcmp("--", name)) {
 		    i++;
@@ -1559,8 +1562,8 @@ SharedTextObjCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[1], optionStrings, "option", 0,
-	    &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[1], optionStrings,
+	    sizeof(char *), "option", 0, &index) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -1664,8 +1667,8 @@ TextPeerCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[2], peerOptionStrings,
-	    "peer option", 0, &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[2], peerOptionStrings,
+	    sizeof(char *), "peer option", 0, &index) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -2552,9 +2555,9 @@ InsertChars(
     int *lineAndByteIndex;
     int resetViewCount;
     int pixels[2*PIXEL_CLIENTS];
+    const char *string = Tcl_GetString(stringPtr);
 
-    const char *string = Tcl_GetStringFromObj(stringPtr, &length);
-
+    length = stringPtr->length;
     if (sharedTextPtr == NULL) {
 	sharedTextPtr = textPtr->sharedTextPtr;
     }
@@ -3713,15 +3716,15 @@ TextSearchCmd(
 	    break;
 	}
 
-	if (Tcl_GetIndexFromObj(NULL, objv[i], switchStrings, "switch", 0,
-		&index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(NULL, objv[i], switchStrings,
+		sizeof(char *), "switch", 0, &index) != TCL_OK) {
 	    /*
 	     * Hide the -hidden option, generating the error description with
 	     * the side effects of T_GIFO.
 	     */
 
-	    (void) Tcl_GetIndexFromObj(interp, objv[i], switchStrings+1,
-		    "switch", 0, &index);
+	    (void) Tcl_GetIndexFromObjStruct(interp, objv[i], switchStrings+1,
+		    sizeof(char *), "switch", 0, &index);
 	    return TCL_ERROR;
 	}
 
@@ -4093,7 +4096,8 @@ TextSearchAddNextLine(
 
     if (lenPtr != NULL) {
 	if (searchSpecPtr->exact) {
-	    Tcl_GetStringFromObj(theLine, lenPtr);
+	    (void)Tcl_GetString(theLine);
+	    *lenPtr = theLine->length;
 	} else {
 	    *lenPtr = Tcl_GetCharLength(theLine);
 	}
@@ -4482,8 +4486,8 @@ TkTextGetTabs(
 	}
 	i += 1;
 
-	if (Tcl_GetIndexFromObj(interp, objv[i], tabOptionStrings,
-		"tab alignment", 0, &index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[i], tabOptionStrings,
+		sizeof(char *), "tab alignment", 0, &index) != TCL_OK) {
 	    goto error;
 	}
 	tabPtr->alignment = (TkTextTabAlign) index;
@@ -4560,8 +4564,8 @@ TextDumpCmd(
 	if (Tcl_GetString(objv[arg])[0] != '-') {
 	    break;
 	}
-	if (Tcl_GetIndexFromObj(interp, objv[arg], optStrings, "option", 0,
-		&index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[arg], optStrings,
+		sizeof(char *), "option", 0, &index) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 	switch ((enum opts) index) {
@@ -4619,7 +4623,8 @@ TextDumpCmd(
 	if (TkTextGetObjIndex(interp, textPtr, objv[arg], &index2) != TCL_OK) {
 	    return TCL_ERROR;
 	}
-	str = Tcl_GetStringFromObj(objv[arg], &length);
+	str = Tcl_GetString(objv[arg]);
+	length = objv[arg]->length;
 	if (strncmp(str, "end", (unsigned) length) == 0) {
 	    atEnd = 1;
 	}
@@ -4936,9 +4941,20 @@ DumpSegment(
 	return 0;
     } else {
 	int oldStateEpoch = TkBTreeEpoch(textPtr->sharedTextPtr->tree);
+	Tcl_DString buf;
+	int code;
 
-	Tcl_VarEval(interp, Tcl_GetString(command), " ", Tcl_GetString(tuple),
-		NULL);
+	Tcl_DStringInit(&buf);
+	Tcl_DStringAppend(&buf, Tcl_GetString(command), -1);
+	Tcl_DStringAppend(&buf, " ", -1);
+	Tcl_DStringAppend(&buf, Tcl_GetString(tuple), -1);
+	code = Tcl_EvalEx(interp, Tcl_DStringValue(&buf), -1, 0);
+	Tcl_DStringFree(&buf);
+	if (code != TCL_OK) {
+	    Tcl_AddErrorInfo(interp,
+		    "\n    (segment dumping command executed by text)");
+	    Tcl_BackgroundException(interp, code);
+	}
 	Tcl_DecrRefCount(tuple);
 	return ((textPtr->flags & DESTROYED) ||
 		TkBTreeEpoch(textPtr->sharedTextPtr->tree) != oldStateEpoch);
@@ -5077,8 +5093,8 @@ TextEditCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[2], editOptionStrings,
-	    "edit option", 0, &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[2], editOptionStrings,
+	    sizeof(char *), "edit option", 0, &index) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -5541,7 +5557,8 @@ SearchCore(
 	 * it has dual purpose.
 	 */
 
-	pattern = Tcl_GetStringFromObj(patObj, &matchLength);
+	pattern = Tcl_GetString(patObj);
+	matchLength = patObj->length;
 	nl = strchr(pattern, '\n');
 
 	/*
@@ -6609,16 +6626,14 @@ static int
 ObjectIsEmpty(
     Tcl_Obj *objPtr)		/* Object to test. May be NULL. */
 {
-    int length;
-
     if (objPtr == NULL) {
 	return 1;
     }
     if (objPtr->bytes != NULL) {
 	return (objPtr->length == 0);
     }
-    Tcl_GetStringFromObj(objPtr, &length);
-    return (length == 0);
+    (void)Tcl_GetString(objPtr);
+    return (objPtr->length == 0);
 }
 
 /*

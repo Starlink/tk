@@ -160,7 +160,7 @@ static int		TestfontObjCmd(ClientData dummy,
 			    Tcl_Obj *const objv[]);
 static int		TestmakeexistCmd(ClientData dummy,
 			    Tcl_Interp *interp, int argc, const char **argv);
-#if !(defined(__WIN32__) || defined(MAC_OSX_TK))
+#if !(defined(__WIN32__) || defined(MAC_OSX_TK) || defined(__CYGWIN__))
 static int		TestmenubarCmd(ClientData dummy,
 			    Tcl_Interp *interp, int argc, const char **argv);
 #endif
@@ -186,7 +186,7 @@ static void		CustomOptionFree(ClientData clientData,
 			    Tk_Window tkwin, char *internalPtr);
 static int		TestpropCmd(ClientData dummy,
 			    Tcl_Interp *interp, int argc, const char **argv);
-#if !(defined(__WIN32__) || defined(MAC_OSX_TK))
+#if !(defined(__WIN32__) || defined(MAC_OSX_TK) || defined(__CYGWIN__))
 static int		TestwrapperCmd(ClientData dummy,
 			    Tcl_Interp *interp, int argc, const char **argv);
 #endif
@@ -223,7 +223,7 @@ Tktest_Init(
     if (Tcl_InitStubs(interp, "8.1", 0) == NULL) {
 	return TCL_ERROR;
     }
-    if (Tk_InitStubs(interp, "8.1", 0) == NULL) {
+    if (Tk_InitStubs(interp, TK_VERSION, 0) == NULL) {
 	return TCL_ERROR;
     }
 
@@ -231,7 +231,7 @@ Tktest_Init(
      * Create additional commands for testing Tk.
      */
 
-    if (Tcl_PkgProvide(interp, "Tktest", TK_VERSION) == TCL_ERROR) {
+    if (Tcl_PkgProvideEx(interp, "Tktest", TK_VERSION, NULL) == TCL_ERROR) {
         return TCL_ERROR;
     }
 
@@ -262,7 +262,7 @@ Tktest_Init(
 #if defined(__WIN32__) || defined(MAC_OSX_TK)
     Tcl_CreateCommand(interp, "testmetrics", TestmetricsCmd,
 	    (ClientData) Tk_MainWindow(interp), NULL);
-#else
+#elif !defined(__CYGWIN__)
     Tcl_CreateCommand(interp, "testmenubar", TestmenubarCmd,
 	    (ClientData) Tk_MainWindow(interp), NULL);
     Tcl_CreateCommand(interp, "testsend", TkpTestsendCmd,
@@ -497,11 +497,11 @@ TestobjconfigObjCmd(
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     static const char *const options[] = {
-	"alltypes", "chain1", "chain2", "configerror", "delete", "info",
+	"alltypes", "chain1", "chain2", "chain3", "configerror", "delete", "info",
 	"internal", "new", "notenoughparams", "twowindows", NULL
     };
     enum {
-	ALL_TYPES, CHAIN1, CHAIN2, CONFIG_ERROR,
+	ALL_TYPES, CHAIN1, CHAIN2, CHAIN3, CONFIG_ERROR,
 	DEL,			/* Can't use DELETE: VC++ compiler barfs. */
 	INFO, INTERNAL, NEW, NOT_ENOUGH_PARAMS, TWO_WINDOWS
     };
@@ -547,8 +547,8 @@ TestobjconfigObjCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[1], options, "command", 0, &index)
-	    != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[1], options,
+	    sizeof(char *), "command", 0, &index)!= TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -720,7 +720,8 @@ TestobjconfigObjCmd(
 	break;
     }
 
-    case CHAIN2: {
+    case CHAIN2:
+    case CHAIN3: {
 	ExtensionWidgetRecord *recordPtr;
 	static const Tk_OptionSpec extensionSpecs[] = {
 	    {TK_OPTION_STRING, "-three", "three", "Three", "three",
@@ -797,12 +798,15 @@ TestobjconfigObjCmd(
 	    Tcl_WrongNumArgs(interp, 2, objv, "tableName");
 	    return TCL_ERROR;
 	}
-	if (Tcl_GetIndexFromObj(interp, objv[2], options, "table", 0,
-		&index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[2], options,
+		sizeof(char *), "table", 0, &index) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 	if (tables[index] != NULL) {
 	    Tk_DeleteOptionTable(tables[index]);
+	    /* Make sure that Tk_DeleteOptionTable() is never done
+	     * twice for the same table. */
+	    tables[index] = NULL;
 	}
 	break;
 
@@ -811,8 +815,8 @@ TestobjconfigObjCmd(
 	    Tcl_WrongNumArgs(interp, 2, objv, "tableName");
 	    return TCL_ERROR;
 	}
-	if (Tcl_GetIndexFromObj(interp, objv[2], options, "table", 0,
-		&index) != TCL_OK) {
+	if (Tcl_GetIndexFromObjStruct(interp, objv[2], options,
+		sizeof(char *), "table", 0, &index) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 	Tcl_SetObjResult(interp, TkDebugConfig(interp, tables[index]));
@@ -1143,8 +1147,8 @@ TrivialConfigObjCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[1], options, "command", 0,
-	    &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[1], options,
+	    sizeof(char *), "command", 0, &index) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -1321,8 +1325,8 @@ TestfontObjCmd(
 	return TCL_ERROR;
     }
 
-    if (Tcl_GetIndexFromObj(interp, objv[1], options, "command", 0, &index)
-	    != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, objv[1], options,
+	    sizeof(char *), "command", 0, &index)!= TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -1496,7 +1500,7 @@ ImageGet(
     XGCValues gcValues;
 
     sprintf(buffer, "%s get", timPtr->imageName);
-    Tcl_SetVar(timPtr->interp, timPtr->varName, buffer,
+    Tcl_SetVar2(timPtr->interp, timPtr->varName, NULL, buffer,
 	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
 
     instPtr = ckalloc(sizeof(TImageInstance));
@@ -1543,8 +1547,8 @@ ImageDisplay(
     sprintf(buffer, "%s display %d %d %d %d %d %d",
 	    instPtr->masterPtr->imageName, imageX, imageY, width, height,
 	    drawableX, drawableY);
-    Tcl_SetVar(instPtr->masterPtr->interp, instPtr->masterPtr->varName, buffer,
-	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
+    Tcl_SetVar2(instPtr->masterPtr->interp, instPtr->masterPtr->varName, NULL,
+	    buffer, TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
     if (width > (instPtr->masterPtr->width - imageX)) {
 	width = instPtr->masterPtr->width - imageX;
     }
@@ -1586,8 +1590,8 @@ ImageFree(
     char buffer[200];
 
     sprintf(buffer, "%s free", instPtr->masterPtr->imageName);
-    Tcl_SetVar(instPtr->masterPtr->interp, instPtr->masterPtr->varName, buffer,
-	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
+    Tcl_SetVar2(instPtr->masterPtr->interp, instPtr->masterPtr->varName, NULL,
+	    buffer, TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
     Tk_FreeColor(instPtr->fg);
     Tk_FreeGC(display, instPtr->gc);
     ckfree(instPtr);
@@ -1620,7 +1624,7 @@ ImageDelete(
     char buffer[100];
 
     sprintf(buffer, "%s delete", timPtr->imageName);
-    Tcl_SetVar(timPtr->interp, timPtr->varName, buffer,
+    Tcl_SetVar2(timPtr->interp, timPtr->varName, NULL, buffer,
 	    TCL_GLOBAL_ONLY|TCL_APPEND_VALUE|TCL_LIST_ELEMENT);
 
     Tcl_DeleteCommand(timPtr->interp, timPtr->imageName);
@@ -1689,7 +1693,7 @@ TestmakeexistCmd(
  */
 
 	/* ARGSUSED */
-#if !(defined(__WIN32__) || defined(MAC_OSX_TK))
+#if !(defined(__WIN32__) || defined(MAC_OSX_TK) || defined(__CYGWIN__))
 static int
 TestmenubarCmd(
     ClientData clientData,	/* Main window for application. */
@@ -1734,8 +1738,7 @@ TestmenubarCmd(
 
     return TCL_OK;
 #else
-    Tcl_SetResult(interp, "testmenubar is supported only under Unix",
-	    TCL_STATIC);
+    Tcl_AppendResult(interp, "testmenubar is supported only under Unix", NULL);
     return TCL_ERROR;
 #endif
 }
@@ -1868,7 +1871,7 @@ TestpropCmd(
 		    *p = '\n';
 		}
 	    }
-	    Tcl_SetResult(interp, (/*!unsigned*/char*)property, TCL_VOLATILE);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj((/*!unsigned*/char*)property, -1));
 	} else {
 	    for (p = property; length > 0; length--) {
 		if (actualFormat == 32) {
@@ -1892,7 +1895,7 @@ TestpropCmd(
     return TCL_OK;
 }
 
-#if !(defined(__WIN32__) || defined(MAC_OSX_TK))
+#if !(defined(__WIN32__) || defined(MAC_OSX_TK) || defined(__CYGWIN__))
 /*
  *----------------------------------------------------------------------
  *
@@ -1939,7 +1942,7 @@ TestwrapperCmd(
 	char buf[TCL_INTEGER_SPACE];
 
 	TkpPrintWindowId(buf, Tk_WindowId(wrapperPtr));
-	Tcl_SetResult(interp, buf, TCL_VOLATILE);
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(buf, -1));
     }
     return TCL_OK;
 }
@@ -1982,7 +1985,7 @@ CustomOptionSet(
     char *saveInternalPtr,
     int flags)
 {
-    int objEmpty, length;
+    int objEmpty;
     char *newStr, *string, *internalPtr;
 
     objEmpty = 0;
@@ -2003,25 +2006,24 @@ CustomOptionSet(
     } else if ((*value)->bytes != NULL) {
 	objEmpty = ((*value)->length == 0);
     } else {
-	Tcl_GetStringFromObj((*value), &length);
-	objEmpty = (length == 0);
+	(void)Tcl_GetString(*value);
+	objEmpty = ((*value)->length == 0);
     }
 
     if ((flags & TK_OPTION_NULL_OK) && objEmpty) {
 	*value = NULL;
     } else {
-	string = Tcl_GetStringFromObj((*value), &length);
+	string = Tcl_GetString(*value);
 	Tcl_UtfToUpper(string);
 	if (strcmp(string, "BAD") == 0) {
-	    Tcl_SetResult(interp, "expected good value, got \"BAD\"",
-		    TCL_STATIC);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj("expected good value, got \"BAD\"", -1));
 	    return TCL_ERROR;
 	}
     }
     if (internalPtr != NULL) {
-	if ((*value) != NULL) {
-	    string = Tcl_GetStringFromObj((*value), &length);
-	    newStr = ckalloc(length + 1);
+	if (*value != NULL) {
+	    string = Tcl_GetString(*value);
+	    newStr = ckalloc((*value)->length + 1);
 	    strcpy(newStr, string);
 	} else {
 	    newStr = NULL;

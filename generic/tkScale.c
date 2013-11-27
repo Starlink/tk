@@ -340,8 +340,8 @@ ScaleWidgetObjCmd(
 	Tcl_WrongNumArgs(interp, 1, objv, "option ?arg ...?");
 	return TCL_ERROR;
     }
-    result = Tcl_GetIndexFromObj(interp, objv[1], commandNames,
-	    "option", 0, &index);
+    result = Tcl_GetIndexFromObjStruct(interp, objv[1], commandNames,
+	    sizeof(char *), "option", 0, &index);
     if (result != TCL_OK) {
 	return result;
     }
@@ -504,8 +504,8 @@ DestroyScale(
      */
 
     if (scalePtr->varNamePtr != NULL) {
-	Tcl_UntraceVar(scalePtr->interp, Tcl_GetString(scalePtr->varNamePtr),
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_UntraceVar2(scalePtr->interp, Tcl_GetString(scalePtr->varNamePtr),
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ScaleVarProc, scalePtr);
     }
     if (scalePtr->troughGC != None) {
@@ -561,8 +561,8 @@ ConfigureScale(
      */
 
     if (scalePtr->varNamePtr != NULL) {
-	Tcl_UntraceVar(interp, Tcl_GetString(scalePtr->varNamePtr),
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_UntraceVar2(interp, Tcl_GetString(scalePtr->varNamePtr),
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ScaleVarProc, scalePtr);
     }
 
@@ -677,8 +677,8 @@ ConfigureScale(
 		ScaleSetVariable(scalePtr);
 	    }
 	}
-	Tcl_TraceVar(interp, Tcl_GetString(scalePtr->varNamePtr),
-		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	Tcl_TraceVar2(interp, Tcl_GetString(scalePtr->varNamePtr),
+		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ScaleVarProc, scalePtr);
     }
 
@@ -1180,8 +1180,8 @@ ScaleVarProc(
 
     if (flags & TCL_TRACE_UNSETS) {
 	if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
-	    Tcl_TraceVar(interp, Tcl_GetString(scalePtr->varNamePtr),
-		    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	    Tcl_TraceVar2(interp, Tcl_GetString(scalePtr->varNamePtr),
+		    NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		    ScaleVarProc, clientData);
 	    scalePtr->flags |= NEVER_SET;
 	    TkScaleSetValue(scalePtr, scalePtr->value, 1, 0);

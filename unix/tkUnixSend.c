@@ -1024,7 +1024,7 @@ Tk_SendCmd(
 	localInterp = riPtr->interp;
 	Tcl_Preserve(localInterp);
 	if (firstArg == (argc-1)) {
-	    result = Tcl_GlobalEval(localInterp, argv[firstArg]);
+	    result = Tcl_EvalEx(localInterp, argv[firstArg], -1, TCL_EVAL_GLOBAL);
 	} else {
 	    Tcl_DStringInit(&request);
 	    Tcl_DStringAppend(&request, argv[firstArg], -1);
@@ -1032,7 +1032,7 @@ Tk_SendCmd(
 		Tcl_DStringAppend(&request, " ", 1);
 		Tcl_DStringAppend(&request, argv[i], -1);
 	    }
-	    result = Tcl_GlobalEval(localInterp, Tcl_DStringValue(&request));
+	    result = Tcl_EvalEx(localInterp, Tcl_DStringValue(&request), -1, TCL_EVAL_GLOBAL);
 	    Tcl_DStringFree(&request);
 	}
 	if (interp != localInterp) {
@@ -1565,7 +1565,7 @@ SendEventProc(
 	    remoteInterp = riPtr->interp;
 	    Tcl_Preserve(remoteInterp);
 
-	    result = Tcl_GlobalEval(remoteInterp, script);
+	    result = Tcl_EvalEx(remoteInterp, script, -1, TCL_EVAL_GLOBAL);
 
 	    /*
 	     * The call to Tcl_Release may have released the interpreter which
@@ -1575,7 +1575,7 @@ SendEventProc(
 	     */
 
 	    if (commWindow != None) {
-		Tcl_DStringAppend(&reply, Tcl_GetStringResult(remoteInterp),
+		Tcl_DStringAppend(&reply, Tcl_GetString(Tcl_GetObjResult(remoteInterp)),
 			-1);
 		if (result == TCL_ERROR) {
 		    const char *varValue;

@@ -16,6 +16,9 @@
 /* Do we have access to Darwin CoreFoundation.framework? */
 #undef HAVE_COREFOUNDATION
 
+/* Compiler support for module scope symbols */
+#undef HAVE_HIDDEN
+
 /* Do we have the intptr_t type? */
 #undef HAVE_INTPTR_T
 
@@ -36,6 +39,9 @@
 
 /* Define to 1 if you have the `open64' function. */
 #undef HAVE_OPEN64
+
+/* Define to 1 if you have the `pthread_atfork' function. */
+#undef HAVE_PTHREAD_ATFORK
 
 /* Define to 1 if you have the `pthread_attr_setstacksize' function. */
 #undef HAVE_PTHREAD_ATTR_SETSTACKSIZE
@@ -88,6 +94,9 @@
 /* Have we turned on XFT (antialiased fonts)? */
 #undef HAVE_XFT
 
+/* Do we have XkbKeycodeToKeysym? */
+#undef HAVE_XKBKEYCODETOKEYSYM
+
 /* Is XScreenSaver available? */
 #undef HAVE_XSS
 
@@ -114,9 +123,6 @@
 
 /* Do we have <stdlib.h>? */
 #undef NO_STDLIB_H
-
-/* No visibility attribute */
-#undef NO_VIZ
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -192,6 +198,9 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* Is XKeycodeToKeysym deprecated? */
+#undef XKEYCODETOKEYSYM_IS_DEPRECATED
 
 /* Are Darwin SUSv3 extensions available? */
 #undef _DARWIN_C_SOURCE
