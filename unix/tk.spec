@@ -4,7 +4,7 @@
 
 Name:          tk
 Summary:       Tk graphical toolkit for the Tcl scripting language.
-Version:       8.5.12
+Version:       8.5.13
 Release:       2
 License:       BSD
 Group:         Development/Languages
@@ -32,7 +32,7 @@ CFLAGS="%optflags" ./configure \
 	--prefix=%{directory} \
 	--exec-prefix=%{directory} \
 	--libdir=%{directory}/%{_lib}
-make 
+make
 
 %install
 cd unix

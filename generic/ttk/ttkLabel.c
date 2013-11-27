@@ -161,8 +161,6 @@ static void TextDraw(TextElement *text, Tk_Window tkwin, Drawable d, Ttk_Box b)
 	TkSetRegion(Tk_Display(tkwin), gc2, clipRegion);
 #ifdef HAVE_XFT
 	TkUnixSetXftClipRegion(clipRegion);
-#else
-	TkDestroyRegion(clipRegion);
 #endif
     }
 
@@ -183,14 +181,16 @@ static void TextDraw(TextElement *text, Tk_Window tkwin, Drawable d, Ttk_Box b)
 	    text->textLayout, b.x, b.y, underline);
     }
 
-    Tk_FreeGC(Tk_Display(tkwin), gc1);
-    Tk_FreeGC(Tk_Display(tkwin), gc2);
-#ifdef HAVE_XFT
     if (clipRegion != NULL) {
+#ifdef HAVE_XFT
 	TkUnixSetXftClipRegion(None);
+#endif
+	XSetClipMask(Tk_Display(tkwin), gc1, None);
+	XSetClipMask(Tk_Display(tkwin), gc2, None);
 	TkDestroyRegion(clipRegion);
     }
-#endif
+    Tk_FreeGC(Tk_Display(tkwin), gc1);
+    Tk_FreeGC(Tk_Display(tkwin), gc2);
 }
 
 static void TextElementSize(
@@ -344,10 +344,14 @@ static void ImageDraw(
      * stipple the image.
      * @@@ Possibly: Don't do disabled-stippling at all;
      * @@@ it's ugly and out of fashion.
+     * Do not stipple at all under Aqua, just draw the image: it shows up 
+     * as a white rectangle otherwise.
      */
     if (state & TTK_STATE_DISABLED) {
 	if (TtkSelectImage(image->imageSpec, 0ul) == image->tkimg) {
+#ifndef MAC_OSX_TK
 	    StippleOver(image, tkwin, d, b.x,b.y);
+#endif
 	}
     }
 }

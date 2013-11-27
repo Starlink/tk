@@ -1,3 +1,144 @@
+2012-11-09  Don Porter  <dgp@users.sourceforge.net>
+
+	*** 8.5.13 TAGGED FOR RELEASE ***
+
+	* generic/tk.h:		Bump to 8.5.13 for release.
+	* library/tk.tcl:
+	* unix/configure.in:
+	* unix/tk.spec:
+	* win/configure.in:
+	* README:
+
+	* unix/configure:	autoconf-2.59
+	* win/configure:
+
+2012-11-07  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/tkFocus.c (TkSetFocusWin): [Bug 3574708]: Move window
+	liveness into this function from caller sites to ensure that there are
+	no paths where things can trip up on setting the focus to a partially
+	dead window.
+
+2012-10-24  Don Porter  <dgp@users.sourceforge.net>
+
+	* macosx/tkMacOSXWm.c:	[Bug 3574893] Add overlooked toplevel ref
+	count maintenance in the [wm manage|forget] operations that could
+	cause segfaults due to premature free of structs.
+
+2012-10-23  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkButton.h: Backport of ::tk::mac::useCompatibilityMetrics
+	* generic/tkButton.c  handling and scrollbar metrics handling from trunk.
+	* generic/tkScrollbar.h
+	* generic/tkScrollbar.c
+	* macosx/tkMacOSXButton.c
+	* macosx/tkMacOSXScrlbr.c
+	* unix/tkUnixPort.h
+	* win/tkWinButton.c
+	* win/tkWinScrlbr.c
+
+2012-10-09  Andreas Kupries  <andreask@activestate.com>
+
+	Cherrypick Merge, Backport of [6223d9e067]. Restored from
+	tk-cocoa-8-5-bacport-branch, did not survive the merge.
+	See trunk 2012-05-29 Donal K. Fellows
+
+	* generic/tkInt.decls (TkMacOSXDrawable): Added OSX-specific mechanism
+	to allow retrieval of the drawing surface. Allows Canvas3d to be
+	adapted to 8.6.
+
+2012-09-28  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkInt.h:     Add 8 colors to the supported color list
+	* generic/tkColor.c:   (aqua, crimson, fuchsia, indigo, lime,
+	* unix/tkUnixColor.c:  olive, silver and teal), part of TIP #403
+	* xlib/rgb.txt
+	* xlib/xcolors.c
+
+2012-09-26  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/Makefile.in:    Compile win32 binaries with -DTCL_NO_DEPRECATED
+
+2012-09-25   Kevin Walzer <wordtech@users.sourceforge.net>
+
+	* macosx/*: Merge Tk-Cocoa backport into core-8-5-branch
+
+2012-09-13  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/ttk/ttkEntry.c (EntryDisplay): [Bug 3567453]: Clip regions
+	* generic/ttk/ttkLabel.c (TextDraw): must be cleared with XSetClipMask
+	* xlib/xgc.c (TkSetRegion): and not TkSetRegion, or crashes will ensue
+	on X11-based builds, which can't handle None for a region argument.
+	Added a clean panic to the non-X11 TkSetRegion to catch this case and
+	stop such confusion from happening again.
+
+2012-09-11  Donal K. Fellows  <dkf@users.sf.net>
+
+	* generic/ttk/ttkEntry.c (EntryDisplay): [Bug 3566594]: Must manually
+	* generic/ttk/ttkLabel.c (TextDraw):     reset the clip region of GCs
+	when not using the Xft font renderer (well, especially on classic X11)
+	because the GC sharing code doesn't take into account clip handling.
+	Thanks to Christian Nassau for identifying the problem.
+
+2012-08-28  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* generic/tkMenuDraw.c: [Bug 3562426]: Context menu goes out of edge of
+	screen.
+
+2012-08-24  Donal K. Fellows  <dkf@users.sf.net>
+
+	* library/tkfbox.tcl (GlobFiltered): [Bug 3558535]: Factor out the
+	filtered-sorted globbing code into one procedure that knows how to
+	avoid nasty problems when non-list filters are used. This allows the
+	rest of the [tk_getOpenFile] implementation to be ignorant of the
+	considerable complexities of globbing.
+
+2012-08-23  Don Porter  <dgp@users.sourceforge.net>
+
+	* unix/tkUnixWm.c: [Bugs 3554026,3561016]: Stop crash with tearoff
+	menus.
+
+2012-08-17  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/nmakehlp.c: Add "-V<num>" option, in order to be able
+	to detect partial version numbers.
+
+2012-08-15  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/buildall.vc.bat: Only build the threaded builds by default
+	* win/rules.vc:        Backport some improvements from Tcl 8.6
+	* win/makefile.vc:
+
+2012-08-11  Francois Vogel  <fvogelnew1@free.fr>
+
+	* generic/tkTextTag.c:  [Bug 3554273]: Test textDisp-32.2 failed
+
+2012-08-09  Stuart Cassoff  <stwo@users.sourceforge.net>
+
+	* generic/tkEvent.c:	Remove useless (void *) casts
+	* unix/tkUnixEvent.c:	introduced in checkin [b7a58eae61].
+	* unix/tkUnixKey.c:	The warnings were false flags from a
+	* unix/tkUnixRFont.c:	faulty OpenBSD C compiler.
+
+2012-08-03  Francois Vogel  <fvogelnew1@free.fr>
+
+	* tests/bind.test:  [Bug 3554081]: Test bind-22.10 failed
+
+2012-08-02  Francois Vogel  <fvogelnew1@free.fr>
+
+	* tests/spinbox.test:  [Bug 3553311]: Test spinbox-3.70 failed
+
+2012-07-31  Donal K. Fellows  <dkf@users.sf.net>
+
+	* unix/tkUnixKey.c (TkpSetKeycodeAndState, TkpInitKeymapInfo)
+	(TkpGetKeySym): [Bug 3551802]: Convert from XKeycodeToKeysym to
+	XkbKeycodeToKeysym to fix deprecation warning.
+
+2012-07-31  Jan Nijtmans  <nijtmans@users.sf.net>
+
+	* win/nmakehlp.c: Backport from Tcl 8.6, but add -Q option from
+	sampleextension.
+
 2012-07-17  Don Porter  <dgp@users.sourceforge.net>
 
 	*** 8.5.12 TAGGED FOR RELEASE ***
@@ -312,7 +453,7 @@
 2011-12-22  Don Porter  <dgp@users.sourceforge.net>
 
 	* win/tkWinMenu.c: [Bug 3235256] Keep menu entry IDs out of system
-	values. Thanks Colin McDonald. 
+	values. Thanks Colin McDonald.
 
 2011-11-22  Jan Nijtmans  <nijtmans@users.sf.net>
 
@@ -1344,7 +1485,7 @@
 
 	* unix/tkUnixSelect.c (SelCvtFromX32, SelCvtFromX8): Make the
 	incremental transfer of binary selections work get deserialized
-	correctly. Thanks to Emiliano Gavilan for detecting.
+	correctly. Thanks to Emiliano Gavilán for detecting.
 
 2009-07-15  Donal K. Fellows  <dkf@users.sf.net>
 
@@ -2052,7 +2193,7 @@
 	* changes:	Updates for 8.5.2 release.
 
 	* unix/tkUnixCursor.c:	Stop crash in [. configure -cursor] on X11.
-	Thanks to emiliano gavilán.  [Bug 1922466]
+	Thanks to Emiliano Gavilán.  [Bug 1922466]
 
 2008-03-26  Joe English  <jenglish@users.sourceforge.net>
 
