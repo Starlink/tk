@@ -2454,7 +2454,11 @@ ImgPhotoGet(
     }
     XFree((char *) visInfoPtr);
 
-    sprintf(buf, ((mono) ? "%d": "%d/%d/%d"), nRed, nGreen, nBlue);
+    if (mono) {
+	sprintf(buf, "%d", nRed);
+    } else {
+	sprintf(buf, "%d/%d/%d", nRed, nGreen, nBlue);
+    }
     instancePtr->defaultPalette = Tk_GetUid(buf);
 
     /*
@@ -5648,6 +5652,9 @@ ImgGetPhoto(
 	    break;
 	}
     }
+    if (!alphaOffset) {
+	blockPtr->offset[3]= -1; /* Tell caller alpha need not be read */
+    }
     greenOffset = blockPtr->offset[1] - blockPtr->offset[0];
     blueOffset = blockPtr->offset[2] - blockPtr->offset[0];
     if (((optPtr->options & OPT_BACKGROUND) && alphaOffset) ||
@@ -5765,9 +5772,6 @@ ImgGetPhoto(
 	    blockPtr->offset[1]= 0;
 	    blockPtr->offset[2]= 0;
 	    blockPtr->offset[3]= 1;
-	}
-	if (!alphaOffset) {
-	  blockPtr->offset[3]= -1;
 	}
 	return data;
     }
