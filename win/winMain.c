@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <tchar.h>
 
+#if defined(__GNUC__)
+int _CRT_glob = 0;
+#endif /* __GNUC__ */
+
 #ifdef TK_TEST
 extern Tcl_PackageInitProc Tktest_Init;
 #endif /* TK_TEST */
@@ -220,7 +224,7 @@ Tcl_AppInit(
      */
 
     /*
-     * Call Tcl_CreateCommand for application-specific commands, if they
+     * Call Tcl_CreateObjCommand for application-specific commands, if they
      * weren't already created by the init procedures called above.
      */
 
