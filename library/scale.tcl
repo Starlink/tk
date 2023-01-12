@@ -71,34 +71,34 @@ if {[tk windowingsystem] eq "win32"} {
 bind Scale <Control-1> {
     tk::ScaleControlPress %W %x %y
 }
-bind Scale <Up> {
+bind Scale <<PrevLine>> {
     tk::ScaleIncrement %W up little noRepeat
 }
-bind Scale <Down> {
+bind Scale <<NextLine>> {
     tk::ScaleIncrement %W down little noRepeat
 }
-bind Scale <Left> {
+bind Scale <<PrevChar>> {
     tk::ScaleIncrement %W up little noRepeat
 }
-bind Scale <Right> {
+bind Scale <<NextChar>> {
     tk::ScaleIncrement %W down little noRepeat
 }
-bind Scale <Control-Up> {
+bind Scale <<PrevPara>> {
     tk::ScaleIncrement %W up big noRepeat
 }
-bind Scale <Control-Down> {
+bind Scale <<NextPara>> {
     tk::ScaleIncrement %W down big noRepeat
 }
-bind Scale <Control-Left> {
+bind Scale <<PrevWord>> {
     tk::ScaleIncrement %W up big noRepeat
 }
-bind Scale <Control-Right> {
+bind Scale <<NextWord>> {
     tk::ScaleIncrement %W down big noRepeat
 }
-bind Scale <Home> {
+bind Scale <<LineStart>> {
     %W set [%W cget -from]
 }
-bind Scale <End> {
+bind Scale <<LineEnd>> {
     %W set [%W cget -to]
 }
 
@@ -210,7 +210,20 @@ proc ::tk::ScaleEndDrag {w} {
 
 proc ::tk::ScaleIncrement {w dir big repeat} {
     variable ::tk::Priv
+
     if {![winfo exists $w]} return
+
+    # give the cancel callback a chance to be serviced if the execution time of
+    # the -command script lasts longer than -repeatdelay
+    set clockms [clock milliseconds]
+    if {$repeat eq "again" &&
+            [expr {$clockms - $Priv(clockms)}] > [expr {[$w cget -repeatinterval] * 1.1}]} {
+        set Priv(clockms) $clockms
+	set Priv(afterId) [after [$w cget -repeatinterval] \
+		[list tk::ScaleIncrement $w $dir $big again]]
+	return
+    }
+
     if {$big eq "big"} {
 	set inc [$w cget -bigincrement]
 	if {$inc == 0} {
@@ -223,16 +236,26 @@ proc ::tk::ScaleIncrement {w dir big repeat} {
 	set inc [$w cget -resolution]
     }
     if {([$w cget -from] > [$w cget -to]) ^ ($dir eq "up")} {
-	set inc [expr {-$inc}]
+        if {$inc > 0} {
+            set inc [expr {-$inc}]
+        }
+    } else {
+        if {$inc < 0} {
+            set inc [expr {-$inc}]
+        }
     }
+    # this will run the -command script (if any) during the redrawing
+    # of the scale at idle time
     $w set [expr {[$w get] + $inc}]
 
     if {$repeat eq "again"} {
+        set Priv(clockms) $clockms
 	set Priv(afterId) [after [$w cget -repeatinterval] \
 		[list tk::ScaleIncrement $w $dir $big again]]
     } elseif {$repeat eq "initial"} {
 	set delay [$w cget -repeatdelay]
 	if {$delay > 0} {
+	    set Priv(clockms) $clockms
 	    set Priv(afterId) [after $delay \
 		    [list tk::ScaleIncrement $w $dir $big again]]
 	}

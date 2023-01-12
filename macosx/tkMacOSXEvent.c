@@ -14,6 +14,7 @@
 #include "tkMacOSXPrivate.h"
 #include "tkMacOSXEvent.h"
 #include "tkMacOSXDebug.h"
+#include "tkMacOSXConstants.h"
 
 #pragma mark TKApplication(TKEvent)
 
@@ -23,25 +24,27 @@ enum {
 
 @implementation TKApplication(TKEvent)
 /* TODO: replace by +[addLocalMonitorForEventsMatchingMask ? */
-- (NSEvent *)tkProcessEvent:(NSEvent *)theEvent {
+- (NSEvent *) tkProcessEvent: (NSEvent *) theEvent
+{
 #ifdef TK_MAC_DEBUG_EVENTS
     TKLog(@"-[%@(%p) %s] %@", [self class], self, _cmd, theEvent);
 #endif
     NSEvent	    *processedEvent = theEvent;
     NSEventType	    type = [theEvent type];
     NSInteger	    subtype;
-    NSUInteger	    flags;
 
     switch ((NSInteger)type) {
     case NSAppKitDefined:
         subtype = [theEvent subtype];
 
 	switch (subtype) {
+	    /* Ignored at the moment. */
 	case NSApplicationActivatedEventType:
 	    break;
 	case NSApplicationDeactivatedEventType:
 	    break;
 	case NSWindowExposedEventType:
+	    break;
 	case NSScreenChangedEventType:
 	    break;
 	case NSWindowMovedEventType:
@@ -52,13 +55,12 @@ enum {
         default:
             break;
 	}
-	break;
+	break; /* AppkitEvent. Return theEvent */
     case NSKeyUp:
     case NSKeyDown:
     case NSFlagsChanged:
-	flags = [theEvent modifierFlags];
 	processedEvent = [self tkProcessKeyEvent:theEvent];
-	break;
+	break; /* Key event.  Return the processed event. */
     case NSLeftMouseDown:
     case NSLeftMouseUp:
     case NSRightMouseDown:
@@ -75,7 +77,7 @@ enum {
     case NSTabletPoint:
     case NSTabletProximity:
 	processedEvent = [self tkProcessMouseEvent:theEvent];
-	break;
+	break; /* Mouse event.  Return the processed event. */
 #if 0
     case NSSystemDefined:
         subtype = [theEvent subtype];
@@ -87,7 +89,6 @@ enum {
 	}
     case NSCursorUpdate:
         break;
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1060
     case NSEventTypeGesture:
     case NSEventTypeMagnify:
     case NSEventTypeRotate:
@@ -96,54 +97,15 @@ enum {
     case NSEventTypeEndGesture:
         break;
 #endif
-#endif
 
     default:
-	break;
+	break; /* return theEvent */
     }
     return processedEvent;
 }
 @end
-
 #pragma mark -
-
-/*
- *----------------------------------------------------------------------
- *
- * TkMacOSXFlushWindows --
- *
- *	This routine flushes all the windows of the application. It is
- *	called by XSync().
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Flushes all Carbon windows
- *
- *----------------------------------------------------------------------
- */
 
-MODULE_SCOPE void
-TkMacOSXFlushWindows(void)
-{
-    NSInteger windowCount;
-    NSInteger *windowNumbers;
-
-    NSCountWindows(&windowCount);
-    if(windowCount) {
-	windowNumbers = (NSInteger *) ckalloc(windowCount * sizeof(NSInteger));
-	NSWindowList(windowCount, windowNumbers);
-	for (NSInteger index = 0; index < windowCount; index++) {
-	    NSWindow *w = [NSApp windowWithWindowNumber:windowNumbers[index]];
-	    if (TkMacOSXGetXWindow(w)) {
-		[w flushWindow];
-	    }
-	}
-	ckfree((char*) windowNumbers);
-    }
-}
-
 /*
  * Local Variables:
  * mode: objc

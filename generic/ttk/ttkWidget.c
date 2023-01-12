@@ -4,14 +4,9 @@
  * Core widget utilities.
  */
 
-#include <string.h>
-#include <tk.h>
+#include "tkInt.h"
 #include "ttkTheme.h"
 #include "ttkWidget.h"
-
-#ifdef MAC_OSX_TK
-#define TK_NO_DOUBLE_BUFFERING 1
-#endif
 
 /*------------------------------------------------------------------------
  * +++ Internal helper routines.
@@ -120,6 +115,19 @@ void TtkRedisplayWidget(WidgetCore *corePtr)
     }
 }
 
+/*
+ * WidgetWorldChanged --
+ * 	Default Tk_ClassWorldChangedProc() for widgets.
+ * 	Invoked whenever fonts or other system resources are changed;
+ * 	recomputes geometry.
+ */
+static void WidgetWorldChanged(ClientData clientData)
+{
+    WidgetCore *corePtr = clientData;
+    SizeChanged(corePtr);
+    TtkRedisplayWidget(corePtr);
+}
+
 /* TtkResizeWidget --
  * 	Recompute widget size, schedule geometry propagation and redisplay.
  */
@@ -129,8 +137,7 @@ void TtkResizeWidget(WidgetCore *corePtr)
 	return;
     }
 
-    SizeChanged(corePtr);
-    TtkRedisplayWidget(corePtr);
+    WidgetWorldChanged(corePtr);
 }
 
 /* TtkWidgetChangeState --
@@ -198,7 +205,7 @@ WidgetInstanceObjCmdDeleted(ClientData clientData)
  *	 Final cleanup for widget; called via Tcl_EventuallyFree().
  */
 static void
-FreeWidget(char *memPtr)
+FreeWidget(void *memPtr)
 {
     ckfree(memPtr);
 }
@@ -231,7 +238,7 @@ DestroyWidget(WidgetCore *corePtr)
 	/* NB: this can reenter the interpreter via a command traces */
 	Tcl_DeleteCommandFromToken(corePtr->interp, cmd);
     }
-    Tcl_EventuallyFree(corePtr, FreeWidget);
+    Tcl_EventuallyFree(corePtr, (Tcl_FreeProc *) FreeWidget);
 }
 
 /*
@@ -263,7 +270,7 @@ static const unsigned CoreEventMask
 
 static void CoreEventProc(ClientData clientData, XEvent *eventPtr)
 {
-    WidgetCore *corePtr = clientData;
+    WidgetCore *corePtr = (WidgetCore *)clientData;
 
     switch (eventPtr->type)
     {
@@ -310,36 +317,25 @@ static void CoreEventProc(ClientData clientData, XEvent *eventPtr)
 	    corePtr->state |= TTK_STATE_HOVER;
 	    TtkRedisplayWidget(corePtr);
 	    break;
-	case VirtualEvent:
-	    if (!strcmp("ThemeChanged", ((XVirtualEvent *)(eventPtr))->name)) {
+	case VirtualEvent: {
+	    const char *name = ((XVirtualEvent *)eventPtr)->name;
+	    if ((name != NULL) && !strcmp("ThemeChanged", name)) {
 		(void)UpdateLayout(corePtr->interp, corePtr);
-		SizeChanged(corePtr);
-		TtkRedisplayWidget(corePtr);
+		WidgetWorldChanged(corePtr);
 	    }
+	    break;
+	}
 	default:
 	    /* can't happen... */
 	    break;
     }
 }
 
-/*
- * WidgetWorldChanged --
- * 	Default Tk_ClassWorldChangedProc() for widgets.
- * 	Invoked whenever fonts or other system resources are changed;
- * 	recomputes geometry.
- */
-static void WidgetWorldChanged(ClientData clientData)
-{
-    WidgetCore *corePtr = clientData;
-    SizeChanged(corePtr);
-    TtkRedisplayWidget(corePtr);
-}
-
 static Tk_ClassProcs widgetClassProcs = {
     sizeof(Tk_ClassProcs),	/* size */
-    WidgetWorldChanged,	/* worldChangedProc */
-    NULL,					/* createProc */
-    NULL					/* modalProc */
+    WidgetWorldChanged,		/* worldChangedProc */
+    NULL,			/* createProc */
+    NULL			/* modalProc */
 };
 
 /*
@@ -440,7 +436,8 @@ int TtkWidgetConstructorObjCmd(
 
 error:
     if (WidgetDestroyed(corePtr)) {
-	Tcl_SetResult(interp, "Widget has been destroyed", TCL_STATIC);
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		"widget has been destroyed", -1));
     } else {
 	Tk_DestroyWindow(tkwin);
     }
@@ -634,8 +631,8 @@ int TtkWidgetConfigureCommand(
 	    return status;
 
 	if (mask & READONLY_OPTION) {
-	    Tcl_SetResult(interp,
-		    "Attempt to change read-only option", TCL_STATIC);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		    "attempt to change read-only option", -1));
 	    Tk_RestoreSavedOptions(&savedOptions);
 	    return TCL_ERROR;
 	}
@@ -649,7 +646,8 @@ int TtkWidgetConfigureCommand(
 
 	status = corePtr->widgetSpec->postConfigureProc(interp,recordPtr,mask);
 	if (WidgetDestroyed(corePtr)) {
-	    Tcl_SetResult(interp, "Widget has been destroyed", TCL_STATIC);
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		    "widget has been destroyed", -1));
 	    status = TCL_ERROR;
 	}
 	if (status != TCL_OK) {
@@ -755,7 +753,7 @@ int TtkWidgetIdentifyCommand(
 {
     WidgetCore *corePtr = recordPtr;
     Ttk_Element element;
-    static const char *whatTable[] = { "element", NULL };
+    static const char *const whatTable[] = { "element", NULL };
     int x, y, what;
 
     if (objc < 4 || objc > 5) {
@@ -764,8 +762,8 @@ int TtkWidgetIdentifyCommand(
     }
     if (objc == 5) {
 	/* $w identify element $x $y */
-	if (Tcl_GetIndexFromObj(interp,objv[2],whatTable,"option",0,&what)
-		!= TCL_OK)
+	if (Tcl_GetIndexFromObjStruct(interp, objv[2], whatTable,
+		sizeof(char *), "option", 0, &what) != TCL_OK)
 	{
 	    return TCL_ERROR;
 	}

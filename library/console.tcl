@@ -6,7 +6,7 @@
 #
 # Copyright (c) 1995-1997 Sun Microsystems, Inc.
 # Copyright (c) 1998-2000 Ajuba Solutions.
-# Copyright (c) 2007 Daniel A. Steffen <das@users.sourceforge.net>
+# Copyright (c) 2007-2008 Daniel A. Steffen <das@users.sourceforge.net>
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -20,10 +20,9 @@ namespace eval ::tk::console {
     variable magicKeys   1   ; # enable brace matching and proc/var recognition
     variable maxLines    600 ; # maximum # of lines buffered in console
     variable showMatches 1   ; # show multiple expand matches
-
+    variable useFontchooser [llength [info command ::tk::fontchooser]]
     variable inPlugin [info exists embed_args]
     variable defaultPrompt   ; # default prompt if tcl_prompt1 isn't used
-
 
     if {$inPlugin} {
 	set defaultPrompt {subst {[history nextid] % }}
@@ -42,8 +41,6 @@ interp alias {} EvalAttached {} consoleinterp eval
 # 	None.
 
 proc ::tk::ConsoleInit {} {
-    global tcl_platform
-
     if {![consoleinterp eval {set tcl_interactive}]} {
 	wm withdraw .
     }
@@ -79,7 +76,7 @@ proc ::tk::ConsoleInit {} {
     AmpMenuArgs	.menubar.edit add command -label [mc P&aste] -accel "$mod+V"\
 	    -command {event generate .console <<Paste>>}
 
-    if {$tcl_platform(platform) ne "windows"} {
+    if {[tk windowingsystem] ne "win32"} {
 	AmpMenuArgs .menubar.edit add command -label [mc Cl&ear] \
 		-command {event generate .console <<Clear>>}
     } else {
@@ -93,10 +90,35 @@ proc ::tk::ConsoleInit {} {
     }
 
     AmpMenuArgs .menubar.edit add separator
+    if {$::tk::console::useFontchooser} {
+	if {[tk windowingsystem] eq "aqua"} {
+	    .menubar.edit add command -label tk_choose_font_marker
+	    set index [.menubar.edit index tk_choose_font_marker]
+	    .menubar.edit entryconfigure $index \
+		-label [mc "Show Fonts"]\
+		-accelerator "$mod-T"\
+		-command [list ::tk::console::FontchooserToggle]
+	    bind Console <<TkFontchooserVisibility>> \
+		[list ::tk::console::FontchooserVisibility $index]
+	    ::tk::console::FontchooserVisibility $index
+	} else {
+	    AmpMenuArgs .menubar.edit add command -label [mc "&Font..."] \
+		-command [list ::tk::console::FontchooserToggle]
+	}
+	bind Console <FocusIn>  [list ::tk::console::FontchooserFocus %W 1]
+	bind Console <FocusOut> [list ::tk::console::FontchooserFocus %W 0]
+    }
     AmpMenuArgs .menubar.edit add command -label [mc "&Increase Font Size"] \
-        -accel "$mod++" -command {event generate .console <<Console_FontSizeIncr>>}
+	-accel "$mod++" -command {event generate .console <<Console_FontSizeIncr>>}
     AmpMenuArgs .menubar.edit add command -label [mc "&Decrease Font Size"] \
-        -accel "$mod+-" -command {event generate .console <<Console_FontSizeDecr>>}
+	-accel "$mod+-" -command {event generate .console <<Console_FontSizeDecr>>}
+    AmpMenuArgs .menubar.edit add command -label [mc "Fit To Screen Width"] \
+	-command {event generate .console <<Console_FitScreenWidth>>}
+
+    if {[tk windowingsystem] eq "aqua"} {
+	.menubar add cascade -label [mc Window] -menu [menu .menubar.window]
+	.menubar add cascade -label [mc Help] -menu [menu .menubar.help]
+    }
 
     . configure -menu .menubar
 
@@ -104,31 +126,31 @@ proc ::tk::ConsoleInit {} {
     catch {font create TkConsoleFont {*}[font configure TkFixedFont]}
     set families [font families]
     switch -exact -- [tk windowingsystem] {
-        aqua { set preferred {Monaco 10} }
-        win32 { set preferred {ProFontWindows 8 Consolas 8} }
-        default { set preferred {} }
+	aqua { set preferred {Monaco 10} }
+	win32 { set preferred {ProFontWindows 8 Consolas 8} }
+	default { set preferred {} }
     }
     foreach {family size} $preferred {
-        if {[lsearch -exact $families $family] != -1} {
-            font configure TkConsoleFont -family $family -size $size
-            break
-        }
+	if {$family in $families} {
+	    font configure TkConsoleFont -family $family -size $size
+	    break
+	}
     }
 
     # Provide the right border for the text widget (platform dependent).
     ::ttk::style layout ConsoleFrame {
-        Entry.field -sticky news -border 1 -children {
-            ConsoleFrame.padding -sticky news
-        }
+	Entry.field -sticky news -border 1 -children {
+	    ConsoleFrame.padding -sticky news
+	}
     }
     ::ttk::frame .consoleframe -style ConsoleFrame
 
     set con [text .console -yscrollcommand [list .sb set] -setgrid true \
-                 -borderwidth 0 -highlightthickness 0 -font TkConsoleFont]
+		 -borderwidth 0 -highlightthickness 0 -font TkConsoleFont]
     if {[tk windowingsystem] eq "aqua"} {
-        scrollbar .sb -command [list $con yview]
+	scrollbar .sb -command [list $con yview]
     } else {
-        ::ttk::scrollbar .sb -command [list $con yview]
+	::ttk::scrollbar .sb -command [list $con yview]
     }
     pack .sb  -in .consoleframe -fill both -side right -padx 1 -pady 1
     pack $con -in .consoleframe -fill both -expand 1 -side left -padx 1 -pady 1
@@ -171,7 +193,7 @@ proc ::tk::ConsoleInit {} {
     $w mark set promptEnd insert
     $w mark gravity promptEnd left
 
-    if {$tcl_platform(platform) eq "windows"} {
+    if {[tk windowingsystem] ne "aqua"} {
 	# Subtle work-around to erase the '% ' that tclMain.c prints out
 	after idle [subst -nocommand {
 	    if {[$con get 1.0 output] eq "% "} { $con delete 1.0 output }
@@ -193,7 +215,7 @@ proc ::tk::ConsoleSource {} {
 	    [list [mc "Tcl Scripts"] .tcl] \
 	    [list [mc "All Files"] *]]]
     if {$filename ne ""} {
-    	set cmd [list source $filename]
+	set cmd [list source $filename]
 	if {[catch {consoleinterp eval $cmd} result]} {
 	    ConsoleOutput stderr "$result\n"
 	}
@@ -251,21 +273,22 @@ proc ::tk::ConsoleHistory {cmd} {
     variable HistNum
 
     switch $cmd {
-    	prev {
+	prev {
 	    incr HistNum -1
 	    if {$HistNum == 0} {
 		set cmd {history event [expr {[history nextid] -1}]}
 	    } else {
 		set cmd "history event $HistNum"
 	    }
-    	    if {[catch {consoleinterp eval $cmd} cmd]} {
-    	    	incr HistNum
-    	    	return
-    	    }
+	    if {[catch {consoleinterp eval $cmd} cmd]} {
+		incr HistNum
+		return
+	    }
 	    .console delete promptEnd end
-    	    .console insert promptEnd $cmd {input stdin}
-    	}
-    	next {
+	    .console insert promptEnd $cmd {input stdin}
+	    .console see end
+	}
+	next {
 	    incr HistNum
 	    if {$HistNum == 0} {
 		set cmd {history event [expr {[history nextid] -1}]}
@@ -280,16 +303,17 @@ proc ::tk::ConsoleHistory {cmd} {
 	    }
 	    .console delete promptEnd end
 	    .console insert promptEnd $cmd {input stdin}
-    	}
-    	reset {
-    	    set HistNum 1
-    	}
+	    .console see end
+	}
+	reset {
+	    set HistNum 1
+	}
     }
 }
 
 # ::tk::ConsolePrompt --
 # This procedure draws the prompt.  If tcl_prompt1 or tcl_prompt2
-# exists in the main interpreter it will be called to generate the 
+# exists in the main interpreter it will be called to generate the
 # prompt.  Otherwise, a hard coded default prompt is printed.
 #
 # Arguments:
@@ -300,19 +324,19 @@ proc ::tk::ConsolePrompt {{partial normal}} {
     if {$partial eq "normal"} {
 	set temp [$w index "end - 1 char"]
 	$w mark set output end
-    	if {[consoleinterp eval "info exists tcl_prompt1"]} {
-    	    consoleinterp eval "eval \[set tcl_prompt1\]"
-    	} else {
-    	    puts -nonewline [EvalAttached $::tk::console::defaultPrompt]
-    	}
+	if {[consoleinterp eval "info exists tcl_prompt1"]} {
+	    consoleinterp eval "eval \[set tcl_prompt1\]"
+	} else {
+	    puts -nonewline [EvalAttached $::tk::console::defaultPrompt]
+	}
     } else {
 	set temp [$w index output]
 	$w mark set output end
-    	if {[consoleinterp eval "info exists tcl_prompt2"]} {
-    	    consoleinterp eval "eval \[set tcl_prompt2\]"
-    	} else {
+	if {[consoleinterp eval "info exists tcl_prompt2"]} {
+	    consoleinterp eval "eval \[set tcl_prompt2\]"
+	} else {
 	    puts -nonewline "> "
-    	}
+	}
     }
     flush stdout
     $w mark set output $temp
@@ -326,33 +350,53 @@ proc ::tk::ConsolePrompt {{partial normal}} {
 # Copy selected text from the console
 proc ::tk::console::Copy {w} {
     if {![catch {set data [$w get sel.first sel.last]}]} {
-        clipboard clear -displayof $w
-        clipboard append -displayof $w $data
+	clipboard clear -displayof $w
+	clipboard append -displayof $w $data
     }
 }
 # Copies selected text. If the selection is within the current active edit
 # region then it will be cut, if not it is only copied.
 proc ::tk::console::Cut {w} {
     if {![catch {set data [$w get sel.first sel.last]}]} {
-        clipboard clear -displayof $w
-        clipboard append -displayof $w $data
-        if {[$w compare sel.first >= output]} {
-            $w delete sel.first sel.last
+	clipboard clear -displayof $w
+	clipboard append -displayof $w $data
+	if {[$w compare sel.first >= output]} {
+	    $w delete sel.first sel.last
 	}
     }
 }
 # Paste text from the clipboard
 proc ::tk::console::Paste {w} {
     catch {
-        set clip [::tk::GetSelection $w CLIPBOARD]
-        set list [split $clip \n\r]
-        tk::ConsoleInsert $w [lindex $list 0]
-        foreach x [lrange $list 1 end] {
-            $w mark set insert {end - 1c}
-            tk::ConsoleInsert $w "\n"
-            tk::ConsoleInvoke
-            tk::ConsoleInsert $w $x
-        }
+	set clip [::tk::GetSelection $w CLIPBOARD]
+	set list [split $clip \n\r]
+	tk::ConsoleInsert $w [lindex $list 0]
+	foreach x [lrange $list 1 end] {
+	    $w mark set insert {end - 1c}
+	    tk::ConsoleInsert $w "\n"
+	    tk::ConsoleInvoke
+	    tk::ConsoleInsert $w $x
+	}
+    }
+}
+
+# Fit TkConsoleFont to window width
+proc ::tk::console::FitScreenWidth {w} {
+    set width [winfo screenwidth $w]
+    set cwidth [$w cget -width]
+    set s -50
+    set fit 0
+    array set fi [font configure TkConsoleFont]
+    while {$s < 0} {
+	set fi(-size) $s
+	set f [font create {*}[array get fi]]
+	set c [font measure $f "eM"]
+	font delete $f
+	if {$c * $cwidth < 1.667 * $width} {
+	    font configure TkConsoleFont -size $s
+	    break
+	}
+	incr s 2
     }
 }
 
@@ -372,59 +416,64 @@ proc ::tk::ConsoleBind {w} {
 	bind Console $ev [bind Text $ev]
     }
     ## We really didn't want the newline insertion...
-    bind Console <Control-Key-o> {}
+    bind Console <Control-o> {}
     ## ...or any Control-v binding (would block <<Paste>>)
-    bind Console <Control-Key-v> {}
+    bind Console <Control-v> {}
 
     # For the moment, transpose isn't enabled until the console
     # gets and overhaul of how it handles input -- hobbs
-    bind Console <Control-Key-t> {}
+    bind Console <Control-t> {}
 
     # Ignore all Alt, Meta, and Control keypresses unless explicitly bound.
     # Otherwise, if a widget binding for one of these is defined, the
     # <Keypress> class binding will also fire and insert the character
     # which is wrong.
 
-    bind Console <Alt-KeyPress> {# nothing }
-    bind Console <Meta-KeyPress> {# nothing}
-    bind Console <Control-KeyPress> {# nothing}
+    bind Console <Alt-Key> {# nothing }
+    bind Console <Meta-Key> {# nothing}
+    bind Console <Control-Key> {# nothing}
+    if {[tk windowingsystem] eq "aqua"} {
+	bind Console <Command-Key> {# nothing}
+	bind Console <Mod4-Key> {# nothing}
+    }
 
     foreach {ev key} {
-	<<Console_Prev>>		<Key-Up>
-	<<Console_Next>>		<Key-Down>
-	<<Console_NextImmediate>>	<Control-Key-n>
-	<<Console_PrevImmediate>>	<Control-Key-p>
-	<<Console_PrevSearch>>		<Control-Key-r>
-	<<Console_NextSearch>>		<Control-Key-s>
+	<<Console_NextImmediate>>	<Control-n>
+	<<Console_PrevImmediate>>	<Control-p>
+	<<Console_PrevSearch>>		<Control-r>
+	<<Console_NextSearch>>		<Control-s>
 
-	<<Console_Expand>>		<Key-Tab>
-	<<Console_Expand>>		<Key-Escape>
-	<<Console_ExpandFile>>		<Control-Shift-Key-F>
-	<<Console_ExpandProc>>		<Control-Shift-Key-P>
-	<<Console_ExpandVar>>		<Control-Shift-Key-V>
-	<<Console_Tab>>			<Control-Key-i>
-	<<Console_Tab>>			<Meta-Key-i>
-	<<Console_Eval>>		<Key-Return>
-	<<Console_Eval>>		<Key-KP_Enter>
+	<<Console_Expand>>		<Tab>
+	<<Console_Expand>>		<Escape>
+	<<Console_ExpandFile>>		<Control-Shift-F>
+	<<Console_ExpandProc>>		<Control-Shift-P>
+	<<Console_ExpandVar>>		<Control-Shift-V>
+	<<Console_Tab>>			<Control-i>
+	<<Console_Tab>>			<Meta-i>
+	<<Console_Eval>>		<Return>
+	<<Console_Eval>>		<KP_Enter>
 
-	<<Console_Clear>>		<Control-Key-l>
-	<<Console_KillLine>>		<Control-Key-k>
-	<<Console_Transpose>>		<Control-Key-t>
-	<<Console_ClearLine>>		<Control-Key-u>
-	<<Console_SaveCommand>>		<Control-Key-z>
-        <<Console_FontSizeIncr>>	<Control-Key-plus>
-        <<Console_FontSizeDecr>>	<Control-Key-minus>
+	<<Console_Clear>>		<Control-l>
+	<<Console_KillLine>>		<Control-k>
+	<<Console_Transpose>>		<Control-t>
+	<<Console_ClearLine>>		<Control-u>
+	<<Console_SaveCommand>>		<Control-z>
+	<<Console_FontSizeIncr>>	<Control-plus>
+	<<Console_FontSizeDecr>>	<Control-minus>
     } {
 	event add $ev $key
 	bind Console $key {}
     }
     if {[tk windowingsystem] eq "aqua"} {
 	foreach {ev key} {
-	    <<Console_FontSizeIncr>>	<Command-Key-plus>
-	    <<Console_FontSizeDecr>>	<Command-Key-minus>
+	    <<Console_FontSizeIncr>>	<Command-plus>
+	    <<Console_FontSizeDecr>>	<Command-minus>
 	} {
 	    event add $ev $key
 	    bind Console $key {}
+	}
+	if {$::tk::console::useFontchooser} {
+	    bind Console <Command-t> [list ::tk::console::FontchooserToggle]
 	}
     }
     bind Console <<Console_Expand>> {
@@ -474,18 +523,16 @@ proc ::tk::ConsoleBind {w} {
     }
     bind Console <Control-h> [bind Console <BackSpace>]
 
-    bind Console <Home> {
+    bind Console <<LineStart>> {
 	if {[%W compare insert < promptEnd]} {
 	    tk::TextSetCursor %W {insert linestart}
 	} else {
 	    tk::TextSetCursor %W promptEnd
 	}
     }
-    bind Console <Control-a> [bind Console <Home>]
-    bind Console <End> {
+    bind Console <<LineEnd>> {
 	tk::TextSetCursor %W {insert lineend}
     }
-    bind Console <Control-e> [bind Console <End>]
     bind Console <Control-d> {
 	if {[%W compare insert < promptEnd]} {
 	    break
@@ -535,21 +582,21 @@ proc ::tk::ConsoleBind {w} {
 	    %W delete insert {insert wordend}
 	}
     }
-    bind Console <<Console_Prev>> {
+    bind Console <<PrevLine>> {
 	tk::ConsoleHistory prev
     }
-    bind Console <<Console_Next>> {
+    bind Console <<NextLine>> {
 	tk::ConsoleHistory next
     }
     bind Console <Insert> {
 	catch {tk::ConsoleInsert %W [::tk::GetSelection %W PRIMARY]}
     }
-    bind Console <KeyPress> {
+    bind Console <Key> {
 	tk::ConsoleInsert %W %A
     }
     bind Console <F9> {
 	eval destroy [winfo child .]
-	source [file join $tk_library console.tcl]
+	source -encoding utf-8 [file join $tk_library console.tcl]
     }
     if {[tk windowingsystem] eq "aqua"} {
 	bind Console <Command-q> {
@@ -561,39 +608,53 @@ proc ::tk::ConsoleBind {w} {
     bind Console <<Paste>> { ::tk::console::Paste %W }
 
     bind Console <<Console_FontSizeIncr>> {
-        set size [font configure TkConsoleFont -size]
-        font configure TkConsoleFont -size [incr size]
+	set size [font configure TkConsoleFont -size]
+	if {$size < 0} {set sign -1} else {set sign 1}
+	set size [expr {(abs($size) + 1) * $sign}]
+	font configure TkConsoleFont -size $size
+	if {$::tk::console::useFontchooser} {
+	    tk fontchooser configure -font TkConsoleFont
+	}
     }
     bind Console <<Console_FontSizeDecr>> {
-        set size [font configure TkConsoleFont -size]
-        font configure TkConsoleFont -size [incr size -1]
+	set size [font configure TkConsoleFont -size]
+	if {abs($size) < 2} { return }
+	if {$size < 0} {set sign -1} else {set sign 1}
+	set size [expr {(abs($size) - 1) * $sign}]
+	font configure TkConsoleFont -size $size
+	if {$::tk::console::useFontchooser} {
+	    tk fontchooser configure -font TkConsoleFont
+	}
+    }
+    bind Console <<Console_FitScreenWidth>> {
+	::tk::console::FitScreenWidth %W
     }
 
     ##
     ## Bindings for doing special things based on certain keys
     ##
-    bind PostConsole <Key-parenright> {
+    bind PostConsole <parenright> {
 	if {"\\" ne [%W get insert-2c]} {
 	    ::tk::console::MatchPair %W \( \) promptEnd
 	}
     }
-    bind PostConsole <Key-bracketright> {
+    bind PostConsole <bracketright> {
 	if {"\\" ne [%W get insert-2c]} {
 	    ::tk::console::MatchPair %W \[ \] promptEnd
 	}
     }
-    bind PostConsole <Key-braceright> {
+    bind PostConsole <braceright> {
 	if {"\\" ne [%W get insert-2c]} {
 	    ::tk::console::MatchPair %W \{ \} promptEnd
 	}
     }
-    bind PostConsole <Key-quotedbl> {
+    bind PostConsole <quotedbl> {
 	if {"\\" ne [%W get insert-2c]} {
 	    ::tk::console::MatchQuote %W promptEnd
 	}
     }
 
-    bind PostConsole <KeyPress> {
+    bind PostConsole <Key> {
 	if {"%A" ne ""} {
 	    ::tk::console::TagProc %W
 	}
@@ -671,6 +732,35 @@ Tcl $::tcl_patchLevel
 Tk $::tk_patchLevel"
 }
 
+# ::tk::console::Fontchooser* --
+# 	Let the user select the console font (TIP 324).
+
+proc ::tk::console::FontchooserToggle {} {
+    if {[tk fontchooser configure -visible]} {
+	tk fontchooser hide
+    } else {
+	tk fontchooser show
+    }
+}
+proc ::tk::console::FontchooserVisibility {index} {
+    if {[tk fontchooser configure -visible]} {
+	.menubar.edit entryconfigure $index -label [::tk::msgcat::mc "Hide Fonts"]
+    } else {
+	.menubar.edit entryconfigure $index -label [::tk::msgcat::mc "Show Fonts"]
+    }
+}
+proc ::tk::console::FontchooserFocus {w isFocusIn} {
+    if {$isFocusIn} {
+	tk fontchooser configure -parent $w -font TkConsoleFont \
+		-command [namespace code [list FontchooserApply]]
+    } else {
+	tk fontchooser configure -parent $w -font {} -command {}
+    }
+}
+proc ::tk::console::FontchooserApply {font args} {
+    catch {font configure TkConsoleFont {*}[font actual $font]}
+}
+
 # ::tk::console::TagProc --
 #
 # Tags a procedure in the console if it's recognized
@@ -720,7 +810,7 @@ proc ::tk::console::TagProc w {
 # 	c2	- second char of pair
 #
 # Calls:	::tk::console::Blink
- 
+
 proc ::tk::console::MatchPair {w c1 c2 {lim 1.0}} {
     if {!$::tk::console::magicKeys} {
 	return
@@ -775,7 +865,7 @@ proc ::tk::console::MatchPair {w c1 c2 {lim 1.0}} {
 #	w	- console text widget
 #
 # Calls:	::tk::console::Blink
- 
+
 proc ::tk::console::MatchQuote {w {lim 1.0}} {
     if {!$::tk::console::magicKeys} {
 	return
@@ -910,11 +1000,11 @@ proc ::tk::console::Expand {w {type ""}} {
 #
 # Returns:	list containing longest unique match followed by all the
 #		possible further matches
- 
+
 proc ::tk::console::ExpandPathname str {
     set pwd [EvalAttached pwd]
-    if {[catch {EvalAttached [list cd [file dirname $str]]} err]} {
-	return -code error $err
+    if {[catch {EvalAttached [list cd [file dirname $str]]} err opt]} {
+	return -options $opt $err
     }
     set dir [file tail $str]
     ## Check to see if it was known to be a directory and keep the trailing
@@ -926,8 +1016,7 @@ proc ::tk::console::ExpandPathname str {
 	set match {}
     } else {
 	if {[llength $m] > 1} {
-	    global tcl_platform
-	    if {[string match windows $tcl_platform(platform)]} {
+	    if { $::tcl_platform(platform) eq "windows" } {
 		## Windows is screwy because it's case insensitive
 		set tmp [ExpandBestMatch [string tolower $m] \
 			[string tolower $dir]]
