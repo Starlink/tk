@@ -949,31 +949,8 @@ Tk_DrawChars(
     int x, int y)		/* Coordinates at which to place origin of the
 				 * string when drawing. */
 {
-    DrawCharsInContext(display, drawable, gc, tkfont, source, numBytes,
-	    0, numBytes, x, y, 0.0);
-}
-
-void
-TkpDrawAngledChars(
-    Display *display,		/* Display on which to draw. */
-    Drawable drawable,		/* Window or pixmap in which to draw. */
-    GC gc,			/* Graphics context for drawing characters. */
-    Tk_Font tkfont,		/* Font in which characters will be drawn;
-				 * must be the same as font used in GC. */
-    const char *source,		/* UTF-8 string to be displayed. Need not be
-				 * '\0' terminated. All Tk meta-characters
-				 * (tabs, control characters, and newlines)
-				 * should be stripped out of the string that
-				 * is passed to this function. If they are not
-				 * stripped out, they will be displayed as
-				 * regular printing characters. */
-    int numBytes,		/* Number of bytes in string. */
-    double x, double y,		/* Coordinates at which to place origin of
-				 * string when drawing. */
-    double angle)		/* What angle to put text at, in degrees. */
-{
-    DrawCharsInContext(display, drawable, gc, tkfont, source, numBytes,
-	    0, numBytes, x, y, angle);
+    TkpDrawCharsInContext(display, drawable, gc, tkfont, source, numBytes,
+	    0, numBytes, x, y);
 }
 
 /*
@@ -1114,14 +1091,6 @@ DrawCharsInContext(
 
     urstart = Tcl_NumUtfChars(source, rangeStart);
     urlen = Tcl_NumUtfChars(source+rangeStart,rangeLength);
-
-    /* Rotate the coordinate system for Quarz drawing. */
-    if (drawingContext.context && angle != 0.0) {
-#define PI	3.14159265358979323846
-	CGContextTranslateCTM(drawingContext.context, x, y);
-	CGContextRotateCTM(drawingContext.context, angle * PI/180.0);
-	CGContextTranslateCTM(drawingContext.context, -x, -y);
-    }
 
     ChkErr(ATSUDrawText, fontPtr->atsuLayout, lineOffset+urstart, urlen, fx,
 	    fy);

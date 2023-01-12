@@ -1188,19 +1188,6 @@ MODULE_SCOPE Status TkParseColor (Display * display,
 MODULE_SCOPE void	TkUnixSetXftClipRegion(TkRegion clipRegion);
 #endif
 
-MODULE_SCOPE void	TkDrawAngledTextLayout(Display *display,
-			    Drawable drawable, GC gc, Tk_TextLayout layout,
-			    int x, int y, double angle, int firstChar,
-			    int lastChar);
-MODULE_SCOPE void	TkpDrawAngledChars(Display *display,Drawable drawable,
-			    GC gc, Tk_Font tkfont, const char *source,
-			    int numBytes, double x, double y, double angle);
-MODULE_SCOPE void	TkUnderlineAngledTextLayout(Display *display,
-			    Drawable drawable, GC gc, Tk_TextLayout layout,
-			    int x, int y, double angle, int underline);
-MODULE_SCOPE int	TkIntersectAngledTextLayout(Tk_TextLayout layout,
-			    int x,int y, int width, int height, double angle);
-
 /*
  * Unsupported commands.
  */

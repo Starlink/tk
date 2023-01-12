@@ -1263,7 +1263,6 @@ append ps_preamable {
 % color and font must already have been set by the caller, and the
 % following arguments must be on the stack:
 %
-% angle -	Angle through which to rotate text, in degrees.
 % x, y -	Coordinates at which to draw text.
 % strings -	An array of strings, one for each line of the text item,
 %		in order from top to bottom.
@@ -1310,7 +1309,6 @@ append ps_preamable {
     % positioning are still on the stack.
 
     translate
-    rotate
     lineLength xoffset mul
     strings length 1 sub spacing mul height add yoffset mul translate
 

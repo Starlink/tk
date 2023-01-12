@@ -712,8 +712,6 @@ ImageToPostscript(
     int width, height;
     Tk_Image image;
     Tk_State state = itemPtr->state;
-    int screenX1, screenY1, screenX2, screenY2;
-    TkCanvas *canvasPtr = (TkCanvas *) canvas;
 
     if(state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
@@ -737,24 +735,6 @@ ImageToPostscript(
         return TCL_OK;
     }
     Tk_SizeOfImage(image, &width, &height);
-
-    /*  Determine region of image that needs to be drawn. 
-     *  Note this is for _rtdimages_. Only the part visible on the display 
-     *  screen is done. */
-    screenX1 = canvasPtr->xOrigin + canvasPtr->inset;
-    screenY1 = canvasPtr->yOrigin + canvasPtr->inset;
-    screenX2 = canvasPtr->xOrigin + Tk_Width(canvasWin) - canvasPtr->inset;
-    screenY2 = canvasPtr->yOrigin + Tk_Height(canvasWin) - canvasPtr->inset;
-    if ( width > screenX2 - screenX1 ) {
-        width = screenX2 - screenX1;
-    } else {
-        screenX1 = 0;
-    }
-    if ( height > screenY2 - screenY1 ) {
-        height = screenY2 - screenY1;
-    } else {
-        screenY1 = 0;
-    }
 
     /*
      * Compute the coordinates of the lower-left corner of the image, taking

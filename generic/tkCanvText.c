@@ -55,8 +55,6 @@ typedef struct TextItem {
 				 * means no word-wrap. */
     int underline;		/* Index of character to put underline beneath
 				 * or -1 for no underlining. */
-    double angle;		/* What angle, in degrees, to draw the text
-				 * at. */
 
     /*
      * Fields whose values are derived from the current values of the
@@ -66,18 +64,18 @@ typedef struct TextItem {
     int numChars;		/* Length of text in characters. */
     int numBytes;		/* Length of text in bytes. */
     Tk_TextLayout textLayout;	/* Cached text layout information. */
-    int actualWidth;		/* Width of text as computed. Used to make
-				 * selections of wrapped text display
-				 * right. */ 
-    double drawOrigin[2];	/* Where we start drawing from. */
+    int leftEdge;		/* Pixel location of the left edge of the text
+				 * item; where the left border of the text
+				 * layout is drawn. */
+    int rightEdge;		/* Pixel just to right of right edge of area
+				 * of text item. Used for selecting up to end
+				 * of line. */
     GC gc;			/* Graphics context for drawing text. */
     GC selTextGC;		/* Graphics context for selected text. */
     GC cursorOffGC;		/* If not None, this gives a graphics context
 				 * to use to draw the insertion cursor when
 				 * it's off. Used if the selection and
 				 * insertion cursor colors are the same. */
-    double sine;		/* Sine of angle field. */
-    double cosine;		/* Cosine of angle field. */
 } TextItem;
 
 /*
@@ -104,8 +102,6 @@ static Tk_ConfigSpec configSpecs[] = {
 	NULL, Tk_Offset(TextItem, activeStipple), TK_CONFIG_NULL_OK},
     {TK_CONFIG_ANCHOR, "-anchor", NULL, NULL,
 	"center", Tk_Offset(TextItem, anchor), TK_CONFIG_DONT_SET_DEFAULT},
-    {TK_CONFIG_DOUBLE, "-angle", NULL, NULL,
-	"0.0", Tk_Offset(TextItem, angle), TK_CONFIG_DONT_SET_DEFAULT},
     {TK_CONFIG_COLOR, "-disabledfill", NULL, NULL,
 	NULL, Tk_Offset(TextItem, disabledColor), TK_CONFIG_NULL_OK},
     {TK_CONFIG_BITMAP, "-disabledstipple", NULL, NULL,
@@ -204,9 +200,6 @@ Tk_ItemType tkTextType = {
     TextDeleteChars,		/* dTextProc */
     NULL,			/* nextPtr */
 };
-
-#define PI	3.14159265358979323846
-#define ROUND(d) ((int) floor((d) + 0.5))
 
 /*
  *--------------------------------------------------------------
@@ -266,18 +259,15 @@ CreateText(
     textPtr->text	= NULL;
     textPtr->width	= 0;
     textPtr->underline	= -1;
-    textPtr->angle	= 0.0;
 
     textPtr->numChars	= 0;
     textPtr->numBytes	= 0;
     textPtr->textLayout = NULL;
-    textPtr->actualWidth = 0;
-    textPtr->drawOrigin[0] = textPtr->drawOrigin[1] = 0.0;
+    textPtr->leftEdge	= 0;
+    textPtr->rightEdge	= 0;
     textPtr->gc		= None;
     textPtr->selTextGC	= None;
     textPtr->cursorOffGC = None;
-    textPtr->sine	= 0.0;
-    textPtr->cosine	= 1.0;
 
     /*
      * Process the arguments to fill in the item record. Only 1 (list) or 2 (x
@@ -336,14 +326,14 @@ TextCoords(
 
     if (objc == 0) {
 	Tcl_Obj *obj = Tcl_NewObj();
-	Tcl_Obj *subobj = Tcl_NewDoubleObj(textPtr->x);
 
+	Tcl_Obj *subobj = Tcl_NewDoubleObj(textPtr->x);
 	Tcl_ListObjAppendElement(interp, obj, subobj);
 	subobj = Tcl_NewDoubleObj(textPtr->y);
 	Tcl_ListObjAppendElement(interp, obj, subobj);
 	Tcl_SetObjResult(interp, obj);
     } else if (objc < 3) {
-	if (objc == 1) {
+	if (objc==1) {
 	    if (Tcl_ListObjGetElements(interp, objv[0], &objc,
 		    (Tcl_Obj ***) &objv) != TCL_OK) {
 		return TCL_ERROR;
@@ -529,16 +519,6 @@ ConfigureText(
 	textPtr->insertPos = textPtr->numChars;
     }
 
-    textPtr->angle = fmod(textPtr->angle, 360.0);
-    if (textPtr->angle < 0.0) {
-	textPtr->angle += 360.0;
-    }
-    if (textPtr->angle == 0.0) {
-	textPtr->angle = 0.0;
-    }
-    textPtr->sine = sin(textPtr->angle * PI/180.0);
-    textPtr->cosine = cos(textPtr->angle * PI/180.0);
-
     ComputeTextBbox(canvas, textPtr);
     return TCL_OK;
 }
@@ -629,9 +609,8 @@ ComputeTextBbox(
     TextItem *textPtr)		/* Item whose bbox is to be recomputed. */
 {
     Tk_CanvasTextInfo *textInfoPtr;
-    int leftX, topY, width, height, fudge, i;
+    int leftX, topY, width, height, fudge;
     Tk_State state = textPtr->header.state;
-     double x[4], y[4], dx[4], dy[4], sinA, cosA, tmp;
 
     if(state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
@@ -651,11 +630,8 @@ ComputeTextBbox(
      * bounding box for the text item.
      */
 
-    leftX = ROUND(textPtr->x);
-    topY = ROUND(textPtr->y);
-    for (i=0 ; i<4 ; i++) {
-	dx[i] = dy[i] = 0.0;
-    }
+    leftX = (int) floor(textPtr->x + 0.5);
+    topY = (int) floor(textPtr->y + 0.5);
     switch (textPtr->anchor) {
     case TK_ANCHOR_NW:
     case TK_ANCHOR_N:
@@ -666,18 +642,12 @@ ComputeTextBbox(
     case TK_ANCHOR_CENTER:
     case TK_ANCHOR_E:
 	topY -= height / 2;
-	for (i=0 ; i<4 ; i++) {
-	    dy[i] = -height / 2;
-	}
 	break;
 
     case TK_ANCHOR_SW:
     case TK_ANCHOR_S:
     case TK_ANCHOR_SE:
 	topY -= height;
-	for (i=0 ; i<4 ; i++) {
-	    dy[i] = -height;
-	}
 	break;
     }
     switch (textPtr->anchor) {
@@ -690,27 +660,17 @@ ComputeTextBbox(
     case TK_ANCHOR_CENTER:
     case TK_ANCHOR_S:
 	leftX -= width / 2;
-	for (i=0 ; i<4 ; i++) {
-	    dx[i] = -width / 2;
-	}
 	break;
 
     case TK_ANCHOR_NE:
     case TK_ANCHOR_E:
     case TK_ANCHOR_SE:
 	leftX -= width;
-	for (i=0 ; i<4 ; i++) {
-	    dx[i] = -width;
-	}
 	break;
     }
 
-    textPtr->actualWidth = width;
-
-    sinA = textPtr->sine;
-    cosA = textPtr->cosine;
-    textPtr->drawOrigin[0] = textPtr->x + dx[0]*cosA + dy[0]*sinA;
-    textPtr->drawOrigin[1] = textPtr->y + dy[0]*cosA - dx[0]*sinA;
+    textPtr->leftEdge = leftX;
+    textPtr->rightEdge = leftX + width;
 
     /*
      * Last of all, update the bounding box for the item. The item's bounding
@@ -723,50 +683,10 @@ ComputeTextBbox(
     if (textInfoPtr->selBorderWidth > fudge) {
 	fudge = textInfoPtr->selBorderWidth;
     }
-
-    /*
-     * Apply the rotation before computing the bounding box.
-     */
-
-    dx[0] -= fudge;
-    dx[1] += width + fudge;
-    dx[2] += width + fudge;
-    dy[2] += height;
-    dx[3] -= fudge;
-    dy[3] += height;
-    for (i=0 ; i<4 ; i++) {
-	x[i] = textPtr->x + dx[i] * cosA + dy[i] * sinA;
-	y[i] = textPtr->y + dy[i] * cosA - dx[i] * sinA;
-    }
-
-    /*
-     * Convert to a rectilinear bounding box.
-     */
-
-    for (i=1,tmp=x[0] ; i<4 ; i++) {
-	if (x[i] < tmp) {
-	    tmp = x[i];
-	}
-    }
-    textPtr->header.x1 = ROUND(tmp);
-    for (i=1,tmp=y[0] ; i<4 ; i++) {
-	if (y[i] < tmp) {
-	    tmp = y[i];
-	}
-    }
-    textPtr->header.y1 = ROUND(tmp);
-    for (i=1,tmp=x[0] ; i<4 ; i++) {
-	if (x[i] > tmp) {
-	    tmp = x[i];
-	}
-    }
-    textPtr->header.x2 = ROUND(tmp);
-    for (i=1,tmp=y[0] ; i<4 ; i++) {
-	if (y[i] > tmp) {
-	    tmp = y[i];
-	}
-    }
-    textPtr->header.y2 = ROUND(tmp);
+    textPtr->header.x1 = leftX - fudge;
+    textPtr->header.y1 = topY;
+    textPtr->header.x2 = leftX + width + fudge;
+    textPtr->header.y2 = topY + height;
 }
 
 /*
@@ -836,8 +756,6 @@ DisplayCanvText(
 
     selFirstChar = -1;
     selLastChar = 0;		/* lint. */
-    Tk_CanvasDrawableCoords(canvas, textPtr->drawOrigin[0],
-	    textPtr->drawOrigin[1], &drawableX, &drawableY);
 
     if (textInfoPtr->selItemPtr == itemPtr) {
 	selFirstChar = textInfoPtr->selectFirst;
@@ -868,30 +786,20 @@ DisplayCanvText(
 	    x = xFirst;
 	    height = hFirst;
 	    for (y = yFirst ; y <= yLast; y += height) {
-		int dx1, dy1, dx2, dy2;
-		double s = textPtr->sine, c = textPtr->cosine;
-		XPoint points[4];
-
 		if (y == yLast) {
 		    width = xLast + wLast - x;
 		} else {
-		    width = textPtr->actualWidth - x;
+		    width = textPtr->rightEdge - textPtr->leftEdge - x;
 		}
-		dx1 = x - textInfoPtr->selBorderWidth;
-		dy1 = y;
-		dx2 = width + 2 * textInfoPtr->selBorderWidth;
-		dy2 = height;
-		points[0].x = drawableX + dx1*c + dy1*s;
-		points[0].y = drawableY + dy1*c - dx1*s;
-		points[1].x = drawableX + (dx1+dx2)*c + dy1*s;
-		points[1].y = drawableY + dy1*c - (dx1+dx2)*s;
-		points[2].x = drawableX + (dx1+dx2)*c + (dy1+dy2)*s;
-		points[2].y = drawableY + (dy1+dy2)*c - (dx1+dx2)*s;
-		points[3].x = drawableX + dx1*c + (dy1+dy2)*s;
-		points[3].y = drawableY + (dy1+dy2)*c - dx1*s;
-		Tk_Fill3DPolygon(Tk_CanvasTkwin(canvas), drawable,
-			textInfoPtr->selBorder, points, 4,
-			textInfoPtr->selBorderWidth, TK_RELIEF_RAISED);
+		Tk_CanvasDrawableCoords(canvas,
+			(double) (textPtr->leftEdge + x
+				- textInfoPtr->selBorderWidth),
+			(double) (textPtr->header.y1 + y),
+			&drawableX, &drawableY);
+		Tk_Fill3DRectangle(Tk_CanvasTkwin(canvas), drawable,
+			textInfoPtr->selBorder, drawableX, drawableY,
+			width + 2 * textInfoPtr->selBorderWidth,
+			height, textInfoPtr->selBorderWidth, TK_RELIEF_RAISED);
 		x = 0;
 	    }
 	}
@@ -909,28 +817,18 @@ DisplayCanvText(
     if ((textInfoPtr->focusItemPtr == itemPtr) && (textInfoPtr->gotFocus)) {
 	if (Tk_CharBbox(textPtr->textLayout, textPtr->insertPos,
 		&x, &y, NULL, &height)) {
-	    int dx1, dy1, dx2, dy2;
-	    double s = textPtr->sine, c = textPtr->cosine;
-	    XPoint points[4];
-
-	    dx1 = x - (textInfoPtr->insertWidth / 2);
-	    dy1 = y;
-	    dx2 = textInfoPtr->insertWidth;
-	    dy2 = height;
-	    points[0].x = drawableX + dx1*c + dy1*s;
-	    points[0].y = drawableY + dy1*c - dx1*s;
-	    points[1].x = drawableX + (dx1+dx2)*c + dy1*s;
-	    points[1].y = drawableY + dy1*c - (dx1+dx2)*s;
-	    points[2].x = drawableX + (dx1+dx2)*c + (dy1+dy2)*s;
-	    points[2].y = drawableY + (dy1+dy2)*c - (dx1+dx2)*s;
-	    points[3].x = drawableX + dx1*c + (dy1+dy2)*s;
-	    points[3].y = drawableY + (dy1+dy2)*c - dx1*s;
-
-	    Tk_SetCaretPos(Tk_CanvasTkwin(canvas), points[0].x, points[0].y,
+	    Tk_CanvasDrawableCoords(canvas,
+		    (double) (textPtr->leftEdge + x
+			    - (textInfoPtr->insertWidth / 2)),
+		    (double) (textPtr->header.y1 + y),
+		    &drawableX, &drawableY);
+	    Tk_SetCaretPos(Tk_CanvasTkwin(canvas), drawableX, drawableY,
 		    height);
 	    if (textInfoPtr->cursorOn) {
-		Tk_Fill3DPolygon(Tk_CanvasTkwin(canvas), drawable,
-			textInfoPtr->insertBorder, points, 4,
+		Tk_Fill3DRectangle(Tk_CanvasTkwin(canvas), drawable,
+			textInfoPtr->insertBorder,
+			drawableX, drawableY,
+			textInfoPtr->insertWidth, height,
 			textInfoPtr->insertBorderWidth, TK_RELIEF_RAISED);
 	    } else if (textPtr->cursorOffGC != None) {
 		/*
@@ -940,8 +838,10 @@ DisplayCanvText(
 		 * where both may be drawn in the same color.
 		 */
 
-		XFillPolygon(display, drawable, textPtr->cursorOffGC,
-			points, 4, Convex, CoordModeOrigin);
+		XFillRectangle(display, drawable, textPtr->cursorOffGC,
+			drawableX, drawableY,
+			(unsigned) textInfoPtr->insertWidth,
+			(unsigned) height);
 	    }
 	}
     }
@@ -956,24 +856,23 @@ DisplayCanvText(
      * anti-aliasing colors would blend together.
      */
 
+    Tk_CanvasDrawableCoords(canvas, (double) textPtr->leftEdge,
+	    (double) textPtr->header.y1, &drawableX, &drawableY);
+
     if ((selFirstChar >= 0) && (textPtr->selTextGC != textPtr->gc)) {
-	TkDrawAngledTextLayout(display, drawable, textPtr->gc,
-		textPtr->textLayout, drawableX, drawableY, textPtr->angle,
-		0, selFirstChar);
-	TkDrawAngledTextLayout(display, drawable, textPtr->selTextGC,
-		textPtr->textLayout, drawableX, drawableY, textPtr->angle,
-		selFirstChar, selLastChar + 1);
-	TkDrawAngledTextLayout(display, drawable, textPtr->gc,
-		textPtr->textLayout, drawableX, drawableY, textPtr->angle,
-		selLastChar + 1, -1);
+	Tk_DrawTextLayout(display, drawable, textPtr->gc, textPtr->textLayout,
+	    drawableX, drawableY, 0, selFirstChar);
+	Tk_DrawTextLayout(display, drawable, textPtr->selTextGC,
+	    textPtr->textLayout, drawableX, drawableY, selFirstChar,
+	    selLastChar + 1);
+	Tk_DrawTextLayout(display, drawable, textPtr->gc, textPtr->textLayout,
+	    drawableX, drawableY, selLastChar + 1, -1);
     } else {
-	TkDrawAngledTextLayout(display, drawable, textPtr->gc,
-		textPtr->textLayout, drawableX, drawableY, textPtr->angle,
-		0, -1);
+	Tk_DrawTextLayout(display, drawable, textPtr->gc, textPtr->textLayout,
+	    drawableX, drawableY, 0, -1);
     }
-    TkUnderlineAngledTextLayout(display, drawable, textPtr->gc,
-	    textPtr->textLayout, drawableX, drawableY, textPtr->angle,
-	    textPtr->underline);
+    Tk_UnderlineTextLayout(display, drawable, textPtr->gc, textPtr->textLayout,
+	    drawableX, drawableY, textPtr->underline);
 
     if (stipple != None) {
 	XSetTSOrigin(display, textPtr->gc, 0, 0);
@@ -1183,17 +1082,15 @@ TextToPoint(
 {
     TextItem *textPtr;
     Tk_State state = itemPtr->state;
-    double value, px, py;
+    double value;
 
     if (state == TK_STATE_NULL) {
 	state = ((TkCanvas *)canvas)->canvas_state;
     }
     textPtr = (TextItem *) itemPtr;
-    px = pointPtr[0] - textPtr->drawOrigin[0];
-    py = pointPtr[1] - textPtr->drawOrigin[1];
     value = (double) Tk_DistanceToTextLayout(textPtr->textLayout,
-           (int) px*textPtr->cosine - py*textPtr->sine,
-           (int) py*textPtr->cosine + px*textPtr->sine);
+	    (int) pointPtr[0] - textPtr->leftEdge,
+	    (int) pointPtr[1] - textPtr->header.y1);
 
     if ((state == TK_STATE_HIDDEN) || (textPtr->color == NULL) ||
 	    (textPtr->text == NULL) || (*textPtr->text == 0)) {
@@ -1237,12 +1134,11 @@ TextToArea(
     }
 
     textPtr = (TextItem *) itemPtr;
-    return TkIntersectAngledTextLayout(textPtr->textLayout,
-	    (int) (rectPtr[0] + 0.5) - textPtr->drawOrigin[0],
-	    (int) (rectPtr[1] + 0.5) - textPtr->drawOrigin[1],
+    return Tk_IntersectTextLayout(textPtr->textLayout,
+	    (int) (rectPtr[0] + 0.5) - textPtr->leftEdge,
+	    (int) (rectPtr[1] + 0.5) - textPtr->header.y1,
 	    (int) (rectPtr[2] - rectPtr[0] + 0.5),
-	    (int) (rectPtr[3] - rectPtr[1] + 0.5),
-	    textPtr->angle);
+	    (int) (rectPtr[3] - rectPtr[1] + 0.5));
 }
 
 /*
@@ -1371,7 +1267,7 @@ GetTextIndex(
 	*indexPtr = textInfoPtr->selectLast;
     } else if (c == '@') {
 	int x, y;
-	double tmp, c = textPtr->cosine, s = textPtr->sine;
+	double tmp;
 	char *end, *p;
 
 	p = string+1;
@@ -1386,9 +1282,9 @@ GetTextIndex(
 	    goto badIndex;
 	}
 	y = (int) ((tmp < 0) ? tmp - 0.5 : tmp + 0.5);
-	x += canvasPtr->scrollX1 - textPtr->drawOrigin[0];
-	y += canvasPtr->scrollY1 - textPtr->drawOrigin[1];
-	*indexPtr = Tk_PointToChar(textPtr->textLayout, x*c-y*s, y*c+x*s);
+	*indexPtr = Tk_PointToChar(textPtr->textLayout,
+		x + canvasPtr->scrollX1 - textPtr->leftEdge,
+		y + canvasPtr->scrollY1 - textPtr->header.y1);
     } else if (Tcl_GetIntFromObj(NULL, obj, indexPtr) == TCL_OK) {
 	if (*indexPtr < 0){
 	    *indexPtr = 0;
@@ -1534,6 +1430,7 @@ TextToPostscript(
     int x, y;
     Tk_FontMetrics fm;
     char *justify;
+    char buffer[500];
     XColor *color;
     Pixmap stipple;
     Tk_State state = itemPtr->state;
@@ -1577,8 +1474,9 @@ TextToPostscript(
 	Tcl_AppendResult(interp, "} bind def\n", NULL);
     }
 
-    Tcl_AppendPrintfToObj(Tcl_GetObjResult(interp), "%.15g %.15g %.15g [\n",
-	    textPtr->angle, textPtr->x, Tk_CanvasPsY(canvas, textPtr->y));
+    sprintf(buffer, "%.15g %.15g [\n", textPtr->x,
+	    Tk_CanvasPsY(canvas, textPtr->y));
+    Tcl_AppendResult(interp, buffer, NULL);
 
     Tk_TextLayoutToPostscript(interp, textPtr->textLayout);
 
@@ -1601,10 +1499,15 @@ TextToPostscript(
     }
 
     Tk_GetFontMetrics(textPtr->tkfont, &fm);
-    Tcl_AppendPrintfToObj(Tcl_GetObjResult(interp),
-           "] %d %g %g %s %s DrawText\n",
-           fm.linespace, x / -2.0, y / 2.0, justify,
-            ((stipple == None) ? "false" : "true"));
+    sprintf(buffer, "] %d ", fm.linespace);
+    Tcl_AppendResult(interp, buffer, NULL);
+    Tcl_PrintDouble(NULL, x / -2.0, buffer);
+    Tcl_AppendResult(interp, buffer, NULL);
+    Tcl_PrintDouble(NULL, y / 2.0, buffer);
+    Tcl_AppendResult(interp, " ", buffer, NULL);
+    sprintf(buffer, " %s %s DrawText\n",
+	    justify, ((stipple == None) ? "false" : "true"));
+    Tcl_AppendResult(interp, buffer, NULL);
 
     return TCL_OK;
 }
