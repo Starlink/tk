@@ -7,6 +7,7 @@
  * Copyright 2001-2009, Apple Inc.
  * Copyright (c) 2006-2009 Daniel A. Steffen <das@users.sourceforge.net>
  * Copyright (c) 2012 Adrian Robert.
+ * Copyright 2015 Marc Culler.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -27,7 +28,9 @@ static Tk_Window grabWinPtr = NULL;
 				/* Current grab window, NULL if no grab. */
 static Tk_Window keyboardGrabWinPtr = NULL;
 				/* Current keyboard grab window. */
-static NSModalSession modalSession = NULL;
+static NSWindow *keyboardGrabNSWindow = nil;
+                               /* NSWindow for the current keyboard grab window. */
+static NSModalSession modalSession = nil;
 
 static BOOL processingCompose = NO;
 static BOOL finishedCompose = NO;
@@ -78,16 +81,18 @@ static unsigned isFunctionKey(unsigned int code);
     case NSFlagsChanged:
 	modifiers = [theEvent modifierFlags];
 	keyCode = [theEvent keyCode];
-	w = [self windowWithWindowNumber:[theEvent windowNumber]];
+	//	w = [self windowWithWindowNumber:[theEvent windowNumber]];
+	w = [theEvent window];
 #if defined(TK_MAC_DEBUG_EVENTS) || NS_KEYLOG == 1
 	NSLog(@"-[%@(%p) %s] r=%d mods=%u '%@' '%@' code=%u c=%d %@ %d", [self class], self, _cmd, repeat, modifiers, characters, charactersIgnoringModifiers, keyCode,([charactersIgnoringModifiers length] == 0) ? 0 : [charactersIgnoringModifiers characterAtIndex: 0], w, type);
 #endif
 	break;
 
     default:
-	return theEvent;
+	return theEvent; /* Unrecognized key event. */
     }
 
+    /* Create an Xevent to add to the Tk queue. */
     if (!processingCompose) {
         unsigned int state = 0;
 
@@ -128,7 +133,7 @@ static unsigned isFunctionKey(unsigned int code);
         tkwin = (Tk_Window) winPtr->dispPtr->focusPtr;
         if (!tkwin) {
           TkMacOSXDbgMsg("tkwin == NULL");
-          return theEvent;
+          return theEvent;  /* Give up. No window for this event. */
         }
 
         /*
@@ -222,7 +227,7 @@ static unsigned isFunctionKey(unsigned int code);
 
 
 
-@implementation TKContentView(TKKeyEvent)
+@implementation TKContentView
 /* <NSTextInput> implementation (called through interpretKeyEvents:]). */
 
 /* <NSTextInput>: called when done composing;
@@ -288,22 +293,6 @@ static unsigned isFunctionKey(unsigned int code);
 }
 
 
-/* delete display of composing characters [not in <NSTextInput>] */
-- (void)deleteWorkingText
-{
-  if (privateWorkingText == nil)
-    return;
-  if (NS_KEYLOG)
-    NSLog(@"deleteWorkingText len = %lu\n",
-	    (unsigned long)[privateWorkingText length]);
-  [privateWorkingText release];
-  privateWorkingText = nil;
-  processingCompose = NO;
-
-  //PENDING: delete working text
-}
-
-
 - (BOOL)hasMarkedText
 {
   return privateWorkingText != nil;
@@ -339,7 +328,7 @@ static unsigned isFunctionKey(unsigned int code);
   pt.y = caret_y;
 
   pt = [self convertPoint: pt toView: nil];
-  pt = [[self window] convertBaseToScreen: pt];
+  pt = [[self window] convertPointToScreen: pt];
   pt.y -= caret_height;
 
   rect.origin = pt;
@@ -413,6 +402,24 @@ static unsigned isFunctionKey(unsigned int code);
 @end
 
 
+@implementation TKContentView(TKKeyEvent)
+/* delete display of composing characters [not in <NSTextInput>] */
+- (void)deleteWorkingText
+{
+  if (privateWorkingText == nil)
+    return;
+  if (NS_KEYLOG)
+    NSLog(@"deleteWorkingText len = %lu\n",
+	    (unsigned long)[privateWorkingText length]);
+  [privateWorkingText release];
+  privateWorkingText = nil;
+  processingCompose = NO;
+
+  //PENDING: delete working text
+}
+@end
+
+
 
 /*
  *  Set up basic fields in xevent for keyboard input.
@@ -474,7 +481,9 @@ XGrabKeyboard(
 	    if (modalSession) {
 		Tcl_Panic("XGrabKeyboard: already grabbed");
 	    }
-	    modalSession = [NSApp beginModalSessionForWindow:[w retain]];
+	    keyboardGrabNSWindow = w;
+	    [w retain];
+	    modalSession = [NSApp beginModalSessionForWindow:w];
 	}
     }
     return GrabSuccess;
@@ -502,11 +511,12 @@ XUngrabKeyboard(
     Time time)
 {
     if (modalSession) {
-	NSWindow *w = keyboardGrabWinPtr ? TkMacOSXDrawableWindow(
-		((TkWindow *) keyboardGrabWinPtr)->window) : nil;
 	[NSApp endModalSession:modalSession];
-	[w release];
-	modalSession = NULL;
+	modalSession = nil;
+    }
+    if (keyboardGrabNSWindow) {
+	[keyboardGrabNSWindow release];
+	keyboardGrabNSWindow = nil;
     }
     keyboardGrabWinPtr = NULL;
 }

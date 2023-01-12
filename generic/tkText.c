@@ -211,18 +211,18 @@ static const Tk_OptionSpec optionSpecs[] = {
 	TK_OPTION_NULL_OK, DEF_TEXT_SELECT_BD_MONO, 0},
     {TK_OPTION_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_TEXT_SELECT_FG_COLOR, -1, Tk_Offset(TkText, selFgColorPtr),
-	TK_CONFIG_NULL_OK, DEF_TEXT_SELECT_FG_MONO, 0},
+	TK_OPTION_NULL_OK, DEF_TEXT_SELECT_FG_MONO, 0},
     {TK_OPTION_BOOLEAN, "-setgrid", "setGrid", "SetGrid",
 	DEF_TEXT_SET_GRID, -1, Tk_Offset(TkText, setGrid), 0, 0, 0},
     {TK_OPTION_PIXELS, "-spacing1", "spacing1", "Spacing",
 	DEF_TEXT_SPACING1, -1, Tk_Offset(TkText, spacing1),
-	TK_OPTION_DONT_SET_DEFAULT, 0 , TK_TEXT_LINE_GEOMETRY },
+	0, 0 , TK_TEXT_LINE_GEOMETRY },
     {TK_OPTION_PIXELS, "-spacing2", "spacing2", "Spacing",
 	DEF_TEXT_SPACING2, -1, Tk_Offset(TkText, spacing2),
-	TK_OPTION_DONT_SET_DEFAULT, 0 , TK_TEXT_LINE_GEOMETRY },
+	0, 0 , TK_TEXT_LINE_GEOMETRY },
     {TK_OPTION_PIXELS, "-spacing3", "spacing3", "Spacing",
 	DEF_TEXT_SPACING3, -1, Tk_Offset(TkText, spacing3),
-	TK_OPTION_DONT_SET_DEFAULT, 0 , TK_TEXT_LINE_GEOMETRY },
+	0, 0 , TK_TEXT_LINE_GEOMETRY },
     {TK_OPTION_CUSTOM, "-startline", NULL, NULL,
 	 NULL, -1, Tk_Offset(TkText, start), TK_OPTION_NULL_OK,
 	 &lineOption, TK_TEXT_LINE_RANGE},
@@ -402,6 +402,7 @@ static Tcl_Obj *	TextGetText(const TkText *textPtr,
 			    const TkTextIndex *index2, int visibleOnly);
 static void		GenerateModifiedEvent(TkText *textPtr);
 static void		UpdateDirtyFlag(TkSharedText *sharedPtr);
+static void		RunAfterSyncCmd(ClientData clientData);
 static void		TextPushUndoAction(TkText *textPtr,
 			    Tcl_Obj *undoString, int insert,
 			    const TkTextIndex *index1Ptr,
@@ -580,14 +581,6 @@ CreateWidget(
 	textPtr->end = NULL;
     }
 
-    /*
-     * Register with the B-tree. In some sense it would be best if we could do
-     * this later (after configuration options), so that any changes to
-     * start,end do not require a total recalculation.
-     */
-
-    TkBTreeAddClient(sharedPtr->tree, textPtr, textPtr->charHeight);
-
     textPtr->state = TK_TEXT_STATE_NORMAL;
     textPtr->relief = TK_RELIEF_FLAT;
     textPtr->cursor = None;
@@ -596,6 +589,14 @@ CreateWidget(
     textPtr->wrapMode = TEXT_WRAPMODE_CHAR;
     textPtr->prevWidth = Tk_Width(newWin);
     textPtr->prevHeight = Tk_Height(newWin);
+
+    /*
+     * Register with the B-tree. In some sense it would be best if we could do
+     * this later (after configuration options), so that any changes to
+     * start,end do not require a total recalculation.
+     */
+
+    TkBTreeAddClient(sharedPtr->tree, textPtr, textPtr->charHeight);
 
     /*
      * This will add refCounts to textPtr.
@@ -702,15 +703,16 @@ TextWidgetObjCmd(
     static const char *const optionStrings[] = {
 	"bbox", "cget", "compare", "configure", "count", "debug", "delete",
 	"dlineinfo", "dump", "edit", "get", "image", "index", "insert",
-	"mark", "peer", "replace", "scan", "search", "see", "tag", "window",
-	"xview", "yview", NULL
+	"mark", "peer", "pendingsync", "replace", "scan", "search",
+	"see", "sync", "tag", "window", "xview", "yview", NULL
     };
     enum options {
 	TEXT_BBOX, TEXT_CGET, TEXT_COMPARE, TEXT_CONFIGURE, TEXT_COUNT,
 	TEXT_DEBUG, TEXT_DELETE, TEXT_DLINEINFO, TEXT_DUMP, TEXT_EDIT,
 	TEXT_GET, TEXT_IMAGE, TEXT_INDEX, TEXT_INSERT, TEXT_MARK,
-	TEXT_PEER, TEXT_REPLACE, TEXT_SCAN, TEXT_SEARCH, TEXT_SEE,
-	TEXT_TAG, TEXT_WINDOW, TEXT_XVIEW, TEXT_YVIEW
+	TEXT_PEER, TEXT_PENDINGSYNC, TEXT_REPLACE, TEXT_SCAN,
+	TEXT_SEARCH, TEXT_SEE, TEXT_SYNC, TEXT_TAG, TEXT_WINDOW,
+	TEXT_XVIEW, TEXT_YVIEW
     };
 
     if (objc < 2) {
@@ -931,7 +933,7 @@ TextWidgetObjCmd(
 
                 /*
                  * Now we need to adjust the count to:
-                 *   - subtract off the number of display lines between 
+                 *   - subtract off the number of display lines between
                  *     indexToPtr and index2, since we might have skipped past
                  *     indexToPtr, if we have several logical lines in a
                  *     single display line
@@ -1392,6 +1394,16 @@ TextWidgetObjCmd(
     case TEXT_PEER:
 	result = TextPeerCmd(textPtr, interp, objc, objv);
 	break;
+    case TEXT_PENDINGSYNC: {
+        if (objc != 2) {
+            Tcl_WrongNumArgs(interp, 2, objv, NULL);
+            result = TCL_ERROR;
+            goto done;
+        }
+        Tcl_SetObjResult(interp,
+                Tcl_NewBooleanObj(TkTextPendingsync(textPtr)));
+        break;
+    }
     case TEXT_REPLACE: {
 	const TkTextIndex *indexFromPtr, *indexToPtr;
 
@@ -1506,6 +1518,39 @@ TextWidgetObjCmd(
     case TEXT_SEE:
 	result = TkTextSeeCmd(textPtr, interp, objc, objv);
 	break;
+    case TEXT_SYNC: {
+	if (objc == 4) {
+	    Tcl_Obj *cmd = objv[3];
+	    const char *option = Tcl_GetString(objv[2]);
+	    if (strncmp(option, "-command", objv[2]->length)) {
+		Tcl_AppendResult(interp, "wrong option \"", option, "\": should be \"-command\"", NULL);
+		result = TCL_ERROR;
+		goto done;
+	    }
+	    Tcl_IncrRefCount(cmd);
+	    if (TkTextPendingsync(textPtr)) {
+		if (textPtr->afterSyncCmd) {
+		    Tcl_DecrRefCount(textPtr->afterSyncCmd);
+		}
+		textPtr->afterSyncCmd = cmd;
+	    } else {
+		textPtr->afterSyncCmd = cmd;
+                Tcl_DoWhenIdle(RunAfterSyncCmd, (ClientData) textPtr);
+	    }
+	    break;
+	} else if (objc != 2) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "?-command command?");
+	    result = TCL_ERROR;
+	    goto done;
+	}
+	if (textPtr->afterSyncCmd) {
+	    Tcl_DecrRefCount(textPtr->afterSyncCmd);
+	}
+	textPtr->afterSyncCmd = NULL;
+	TkTextUpdateLineMetrics(textPtr, 1,
+		TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr), -1);
+	break;
+    }
     case TEXT_TAG:
 	result = TkTextTagCmd(textPtr, interp, objc, objv);
 	break;
@@ -1995,6 +2040,10 @@ DestroyText(
     textPtr->tkwin = NULL;
     textPtr->refCount--;
     Tcl_DeleteCommandFromToken(textPtr->interp, textPtr->widgetCmd);
+    if (textPtr->afterSyncCmd){
+	Tcl_DecrRefCount(textPtr->afterSyncCmd);
+	textPtr->afterSyncCmd = NULL;
+    }
     if (textPtr->refCount == 0) {
 	ckfree(textPtr);
     }
@@ -2344,6 +2393,7 @@ TextWorldChanged(
 {
     Tk_FontMetrics fm;
     int border;
+    int oldCharHeight = textPtr->charHeight;
 
     textPtr->charWidth = Tk_TextWidth(textPtr->tkfont, "0", 1);
     if (textPtr->charWidth <= 0) {
@@ -2354,6 +2404,9 @@ TextWorldChanged(
     textPtr->charHeight = fm.linespace;
     if (textPtr->charHeight <= 0) {
 	textPtr->charHeight = 1;
+    }
+    if (textPtr->charHeight != oldCharHeight) {
+        TkBTreeClientRangeChanged(textPtr, textPtr->charHeight);
     }
     border = textPtr->borderWidth + textPtr->highlightWidth;
     Tk_GeometryRequest(textPtr->tkwin,
@@ -3022,11 +3075,9 @@ DeleteIndexRange(
      * The code below is ugly, but it's needed to make sure there is always a
      * dummy empty line at the end of the text. If the final newline of the
      * file (just before the dummy line) is being deleted, then back up index
-     * to just before the newline. If there is a newline just before the first
-     * character being deleted, then back up the first index too, so that an
-     * even number of lines gets deleted. Furthermore, remove any tags that
-     * are present on the newline that isn't going to be deleted after all
-     * (this simulates deleting the newline and then adding a "clean" one back
+     * to just before the newline. Furthermore, remove any tags that are
+     * present on the newline that isn't going to be deleted after all (this
+     * simulates deleting the newline and then adding a "clean" one back
      * again). Note that index1 and index2 might now be equal again which
      * means that no text will be deleted but tags might be removed.
      */
@@ -3041,10 +3092,6 @@ DeleteIndexRange(
 	oldIndex2 = index2;
 	TkTextIndexBackChars(NULL, &oldIndex2, 1, &index2, COUNT_INDICES);
 	line2--;
-	if ((index1.byteIndex == 0) && (line1 != 0)) {
-	    TkTextIndexBackChars(NULL, &index1, 1, &index1, COUNT_INDICES);
-	    line1--;
-	}
 	arrayPtr = TkBTreeGetTags(&index2, NULL, &arraySize);
 	if (arrayPtr != NULL) {
 	    for (i = 0; i < arraySize; i++) {
@@ -4240,7 +4287,11 @@ TextSearchFoundMatch(
 		    matchOffset += Tcl_NumUtfChars(segPtr->body.chars, -1);
 		}
 	    } else {
-		leftToScan -= segPtr->size;
+		if (searchSpecPtr->exact) {
+		    leftToScan -= segPtr->size;
+		} else {
+		    leftToScan -= Tcl_NumUtfChars(segPtr->body.chars, -1);
+		}
 	    }
 	    curIndex.byteIndex += segPtr->size;
 	}
@@ -5361,6 +5412,52 @@ UpdateDirtyFlag(
 	    GenerateModifiedEvent(textPtr);
 	}
     }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * RunAfterSyncCmd --
+ *
+ *	This function is called by the event loop and executes the command
+ *      scheduled by [.text sync -command $cmd].
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Anything may happen, depending on $cmd contents.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+RunAfterSyncCmd(
+    ClientData clientData)		/* Information about text widget. */
+{
+    register TkText *textPtr = (TkText *) clientData;
+    int code;
+
+    if ((textPtr->tkwin == NULL) || (textPtr->flags & DESTROYED)) {
+        /*
+        * The widget has been deleted. Don't do anything.
+        */
+
+        if (--textPtr->refCount == 0) {
+            ckfree((char *) textPtr);
+        }
+        return;
+    }
+
+    Tcl_Preserve((ClientData) textPtr->interp);
+    code = Tcl_EvalObjEx(textPtr->interp, textPtr->afterSyncCmd, TCL_EVAL_GLOBAL);
+    if (code == TCL_ERROR) {
+        Tcl_AddErrorInfo(textPtr->interp, "\n    (text sync)");
+        Tcl_BackgroundError(textPtr->interp);
+    }
+    Tcl_Release((ClientData) textPtr->interp);
+    Tcl_DecrRefCount(textPtr->afterSyncCmd);
+    textPtr->afterSyncCmd = NULL;
 }
 
 /*

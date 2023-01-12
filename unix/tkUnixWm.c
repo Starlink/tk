@@ -1826,6 +1826,11 @@ WmForgetCmd(
 		~(TK_TOP_HIERARCHY|TK_TOP_LEVEL|TK_HAS_WRAPPER|TK_WIN_MANAGED);
 	RemapWindows(winPtr, winPtr->parentPtr);
 
+        /*
+         * Make sure wm no longer manages this window
+         */
+        Tk_ManageGeometry(frameWin, NULL, NULL);
+
 	/*
 	 * Flags (above) must be cleared before calling TkMapTopFrame (below).
 	 */
@@ -3734,7 +3739,7 @@ WmWaitMapProc(
  *	This function is invoked by a widget when it wishes to set a grid
  *	coordinate system that controls the size of a top-level window. It
  *	provides a C interface equivalent to the "wm grid" command and is
- *	usually asscoiated with the -setgrid option.
+ *	usually associated with the -setgrid option.
  *
  * Results:
  *	None.

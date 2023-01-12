@@ -21,6 +21,8 @@
 #include "tkMacOSXEvent.h"
 #include "tkMacOSXDebug.h"
 
+#define DEBUG_ZOMBIES 0
+
 /*
 #ifdef TK_MAC_DEBUG
 #define TK_MAC_DEBUG_WINDOWS
@@ -53,7 +55,7 @@
 
 /*Objects for use in setting background color and opacity of window.*/
 NSColor *colorName = NULL;
-NSString *opaqueTag = NULL;
+BOOL opaqueTag = FALSE;
 
 static const struct {
     const UInt64 validAttrs, defaultAttrs, forceOnAttrs, forceOffAttrs;
@@ -193,6 +195,48 @@ static int tkMacOSXWmAttrNotifyVal = 0;
 
 static Tcl_HashTable windowTable;
 static int windowHashInit = false;
+
+
+
+#pragma mark NSWindow(TKWm)
+
+/*
+ * Conversion of coordinates between window and screen.
+ */
+
+@implementation NSWindow(TKWm)
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1070
+- (NSPoint) convertPointToScreen: (NSPoint) point
+{
+    return [self convertBaseToScreen:point];
+}
+- (NSPoint) convertPointFromScreen: (NSPoint)point
+{
+    return [self convertScreenToBase:point];
+}
+@end
+#else
+- (NSPoint) convertPointToScreen: (NSPoint) point
+{
+    NSRect pointrect;
+    pointrect.origin = point;
+    pointrect.size.width = 0;
+    pointrect.size.height = 0;
+    return [self convertRectToScreen:pointrect].origin;
+}
+- (NSPoint) convertPointFromScreen: (NSPoint)point
+{
+    NSRect pointrect;
+    pointrect.origin = point;
+    pointrect.size.width = 0;
+    pointrect.size.height = 0;
+    return [self convertRectFromScreen:pointrect].origin;
+}
+@end
+#endif
+
+#pragma mark -
+
 
 /*
  * Forward declarations for procedures defined in this file:
@@ -342,6 +386,7 @@ static void		RemapWindows(TkWindow *winPtr,
 @end
 
 @implementation TKWindow(TKWm)
+
 - (BOOL) canBecomeKeyWindow
 {
     TkWindow *winPtr = TkMacOSXGetTkWindow(self);
@@ -350,6 +395,59 @@ static void		RemapWindows(TkWindow *winPtr,
 	    kHelpWindowClass || winPtr->wmInfoPtr->attributes &
 	    kWindowNoActivatesAttribute)) ? NO : YES;
 }
+
+#if DEBUG_ZOMBIES
+- (id) retain
+{
+    id result = [super retain];
+    const char *title = [[self title] UTF8String];
+    if (title == nil) {
+	title = "unnamed window";
+    }
+    if (DEBUG_ZOMBIES > 1){
+	printf("Retained <%s>. Count is: %lu\n", title, [self retainCount]);
+    }
+    return result;
+}
+
+- (id) autorelease
+{
+    static int xcount = 0;
+    id result = [super autorelease];
+    const char *title = [[self title] UTF8String];
+    if (title == nil) {
+	title = "unnamed window";
+    }
+    if (DEBUG_ZOMBIES > 1){
+	printf("Autoreleased <%s>. Count is %lu\n", title, [self retainCount]);
+    }
+    return result;
+}
+
+- (oneway void) release {
+    const char *title = [[self title] UTF8String];
+    if (title == nil) {
+	title = "unnamed window";
+    }
+    if (DEBUG_ZOMBIES > 1){
+	printf("Releasing <%s>. Count is %lu\n", title, [self retainCount]);
+    }
+    [super release];
+}
+
+- (void) dealloc {
+    const char *title = [[self title] UTF8String];
+    if (title == nil) {
+	title = "unnamed window";
+    }
+    if (DEBUG_ZOMBIES > 0){
+	printf(">>>> Freeing <%s>. Count is %lu\n", title, [self retainCount]);
+    }
+    [super dealloc];
+}
+
+
+#endif
 @end
 
 #pragma mark -
@@ -463,25 +561,16 @@ FrontWindowAtPoint(
     int x, int y)
 {
     NSPoint p = NSMakePoint(x, tkMacOSXZeroScreenHeight - y);
-    NSWindow *win = nil;
-    NSInteger windowCount;
-    NSInteger *windowNumbers;
+    NSArray *windows = [NSApp orderedWindows];
+    TkWindow *front = NULL;
 
-    NSCountWindows(&windowCount);
-    if (windowCount) {
-	windowNumbers = ckalloc(windowCount * sizeof(NSInteger));
-	NSWindowList(windowCount, windowNumbers);
-	for (NSInteger index = 0; index < windowCount; index++) {
-	    NSWindow *w = [NSApp windowWithWindowNumber:windowNumbers[index]];
-
+    for (NSWindow *w in windows) {
 	    if (w && NSMouseInRect(p, [w frame], NO)) {
-		win = w;
+		front = TkMacOSXGetTkWindow(w);
 		break;
 	    }
 	}
-	ckfree(windowNumbers);
-    }
-    return (win ? TkMacOSXGetTkWindow(win) : NULL);
+    return front;
 }
 
 /*
@@ -677,6 +766,7 @@ TkWmMapWindow(
      */
 
     XMapWindow(winPtr->display, winPtr->window);
+
 }
 
 /*
@@ -699,7 +789,7 @@ TkWmMapWindow(
 void
 TkWmUnmapWindow(
     TkWindow *winPtr)		/* Top-level window that's about to be
-				 * mapped. */
+				 * unmapped. */
 {
     XUnmapWindow(winPtr->display, winPtr->window);
 }
@@ -783,16 +873,42 @@ TkWmDeadWindow(
     NSWindow *window = wmPtr->window;
 
     if (window && !Tk_IsEmbedded(winPtr) ) {
-	[[window parentWindow] removeChildWindow:window];
-	[window setExcludedFromWindowsMenu:YES];
+	NSWindow *parent = [window parentWindow];
+	if (parent) {
+	    [parent removeChildWindow:window];
+	}
 	[window close];
 	TkMacOSXUnregisterMacWindow(window);
-	if (winPtr->window) {
-	    ((MacDrawable *) winPtr->window)->view = nil;
+        if (winPtr->window) {
+            ((MacDrawable *) winPtr->window)->view = nil;
+        }
+#if DEBUG_ZOMBIES > 0
+	{
+	    const char *title = [[window title] UTF8String];
+	    if (title == nil) {
+		title = "unnamed window";
+	    }
+	    printf(">>>> Closing <%s>. Count is: %lu\n", title, [window retainCount]);
 	}
-	TkMacOSXMakeCollectableAndRelease(wmPtr->window);
-    }
+#endif
+        [window release];
+	wmPtr->window = NULL;
 
+	/* Activate the highest window left on the screen. */
+	NSArray *windows = [NSApp orderedWindows];
+	if ( [windows count] > 0 ) {
+	    NSWindow *front = [windows objectAtIndex:0];
+	    if ( front && [front canBecomeKeyWindow] ) {
+		[front makeKeyAndOrderFront:NSApp];
+	    }
+	}
+	[NSApp _resetAutoreleasePool];
+
+#if DEBUG_ZOMBIES > 0
+	fprintf(stderr, "================= Pool dump ===================\n");
+	[NSAutoreleasePool showPools];
+#endif
+    }
     ckfree(wmPtr);
     winPtr->wmInfoPtr = NULL;
 }
@@ -1671,6 +1787,11 @@ WmForgetCmd(
 
 	TkWmDeadWindow(winPtr);
 	RemapWindows(winPtr, (MacDrawable *) winPtr->parentPtr->window);
+
+        /*
+         * Make sure wm no longer manages this window
+         */
+        Tk_ManageGeometry(frameWin, NULL, NULL);
 
 	winPtr->flags &= ~(TK_TOP_HIERARCHY|TK_TOP_LEVEL|TK_HAS_WRAPPER|TK_WIN_MANAGED);
 
@@ -5117,7 +5238,7 @@ TkUnsupported1ObjCmd(
     	    colorName = [NSColor clearColor];	//use systemTransparent in Tk scripts to match
     	}
     	if (Tcl_StringMatch(Tcl_GetString(objv[i]), "*opacity*")) {
-    	    opaqueTag = @"YES";
+    	    opaqueTag = YES;
     	}
     }
 
@@ -5445,7 +5566,6 @@ TkMacOSXMakeRealWindowExist(
 	 * TODO: Here we should handle out of process embedding.
 	 */
     }
-
     WindowClass macClass = wmPtr->macClass;
     wmPtr->attributes &= (tkAlwaysValidAttributes |
 	    macClassAttrs[macClass].validAttrs);
@@ -5479,11 +5599,10 @@ TkMacOSXMakeRealWindowExist(
     NSWindow *window = [[winClass alloc] initWithContentRect:contentRect
 	    styleMask:styleMask backing:NSBackingStoreBuffered defer:YES];
     if (!window) {
-	Tcl_Panic("couldn't allocate new Mac window");
+    	Tcl_Panic("couldn't allocate new Mac window");
     }
-    TkMacOSXMakeUncollectable(window);
     TKContentView *contentView = [[TKContentView alloc]
-	    initWithFrame:NSZeroRect];
+				     initWithFrame:NSZeroRect];
     [window setContentView:contentView];
     [contentView release];
     [window setDelegate:NSApp];
@@ -5508,7 +5627,7 @@ TkMacOSXMakeRealWindowExist(
     	[window setBackgroundColor: colorName];
     }
 
-    if (opaqueTag != NULL) {
+    if (opaqueTag) {
 #ifdef TK_GOT_AT_LEAST_SNOW_LEOPARD
     	[window setOpaque: opaqueTag];
 #else
@@ -5518,7 +5637,7 @@ TkMacOSXMakeRealWindowExist(
 
     [window setDocumentEdited:NO];
     wmPtr->window = window;
-    macWin->view = contentView;
+    macWin->view = window.contentView;
     TkMacOSXApplyWindowAttributes(winPtr, window);
 
     NSRect geometry = InitialWindowBounds(winPtr, window);
@@ -5527,7 +5646,6 @@ TkMacOSXMakeRealWindowExist(
     geometry.origin.y = tkMacOSXZeroScreenHeight - (geometry.origin.y +
 	    geometry.size.height);
     [window setFrame:geometry display:NO];
-
     TkMacOSXRegisterOffScreenWindow((Window) macWin, window);
     macWin->flags |= TK_HOST_EXISTS;
 }
@@ -5916,13 +6034,19 @@ TkpChangeFocus(
 				 * didn't originally belong to topLevelPtr's
 				 * application. */
 {
-    /*
-     * We don't really need to do anything on the Mac. Tk will keep all this
-     * state for us.
-     */
-
     if (winPtr->atts.override_redirect) {
 	return 0;
+    }
+
+    if (Tk_IsTopLevel(winPtr) && !Tk_IsEmbedded(winPtr) ){
+    	NSWindow *win = TkMacOSXDrawableWindow(winPtr->window);
+    	TkWmRestackToplevel(winPtr, Above, NULL);
+    	if (force ) {
+    	    [NSApp activateIgnoringOtherApps:YES];
+    	}
+	if ( win && [win canBecomeKeyWindow] ) {
+	    [win makeKeyAndOrderFront:NSApp];
+	}
     }
 
     /*
@@ -5941,7 +6065,7 @@ TkpChangeFocus(
  * WmStackorderToplevelWrapperMap --
  *
  *	This procedure will create a table that maps the reparent wrapper X id
- *	for a toplevel to the TkWindow structure that is wraps. Tk keeps track
+ *	for a toplevel to the TkWindow structure that it wraps. Tk keeps track
  *	of a mapping from the window X id to the TkWindow structure but that
  *	does us no good here since we only get the X id of the wrapper window.
  *	Only those toplevel windows that are mapped have a position in the
@@ -6004,8 +6128,6 @@ TkWmStackorderToplevel(
     Tcl_HashTable table;
     Tcl_HashEntry *hPtr;
     Tcl_HashSearch search;
-    NSInteger windowCount;
-    NSInteger *windowNumbers;
 
     /*
      * Map mac windows to a TkWindow of the wrapped toplevel.
@@ -6032,31 +6154,26 @@ TkWmStackorderToplevel(
 	goto done;
     }
 
-    NSCountWindows(&windowCount);
+    NSArray *macWindows = [NSApp orderedWindows];
+    NSInteger windowCount = [macWindows count];
+
     if (!windowCount) {
 	ckfree(windows);
 	windows = NULL;
     } else {
 	windowPtr = windows + table.numEntries;
 	*windowPtr-- = NULL;
-	windowNumbers = ckalloc(windowCount * sizeof(NSInteger));
-	NSWindowList(windowCount, windowNumbers);
-	for (NSInteger index = 0; index < windowCount; index++) {
-	    NSWindow *w = [NSApp windowWithWindowNumber:windowNumbers[index]];
-
-	    if (w) {
-		hPtr = Tcl_FindHashEntry(&table, (char*) w);
-		if (hPtr != NULL) {
-		    childWinPtr = Tcl_GetHashValue(hPtr);
-		    *windowPtr-- = childWinPtr;
-		}
+	for (NSWindow *w in macWindows) {
+	    hPtr = Tcl_FindHashEntry(&table, (char*) w);
+	    if (hPtr != NULL) {
+		childWinPtr = Tcl_GetHashValue(hPtr);
+		*windowPtr-- = childWinPtr;
 	    }
 	}
 	if (windowPtr != windows-1) {
 	    Tcl_Panic("num matched toplevel windows does not equal num "
-		    "children");
+		      "children");
 	}
-	ckfree(windowNumbers);
     }
 
   done:
@@ -6615,7 +6732,6 @@ RemapWindows(
     MacDrawable *parentWin)
 {
     TkWindow *childPtr;
-
     /*
      * Remove the OS specific window. It will get rebuilt when the window gets
      * Mapped.
