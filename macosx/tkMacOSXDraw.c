@@ -101,13 +101,6 @@ TkMacOSXInitCGDrawing(
 		(char *) &useThemedFrame, TCL_LINK_BOOLEAN) != TCL_OK) {
 	    Tcl_ResetResult(interp);
 	}
-#if TK_MAC_BUTTON_USE_COMPATIBILITY_METRICS
-	if (Tcl_LinkVar(interp, "::tk::mac::useCompatibilityMetrics",
-		(char *) &tkMacOSXUseCompatibilityMetrics, TCL_LINK_BOOLEAN)
-		!= TCL_OK) {
-	    Tcl_ResetResult(interp);
-	}
-#endif
     }
     return TCL_OK;
 }
@@ -1484,7 +1477,6 @@ TkScrollWindow(
     CGRect srcRect, dstRect;
     HIShapeRef dmgRgn = NULL, extraRgn;
     NSRect bounds, visRect, scrollSrc, scrollDst;
-    NSPoint delta = NSMakePoint(dx, dy);
     int result;
   
     if ( view ) {
@@ -1516,25 +1508,6 @@ TkScrollWindow(
   	    
  	    /* Scroll the rectangle. */
  	    [view scrollRect:scrollSrc by:NSMakeSize(dx, -dy)];
-  
- 	    /* 
- 	     * Adjust the positions of the button subwindows that meet the scroll
- 	     * area.
-  	     */
- 
-  	    for (NSView *subview in [view subviews] ) {
- 	    	if ( [subview isKindOfClass:[NSButton class]] == YES ) {
- 		    NSRect subframe = [subview frame];
- 		    if  ( NSIntersectsRect(scrollSrc, subframe) ||
- 			  NSIntersectsRect(scrollDst, subframe) ) { 
- 			TkpShiftButton((NSButton *)subview, delta );
- 		    }
- 	    	}
-  	    }
- 
- 	    /* Redisplay the scrolled area. */
- 	    [view displayRect:scrollDst];
- 
   	}
     }
   
@@ -1879,9 +1852,9 @@ TkpClipDrawableToRect(
 	macDraw->drawRgn = NULL;
     }
     if (width >= 0 && height >= 0) {
-	CGRect drawRect = CGRectMake(x + macDraw->xOff, y + macDraw->yOff,
+	CGRect clipRect = CGRectMake(x + macDraw->xOff, y + macDraw->yOff,
 		width, height);
-	HIShapeRef drawRgn = HIShapeCreateWithRect(&drawRect);
+	HIShapeRef drawRgn = HIShapeCreateWithRect(&clipRect);
 
 	if (macDraw->winPtr && macDraw->flags & TK_CLIP_INVALID) {
 	    TkMacOSXUpdateClipRgn(macDraw->winPtr);
@@ -1894,9 +1867,9 @@ TkpClipDrawableToRect(
 	    macDraw->drawRgn = drawRgn;
 	}
 	if (view && view != [NSView focusView] && [view lockFocusIfCanDraw]) {
-	    drawRect.origin.y = [view bounds].size.height -
-		    (drawRect.origin.y + drawRect.size.height);
-	    NSRectClip(NSRectFromCGRect(drawRect));
+	    clipRect.origin.y = [view bounds].size.height -
+		    (clipRect.origin.y + clipRect.size.height);
+	    NSRectClip(NSRectFromCGRect(clipRect));
 	    macDraw->flags |= TK_FOCUSED_VIEW;
 	}
     } else {

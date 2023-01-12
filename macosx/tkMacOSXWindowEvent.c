@@ -6,6 +6,8 @@
  *
  * Copyright 2001-2009, Apple Inc.
  * Copyright (c) 2005-2009 Daniel A. Steffen <das@users.sourceforge.net>
+ * Copyright (c) 2015 Kevin Walzer/WordTech Communications LLC.
+ * Copyright (c) 2015 Marc Culler.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -15,7 +17,7 @@
 #include "tkMacOSXWm.h"
 #include "tkMacOSXEvent.h"
 #include "tkMacOSXDebug.h"
-
+ 
 /*
 #ifdef TK_MAC_DEBUG
 #define TK_MAC_DEBUG_EVENTS
@@ -762,17 +764,29 @@ Tk_MacOSXIsAppInFront(void)
 #import <ApplicationServices/ApplicationServices.h>
 
 /*
- * Custom content view for Tk NSWindows, containing standard NSView subviews.
- * The goal is to emulate X11-style drawing in response to Expose events:
- * during the normal AppKit drawing cycle, we supress drawing of all subviews
- * and instead send Expose events about the subviews that would be redrawn.
+ * Custom content view for use in Tk NSWindows.
+ * 
+ * Since Tk handles all drawing of widgets, we only use the AppKit event loop
+ * as a source of input events.  To do this, we overload the NSView drawRect
+ * method with a method which generates Expose events for Tk but does no
+ * drawing.  The redrawing operations are then done when Tk processes these
+ * events.
+ *
+ * Earlier versions of Mac Tk used subclasses of NSView, e.g. NSButton, as the
+ * basis for Tk widgets.  These would then appear as subviews of the
+ * TKContentView.  To prevent the AppKit from redrawing and corrupting the Tk
+ * Widgets it was necessary to use Apple private API calls.  In order to avoid
+ * using private API calls, the NSView-based widgets have been replaced with
+ * normal Tk widgets which draw themselves as native widgets by using the
+ * HITheme API.
+ *
  */
 
 @interface TKContentView(TKWindowEvent)
 - (void) drawRect: (NSRect) rect;
 - (void) generateExposeEvents: (HIMutableShapeRef) shape;
 - (void) viewDidEndLiveResize;
-- (void) viewWillDraw;
+- (void) tkToolbarButton: (id) sender;
 - (BOOL) isOpaque;
 - (BOOL) wantsDefaultClipping;
 - (BOOL) acceptsFirstResponder;
@@ -782,15 +796,6 @@ Tk_MacOSXIsAppInFront(void)
 @implementation TKContentView
 @end
 
-double drawTime;
-
-/*
- * Set a minimum time for drawing to render. With removal of private NSView API's, default drawing
- * is slower and less responsive. This number, which seems feasible after some experimentatation, skips
- * some drawing to avoid lag. 
- */
-
-#define MAX_DYNAMIC_TIME .000000001
 
 /*Restrict event processing to Expose events.*/
 static Tk_RestrictAction
@@ -802,7 +807,6 @@ ExposeRestrictProc(
 	    ? TK_PROCESS_EVENT : TK_DEFER_EVENT);
 }
 
-
 @implementation TKContentView(TKWindowEvent)
 
 - (void) drawRect: (NSRect) rect
@@ -811,6 +815,7 @@ ExposeRestrictProc(
     NSInteger rectsBeingDrawnCount;
 
     [self getRectsBeingDrawn:&rectsBeingDrawn count:&rectsBeingDrawnCount];
+
 #ifdef TK_MAC_DEBUG_DRAWING
     TKLog(@"-[%@(%p) %s%@]", [self class], self, _cmd, NSStringFromRect(rect));
     [[NSColor colorWithDeviceRed:0.0 green:1.0 blue:0.0 alpha:.1] setFill];
@@ -818,17 +823,12 @@ ExposeRestrictProc(
 	    NSCompositeSourceOver);
 #endif
 
-    NSDate *beginTime=[NSDate date];
-
-    /*Skip drawing during live resize if redraw is too slow.*/
-    if([self inLiveResize] && drawTime>MAX_DYNAMIC_TIME) return;
-
+ 	    
     CGFloat height = [self bounds].size.height;
     HIMutableShapeRef drawShape = HIShapeCreateMutable();
 
     while (rectsBeingDrawnCount--) {
 	CGRect r = NSRectToCGRect(*rectsBeingDrawn++);
-
 	r.origin.y = height - (r.origin.y + r.size.height);
 	HIShapeUnionWithRect(drawShape, &r);
     }
@@ -841,23 +841,26 @@ ExposeRestrictProc(
 			NSEventTrackingRunLoopMode, NSModalPanelRunLoopMode,
 			nil]];
     }
+   
     CFRelease(drawShape);
-    drawTime=-[beginTime timeIntervalSinceNow];
+  
 }
 
-/*At conclusion of resize event, send notification and set view for redraw if earlier drawing was skipped because of lagginess.*/
+/*
+ * As insurance against bugs that might cause layout glitches during a live
+ * resize, we redraw the window at the end of the resize operation.
+ */
+
 - (void)viewDidEndLiveResize
 {
-    if(drawTime>MAX_DYNAMIC_TIME) {
-    [self setNeedsDisplay:YES];
-    [super viewDidEndLiveResize];
-    }
+    HIRect bounds = NSRectToCGRect([self bounds]);
+    HIShapeRef shape = HIShapeCreateWithRect(&bounds);
+    [self generateExposeEvents: shape];
+
 }
 
--(void) viewWillDraw  {
-	[self setNeedsDisplay:YES];
-    } 
 
+/*Core function of this class, generates expose events for redrawing.*/
 - (void) generateExposeEvents: (HIMutableShapeRef) shape
 {
 
@@ -869,21 +872,23 @@ ExposeRestrictProc(
 		return;
     }
 
+
     HIShapeGetBounds(shape, &updateBounds);
     serial = LastKnownRequestProcessed(Tk_Display(winPtr));
     if (GenerateUpdates(shape, &updateBounds, winPtr) &&
 	![[NSRunLoop currentRunLoop] currentMode] &&
 	Tcl_GetServiceMode() != TCL_SERVICE_NONE) {
     	/*
-    	 * Ensure there are no pending idle-time redraws that could prevent the
-    	 * just posted Expose events from generating new redraws.
+    	 * Ensure there are no pending idle-time redraws that could
+         * prevent the just posted Expose events from generating
+         * new redraws.
     	 */
 
-    	while (Tcl_DoOneEvent(TCL_IDLE_EVENTS|TCL_DONT_WAIT)) {}
+	while (Tcl_DoOneEvent(TCL_IDLE_EVENTS|TCL_DONT_WAIT)) {}
 
     	/*
-    	 * For smoother drawing, process Expose events and resulting redraws
-    	 * immediately instead of at idle time.
+    	 * For smoother drawing, process Expose events and resulting
+         * redraws immediately instead of at idle time.
     	 */
 
     	ClientData oldArg;
@@ -891,15 +896,19 @@ ExposeRestrictProc(
 						     UINT2PTR(serial), &oldArg);
 
     	while (Tcl_ServiceEvent(TCL_WINDOW_EVENTS)) {}
- 
+
     	Tk_RestrictEvents(oldProc, oldArg, &oldArg);
+
     	while (Tcl_DoOneEvent(TCL_IDLE_EVENTS|TCL_DONT_WAIT)) {}
 
-    } 
-   
+    }
+
 }
 
-/*This is no-op on 10.7 and up because Apple has removed this widget, but leaving here for backwards compatibility.*/
+/*
+ * This is no-op on 10.7 and up because Apple has removed this widget,
+ * but we are leaving it here for backwards compatibility.
+ */
 - (void) tkToolbarButton: (id) sender
 {
 #ifdef TK_MAC_DEBUG_EVENTS
@@ -925,16 +934,6 @@ ExposeRestrictProc(
     event.same_screen = true;
     event.name = Tk_GetUid("ToolbarButton");
     Tk_QueueWindowEvent((XEvent *) &event, TCL_QUEUE_TAIL);
-}
-
-- (void) setFrameSize: (NSSize) newSize
-{
-    [super setFrameSize:newSize];
-}
-
-- (void) setNeedsDisplayInRect: (NSRect) invalidRect
-{
-    [super setNeedsDisplayInRect:invalidRect];
 }
 
 - (BOOL) isOpaque
@@ -968,7 +967,6 @@ ExposeRestrictProc(
 }
 
 @end
-
 
 /*
  * Local Variables:
