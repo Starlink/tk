@@ -1,9 +1,11 @@
 *.dSYM
 *.a
 *.dylib
+*.dylib.E
 *.o
 *.so
 *~
+.*.swp
 Makefile
 Makefile.in
 aclocal.m4
@@ -24,7 +26,9 @@ configure-output.log.err
 make.log
 make.log.err
 compile
-unix/Tk-Info.plist
-unix/Wish-Info.plist
-unix/libtk8.5.dylib.E
-unix/tk.pc
+/unix/Credits.html
+/unix/Tk-Info.plist
+/unix/Wish-Info.plist
+/unix/libtk8.5.dylib.E
+/unix/tk.pc
+/unix/tkUuid.h
