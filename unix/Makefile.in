@@ -565,6 +565,7 @@ PUBLIC_HDRS = $(GENERIC_DIR)/tk.h $(GENERIC_DIR)/tkDecls.h \
 # The private headers we want installed for install-private-headers
 PRIVATE_HDRS = $(GENERIC_DIR)/tkInt.h $(GENERIC_DIR)/tkIntDecls.h \
 	$(GENERIC_DIR)/tkIntPlatDecls.h $(GENERIC_DIR)/tkPort.h \
+	$(GENERIC_DIR)/tk3d.h $(GENERIC_DIR)/tkFont.h \
 	$(TTK_HDRS) $(@TK_WINDOWINGSYSTEM@_PRIVATE_HDRS)
 
 DEMOPROGS = browse hello ixset rmt rolodex square tcolor timer widget
@@ -767,7 +768,7 @@ install-binaries: $(TK_STUB_LIB_FILE) $(TK_LIB_FILE) ${WISH_EXE}
 	@$(INSTALL_DATA_DIR) "$(LIB_INSTALL_DIR)/pkgconfig"
 	@$(INSTALL_DATA) tk.pc "$(LIB_INSTALL_DIR)/pkgconfig/tk.pc"
 
-install-libraries: libraries
+install-libraries: libraries install-private-headers
 	@for i in "$(SCRIPT_INSTALL_DIR)" "$(SCRIPT_INSTALL_DIR)/images" \
 		"$(SCRIPT_INSTALL_DIR)/msgs" "$(SCRIPT_INSTALL_DIR)/ttk"; \
 	    do \
